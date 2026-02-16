@@ -1,0 +1,255 @@
+import { EditorState } from '../editor-state.js';
+import { colRowFromTileId } from '../../utils/tile-math.js';
+
+/**
+ * Tile inspector panel with WangId zone editor.
+ * Shows a zoomed tile preview, a 3x3 clickable grid for corner/edge painting,
+ * and the raw WangId array.
+ */
+export class InspectorPanel {
+  readonly element: HTMLDivElement;
+  private state: EditorState;
+  private image: HTMLImageElement;
+  private previewCanvas!: HTMLCanvasElement;
+  private gridContainer!: HTMLDivElement;
+  private wangIdDisplay!: HTMLDivElement;
+  private infoDisplay!: HTMLDivElement;
+
+  constructor(state: EditorState, image: HTMLImageElement) {
+    this.state = state;
+    this.image = image;
+
+    this.element = document.createElement('div');
+    this.buildUI();
+
+    this.state.on('selectedTileChanged', () => this.render());
+    this.state.on('activeColorChanged', () => this.render());
+    this.state.on('metadataChanged', () => this.render());
+    this.state.on('activeWangSetChanged', () => this.render());
+
+    this.render();
+  }
+
+  private buildUI(): void {
+    const header = document.createElement('h3');
+    header.textContent = 'Inspector';
+    header.style.cssText = 'margin: 0 0 8px 0; font-size: 13px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;';
+    this.element.appendChild(header);
+
+    // Info display
+    this.infoDisplay = document.createElement('div');
+    this.infoDisplay.style.cssText = 'margin-bottom: 8px; font-size: 12px; color: #888;';
+    this.element.appendChild(this.infoDisplay);
+
+    // Tile preview
+    this.previewCanvas = document.createElement('canvas');
+    this.previewCanvas.width = 128;
+    this.previewCanvas.height = 128;
+    this.previewCanvas.style.cssText = `
+      image-rendering: pixelated;
+      border: 1px solid #444;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      background: #111;
+    `;
+    this.element.appendChild(this.previewCanvas);
+
+    // 3x3 WangId grid label
+    const gridLabel = document.createElement('div');
+    gridLabel.textContent = 'WangId Zones';
+    gridLabel.style.cssText = 'font-size: 11px; color: #888; margin-bottom: 4px;';
+    this.element.appendChild(gridLabel);
+
+    // 3x3 grid
+    this.gridContainer = document.createElement('div');
+    this.gridContainer.style.cssText = `
+      display: grid;
+      grid-template-columns: repeat(3, 40px);
+      grid-template-rows: repeat(3, 40px);
+      gap: 2px;
+      margin-bottom: 12px;
+    `;
+    this.element.appendChild(this.gridContainer);
+
+    // WangId array display
+    const wangLabel = document.createElement('div');
+    wangLabel.textContent = 'WangId';
+    wangLabel.style.cssText = 'font-size: 11px; color: #888; margin-bottom: 4px;';
+    this.element.appendChild(wangLabel);
+
+    this.wangIdDisplay = document.createElement('div');
+    this.wangIdDisplay.style.cssText = `
+      font-family: monospace; font-size: 12px;
+      background: #111; padding: 6px 8px;
+      border-radius: 3px; border: 1px solid #333;
+      word-break: break-all;
+    `;
+    this.element.appendChild(this.wangIdDisplay);
+
+    // Action buttons
+    const actions = document.createElement('div');
+    actions.style.cssText = 'margin-top: 12px; display: flex; flex-direction: column; gap: 4px;';
+
+    const clearBtn = document.createElement('button');
+    clearBtn.textContent = 'Clear WangId';
+    clearBtn.style.cssText = `
+      background: #4a2020; color: #ccc; border: 1px solid #633;
+      padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;
+    `;
+    clearBtn.addEventListener('click', () => {
+      if (this.state.selectedTileId >= 0) {
+        this.state.removeWangTile(this.state.selectedTileId);
+      }
+    });
+    actions.appendChild(clearBtn);
+
+    this.element.appendChild(actions);
+  }
+
+  render(): void {
+    const tileId = this.state.selectedTileId;
+
+    if (tileId < 0) {
+      this.infoDisplay.textContent = 'No tile selected';
+      this.clearPreview();
+      this.clearGrid();
+      this.wangIdDisplay.textContent = '—';
+      return;
+    }
+
+    // Info
+    const [col, row] = colRowFromTileId(tileId, this.state.metadata.columns);
+    this.infoDisplay.textContent = `Tile ${tileId} (col ${col}, row ${row})`;
+
+    // Preview
+    this.drawPreview(tileId);
+
+    // Grid
+    this.drawGrid(tileId);
+
+    // WangId display
+    const wt = this.state.getWangTile(tileId);
+    this.wangIdDisplay.textContent = wt
+      ? `[${wt.wangid.join(', ')}]`
+      : 'Not tagged';
+  }
+
+  private drawPreview(tileId: number): void {
+    const ctx = this.previewCanvas.getContext('2d')!;
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, 128, 128);
+
+    const { tileWidth, tileHeight, columns } = this.state.metadata;
+    const [col, row] = colRowFromTileId(tileId, columns);
+
+    ctx.drawImage(
+      this.image,
+      col * tileWidth, row * tileHeight, tileWidth, tileHeight,
+      0, 0, 128, 128
+    );
+  }
+
+  private clearPreview(): void {
+    const ctx = this.previewCanvas.getContext('2d')!;
+    ctx.clearRect(0, 0, 128, 128);
+  }
+
+  private drawGrid(tileId: number): void {
+    // Clear grid
+    while (this.gridContainer.firstChild) {
+      this.gridContainer.removeChild(this.gridContainer.firstChild);
+    }
+
+    const ws = this.state.activeWangSet;
+    const wt = this.state.getWangTile(tileId);
+    const wangid = wt ? wt.wangid : [0, 0, 0, 0, 0, 0, 0, 0];
+    const type = ws?.type ?? 'corner';
+
+    // 3x3 grid mapping: position -> wangId index
+    // Layout:
+    //   TL(7)  T(0)   TR(1)
+    //   L(6)   center R(2)
+    //   BL(5)  B(4)   BR(3)
+    const gridMap: (number | null)[] = [
+      7, 0, 1,
+      6, null, 2,
+      5, 4, 3,
+    ];
+
+    for (let i = 0; i < 9; i++) {
+      const wangIdx = gridMap[i];
+      const cell = document.createElement('div');
+
+      if (wangIdx === null) {
+        // Center cell: show tile icon
+        cell.style.cssText = `
+          background: #222;
+          border: 1px solid #444;
+          border-radius: 3px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          color: #666;
+        `;
+        cell.textContent = 'tile';
+      } else {
+        const isCorner = wangIdx % 2 === 1;
+        const isEdge = wangIdx % 2 === 0;
+        const isActive = (type === 'corner' && isCorner)
+          || (type === 'edge' && isEdge)
+          || type === 'mixed';
+
+        const colorId = wangid[wangIdx];
+        const colorData = ws && colorId > 0 ? ws.colors[colorId - 1] : undefined;
+        const bgColor = colorData ? colorData.color : '#222';
+
+        cell.style.cssText = `
+          background: ${bgColor};
+          border: 1px solid ${isActive ? '#666' : '#333'};
+          border-radius: 3px;
+          cursor: ${isActive ? 'pointer' : 'default'};
+          opacity: ${isActive ? '1' : '0.3'};
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          color: rgba(255,255,255,0.7);
+          transition: border-color 0.1s;
+        `;
+        cell.textContent = colorId > 0 ? String(colorId) : '';
+
+        if (isActive) {
+          cell.addEventListener('click', () => {
+            this.paintZone(tileId, wangIdx);
+          });
+          cell.addEventListener('mouseenter', () => {
+            cell.style.borderColor = '#999';
+          });
+          cell.addEventListener('mouseleave', () => {
+            cell.style.borderColor = '#666';
+          });
+        }
+      }
+
+      this.gridContainer.appendChild(cell);
+    }
+  }
+
+  private clearGrid(): void {
+    while (this.gridContainer.firstChild) {
+      this.gridContainer.removeChild(this.gridContainer.firstChild);
+    }
+  }
+
+  private paintZone(tileId: number, wangIdx: number): void {
+    const wt = this.state.getWangTile(tileId);
+    const wangid = wt ? [...wt.wangid] : [0, 0, 0, 0, 0, 0, 0, 0];
+
+    const colorId = this.state.activeColorId;
+    // Toggle: if already this color, set to 0 (erase)
+    wangid[wangIdx] = wangid[wangIdx] === colorId ? 0 : colorId;
+
+    this.state.setWangId(tileId, wangid);
+  }
+}
