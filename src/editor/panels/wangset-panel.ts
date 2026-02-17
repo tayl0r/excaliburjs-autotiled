@@ -1,14 +1,20 @@
 import { EditorState } from '../editor-state.js';
+import { checkCompleteness } from '../completeness-checker.js';
+import type { WangSetData } from '../../core/metadata-schema.js';
 
 /**
  * WangSet and color management panel.
  * Shows the list of WangSets, their colors, and allows selecting the active color
  * for WangId zone painting in the inspector.
+ *
+ * Supports full CRUD for WangSets and WangColors, plus completeness status display.
  */
 export class WangSetPanel {
   readonly element: HTMLDivElement;
   private state: EditorState;
   private listContainer!: HTMLDivElement;
+  /** Track whether the completeness missing-list is expanded */
+  private missingExpanded = false;
 
   constructor(state: EditorState) {
     this.state = state;
@@ -23,7 +29,10 @@ export class WangSetPanel {
     this.listContainer = document.createElement('div');
     this.element.appendChild(this.listContainer);
 
-    this.state.on('activeWangSetChanged', () => this.render());
+    this.state.on('activeWangSetChanged', () => {
+      this.missingExpanded = false;
+      this.render();
+    });
     this.state.on('activeColorChanged', () => this.render());
     this.state.on('metadataChanged', () => this.render());
 
@@ -43,66 +52,124 @@ export class WangSetPanel {
       empty.textContent = 'No WangSets defined.';
       empty.style.cssText = 'color: #666; font-style: italic; padding: 8px 0;';
       this.listContainer.appendChild(empty);
-      return;
-    }
+    } else {
+      wangsets.forEach((ws, wsIndex) => {
+        const wsDiv = document.createElement('div');
+        wsDiv.style.cssText = `
+          margin-bottom: 12px;
+          background: ${wsIndex === this.state.activeWangSetIndex ? '#2a2a5a' : 'transparent'};
+          border-radius: 4px;
+          padding: 6px;
+        `;
 
-    wangsets.forEach((ws, wsIndex) => {
-      const wsDiv = document.createElement('div');
-      wsDiv.style.cssText = `
-        margin-bottom: 12px;
-        background: ${wsIndex === this.state.activeWangSetIndex ? '#2a2a5a' : 'transparent'};
-        border-radius: 4px;
-        padding: 6px;
-      `;
-
-      // WangSet header
-      const wsHeader = document.createElement('div');
-      wsHeader.style.cssText = `
-        display: flex; align-items: center; gap: 6px;
-        cursor: pointer; padding: 4px 0;
-        font-weight: ${wsIndex === this.state.activeWangSetIndex ? '600' : '400'};
-      `;
-      wsHeader.addEventListener('click', () => {
-        this.state.setActiveWangSet(wsIndex);
-      });
-
-      const wsName = document.createElement('span');
-      wsName.textContent = ws.name;
-      wsName.style.flex = '1';
-      wsHeader.appendChild(wsName);
-
-      const wsType = document.createElement('span');
-      wsType.textContent = ws.type;
-      wsType.style.cssText = 'font-size: 10px; color: #888; background: #333; padding: 1px 6px; border-radius: 3px;';
-      wsHeader.appendChild(wsType);
-
-      const tileCount = document.createElement('span');
-      tileCount.textContent = `${ws.wangtiles.length} tiles`;
-      tileCount.style.cssText = 'font-size: 10px; color: #888;';
-      wsHeader.appendChild(tileCount);
-
-      wsDiv.appendChild(wsHeader);
-
-      // Colors list (only show for active WangSet)
-      if (wsIndex === this.state.activeWangSetIndex) {
-        const colorsList = document.createElement('div');
-        colorsList.style.cssText = 'margin-top: 4px; padding-left: 4px;';
-
-        // Color 0 = "Erase" option
-        const eraseRow = this.createColorRow(0, 'Erase', '#333', '0');
-        colorsList.appendChild(eraseRow);
-
-        ws.colors.forEach((color, ci) => {
-          const colorId = ci + 1; // 1-based
-          const row = this.createColorRow(colorId, color.name, color.color, String(colorId));
-          colorsList.appendChild(row);
+        // WangSet header
+        const wsHeader = document.createElement('div');
+        wsHeader.style.cssText = `
+          display: flex; align-items: center; gap: 6px;
+          cursor: pointer; padding: 4px 0;
+          font-weight: ${wsIndex === this.state.activeWangSetIndex ? '600' : '400'};
+        `;
+        wsHeader.addEventListener('click', () => {
+          this.state.setActiveWangSet(wsIndex);
         });
 
-        wsDiv.appendChild(colorsList);
-      }
+        // WangSet name (supports inline rename on dblclick)
+        const wsName = document.createElement('span');
+        wsName.textContent = ws.name;
+        wsName.style.flex = '1';
+        wsName.addEventListener('dblclick', (e) => {
+          e.stopPropagation();
+          this.startInlineRenameWangSet(wsName, wsIndex);
+        });
+        wsHeader.appendChild(wsName);
 
-      this.listContainer.appendChild(wsDiv);
+        const wsType = document.createElement('span');
+        wsType.textContent = ws.type;
+        wsType.style.cssText = 'font-size: 10px; color: #888; background: #333; padding: 1px 6px; border-radius: 3px;';
+        wsHeader.appendChild(wsType);
+
+        const tileCount = document.createElement('span');
+        tileCount.textContent = `${ws.wangtiles.length} tiles`;
+        tileCount.style.cssText = 'font-size: 10px; color: #888;';
+        wsHeader.appendChild(tileCount);
+
+        // Delete WangSet button
+        const deleteWsBtn = document.createElement('button');
+        deleteWsBtn.textContent = '\u00d7';
+        deleteWsBtn.title = `Delete WangSet "${ws.name}"`;
+        deleteWsBtn.style.cssText = `
+          background: #333; color: #ccc; border: none; cursor: pointer;
+          font-size: 14px; line-height: 1; padding: 2px 6px;
+          border-radius: 3px;
+        `;
+        deleteWsBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (confirm(`Delete WangSet "${ws.name}"?`)) {
+            this.state.removeWangSet(wsIndex);
+          }
+        });
+        wsHeader.appendChild(deleteWsBtn);
+
+        wsDiv.appendChild(wsHeader);
+
+        // Colors list (only show for active WangSet)
+        if (wsIndex === this.state.activeWangSetIndex) {
+          const colorsList = document.createElement('div');
+          colorsList.style.cssText = 'margin-top: 4px; padding-left: 4px;';
+
+          // Color 0 = "Erase" option
+          const eraseRow = this.createColorRow(0, 'Erase', '#333', '0');
+          colorsList.appendChild(eraseRow);
+
+          ws.colors.forEach((color, ci) => {
+            const colorId = ci + 1; // 1-based
+            const row = this.createColorRow(colorId, color.name, color.color, String(colorId), ci);
+            colorsList.appendChild(row);
+          });
+
+          // "+ Add Color" button
+          const addColorBtn = document.createElement('button');
+          addColorBtn.textContent = '+ Add Color';
+          addColorBtn.style.cssText = `
+            background: #333; color: #ccc; border: 1px solid #555;
+            cursor: pointer; font-size: 11px; padding: 4px 10px;
+            border-radius: 3px; margin-top: 6px; width: 100%;
+          `;
+          addColorBtn.addEventListener('click', () => {
+            const n = ws.colors.length + 1;
+            const name = `Color ${n}`;
+            const hue = (ws.colors.length * 137) % 360; // golden-angle rotation
+            const hexColor = this.hslToHex(hue, 70, 50);
+            this.state.addColor(name, hexColor);
+          });
+          colorsList.appendChild(addColorBtn);
+
+          wsDiv.appendChild(colorsList);
+
+          // Completeness status display
+          if (ws.colors.length > 0) {
+            const completenessDiv = this.createCompletenessDisplay(ws);
+            wsDiv.appendChild(completenessDiv);
+          }
+        }
+
+        this.listContainer.appendChild(wsDiv);
+      });
+    }
+
+    // "+ New WangSet" button
+    const addWsBtn = document.createElement('button');
+    addWsBtn.textContent = '+ New WangSet';
+    addWsBtn.style.cssText = `
+      background: #333; color: #ccc; border: 1px solid #555;
+      cursor: pointer; font-size: 11px; padding: 4px 10px;
+      border-radius: 3px; margin-top: 8px; width: 100%;
+    `;
+    addWsBtn.addEventListener('click', () => {
+      const n = wangsets.length + 1;
+      this.state.addWangSet(`WangSet ${n}`, 'corner');
     });
+    this.listContainer.appendChild(addWsBtn);
 
     // Keyboard hint
     const hint = document.createElement('div');
@@ -111,7 +178,98 @@ export class WangSetPanel {
     this.listContainer.appendChild(hint);
   }
 
-  private createColorRow(colorId: number, name: string, hexColor: string, shortcut: string): HTMLDivElement {
+  /**
+   * Replace a WangSet name span with an inline text input for renaming.
+   */
+  private startInlineRenameWangSet(span: HTMLSpanElement, wsIndex: number): void {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = this.state.metadata.wangsets[wsIndex].name;
+    input.style.cssText = `
+      flex: 1; background: #1e1e3a; color: #e0e0e0; border: 1px solid #6666cc;
+      font-size: 12px; padding: 1px 4px; border-radius: 2px; outline: none;
+    `;
+
+    let committed = false;
+    const commit = () => {
+      if (committed) return;
+      committed = true;
+      const newName = input.value.trim();
+      if (newName && newName !== this.state.metadata.wangsets[wsIndex]?.name) {
+        this.state.renameWangSet(wsIndex, newName);
+      }
+      this.render();
+    };
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commit();
+      } else if (e.key === 'Escape') {
+        committed = true;
+        this.render();
+      }
+    });
+    input.addEventListener('blur', commit);
+
+    span.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  /**
+   * Replace a color name label with an inline text input for renaming.
+   */
+  private startInlineRenameColor(span: HTMLSpanElement, colorIndex: number): void {
+    const ws = this.state.activeWangSet;
+    if (!ws) return;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = ws.colors[colorIndex].name;
+    input.style.cssText = `
+      flex: 1; background: #1e1e3a; color: #e0e0e0; border: 1px solid #6666cc;
+      font-size: 12px; padding: 1px 4px; border-radius: 2px; outline: none;
+    `;
+
+    let committed = false;
+    const commit = () => {
+      if (committed) return;
+      committed = true;
+      const newName = input.value.trim();
+      if (newName && newName !== ws.colors[colorIndex]?.name) {
+        this.state.updateColor(colorIndex, { name: newName });
+      }
+      this.render();
+    };
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commit();
+      } else if (e.key === 'Escape') {
+        committed = true;
+        this.render();
+      }
+    });
+    input.addEventListener('blur', commit);
+
+    span.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  /**
+   * Create a color row. When colorIndex is provided (for real colors, not erase),
+   * enables inline rename, color picker, and delete.
+   */
+  private createColorRow(
+    colorId: number,
+    name: string,
+    hexColor: string,
+    shortcut: string,
+    colorIndex?: number,
+  ): HTMLDivElement {
     const row = document.createElement('div');
     const isActive = colorId === this.state.activeColorId;
     row.style.cssText = `
@@ -125,6 +283,7 @@ export class WangSetPanel {
       this.state.setActiveColor(colorId);
     });
 
+    // Color swatch — clickable to open a color picker for real colors
     const swatch = document.createElement('div');
     swatch.style.cssText = `
       width: 14px; height: 14px; border-radius: 2px;
@@ -132,13 +291,44 @@ export class WangSetPanel {
       border: 1px solid rgba(255,255,255,0.3);
       flex-shrink: 0;
     `;
+
+    if (colorIndex !== undefined) {
+      // Make swatch open a hidden color picker on click
+      swatch.style.cursor = 'pointer';
+      swatch.title = 'Click to change color';
+      swatch.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const picker = document.createElement('input');
+        picker.type = 'color';
+        picker.value = hexColor;
+        picker.style.cssText = 'position: absolute; opacity: 0; pointer-events: none;';
+        swatch.appendChild(picker);
+        picker.addEventListener('input', () => {
+          swatch.style.background = picker.value;
+          this.state.updateColor(colorIndex, { color: picker.value });
+        });
+        const removePicker = () => { if (picker.parentNode) picker.remove(); };
+        picker.addEventListener('change', removePicker);
+        picker.addEventListener('blur', removePicker);
+        picker.click();
+      });
+    }
     row.appendChild(swatch);
 
+    // Name label (supports inline rename for real colors on dblclick)
     const label = document.createElement('span');
     label.textContent = name;
     label.style.cssText = 'flex: 1; font-size: 12px;';
+
+    if (colorIndex !== undefined) {
+      label.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        this.startInlineRenameColor(label, colorIndex);
+      });
+    }
     row.appendChild(label);
 
+    // Keyboard shortcut badge
     const key = document.createElement('span');
     key.textContent = shortcut;
     key.style.cssText = `
@@ -148,6 +338,116 @@ export class WangSetPanel {
     `;
     row.appendChild(key);
 
+    // Delete button for real colors
+    if (colorIndex !== undefined) {
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = '\u00d7';
+      deleteBtn.title = `Delete color "${name}"`;
+      deleteBtn.style.cssText = `
+        background: #333; color: #ccc; border: none; cursor: pointer;
+        font-size: 12px; line-height: 1; padding: 1px 5px;
+        border-radius: 3px;
+      `;
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (confirm(`Delete color "${name}"? This clears it from all tagged tiles.`)) {
+          this.state.removeColor(colorIndex);
+        }
+      });
+      row.appendChild(deleteBtn);
+    }
+
     return row;
+  }
+
+  /**
+   * Create the completeness status display for a WangSet.
+   * Shows matched/total count and an expandable list of missing combinations.
+   */
+  private createCompletenessDisplay(ws: WangSetData): HTMLDivElement {
+    const result = checkCompleteness(ws);
+    const container = document.createElement('div');
+    container.style.cssText = 'margin-top: 8px; padding: 4px 6px;';
+
+    const isComplete = result.matched === result.total;
+    const hasMissing = result.missing.length > 0;
+
+    // Status line
+    const statusLine = document.createElement('div');
+    statusLine.style.cssText = `
+      font-size: 11px; cursor: ${hasMissing ? 'pointer' : 'default'};
+      user-select: none;
+    `;
+
+    if (isComplete) {
+      statusLine.style.color = '#4caf50';
+      statusLine.textContent = `${result.matched}/${result.total} complete`;
+    } else {
+      statusLine.style.color = '#ff9800';
+      const missingCount = result.total - result.matched;
+      statusLine.textContent = `${result.matched}/${result.total} \u2014 ${missingCount} missing`;
+      if (hasMissing) {
+        statusLine.textContent += ' (click to expand)';
+      }
+    }
+
+    if (hasMissing) {
+      statusLine.addEventListener('click', () => {
+        this.missingExpanded = !this.missingExpanded;
+        this.render();
+      });
+    }
+
+    container.appendChild(statusLine);
+
+    // Expandable missing list
+    if (hasMissing && this.missingExpanded) {
+      const detailPanel = document.createElement('div');
+      detailPanel.style.cssText = `
+        margin-top: 4px; padding: 4px 6px;
+        background: #1e1e3a; border-radius: 3px;
+        max-height: 200px; overflow-y: auto;
+        font-size: 11px; color: #e0e0e0;
+      `;
+
+      for (const mc of result.missing) {
+        const [tl, tr, br, bl] = mc.corners;
+        const entry = document.createElement('div');
+        entry.style.cssText = 'padding: 1px 0; color: #ccc;';
+        const tlName = this.colorIdToName(ws, tl);
+        const trName = this.colorIdToName(ws, tr);
+        const brName = this.colorIdToName(ws, br);
+        const blName = this.colorIdToName(ws, bl);
+        entry.textContent = `TL=${tlName}, TR=${trName}, BR=${brName}, BL=${blName}`;
+        detailPanel.appendChild(entry);
+      }
+
+      container.appendChild(detailPanel);
+    }
+
+    return container;
+  }
+
+  /**
+   * Convert a 1-based color ID to a human-readable name.
+   */
+  private colorIdToName(ws: WangSetData, colorId: number): string {
+    const color = ws.colors[colorId - 1];
+    return color ? color.name : `Color ${colorId}`;
+  }
+
+  /**
+   * Convert HSL values to a hex color string.
+   */
+  private hslToHex(h: number, s: number, l: number): string {
+    const sNorm = s / 100;
+    const lNorm = l / 100;
+    const a = sNorm * Math.min(lNorm, 1 - lNorm);
+    const f = (n: number) => {
+      const k = (n + h / 30) % 12;
+      const color = lNorm - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+      return Math.round(255 * color).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
   }
 }
