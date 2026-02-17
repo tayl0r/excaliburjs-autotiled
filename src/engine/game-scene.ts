@@ -140,6 +140,27 @@ export class GameScene extends ex.Scene {
     });
   }
 
+  /** Reload WangSet data from updated metadata and re-resolve all tiles */
+  reloadMetadata(metadata: import('../core/metadata-schema.js').TilesetMetadata): void {
+    this.tilesetManager.reload(metadata);
+    const wangSet = this.tilesetManager.primaryWangSet;
+    if (!wangSet) return;
+    this.autotileTilemap.updateWangSet(wangSet);
+
+    const totalTiles = metadata.wangsets.reduce((s, ws) => s + ws.wangtiles.length, 0);
+    const totalColors = metadata.wangsets.reduce((s, ws) => s + ws.colors.length, 0);
+    console.log(
+      `[metadata] Reloaded terrain.autotile.json:`,
+      `${metadata.wangsets.length} WangSet(s),`,
+      `${totalColors} colors,`,
+      `${totalTiles} tagged tiles`
+    );
+
+    // Rebuild HUD with potentially updated colors
+    this.hud?.remove();
+    this.createHUD(wangSet);
+  }
+
   onPreUpdate(_engine: ex.Engine, delta: number): void {
     this.autotileTilemap?.updateAnimations(delta);
   }

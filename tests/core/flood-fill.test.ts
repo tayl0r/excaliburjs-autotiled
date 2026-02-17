@@ -69,13 +69,20 @@ function initMap(map: SimpleAutotileMap, ws: WangSet, color: number): void {
 }
 
 describe('floodFillTerrain', () => {
-  it('fill same color → no-op', () => {
+  it('fill same color → re-resolves tiles', () => {
     const ws = createGrassDirtWangSet();
     const map = new SimpleAutotileMap(5, 5, 1);
     initMap(map, ws, 1);
 
     const affected = floodFillTerrain(map, ws, 2, 2, 1);
-    expect(affected).toEqual([]);
+    // Same-color fill still runs the autotiler to re-randomize tiles
+    expect(affected.length).toBeGreaterThan(0);
+    // All cells should still be color 1
+    for (let y = 0; y < 5; y++) {
+      for (let x = 0; x < 5; x++) {
+        expect(map.colorAt(x, y)).toBe(1);
+      }
+    }
   });
 
   it('fill empty cell (color 0) → no-op', () => {

@@ -64,16 +64,31 @@ export class InspectorPanel {
     gridLabel.style.cssText = 'font-size: 11px; color: #888; margin-bottom: 4px;';
     this.element.appendChild(gridLabel);
 
-    // 3x3 grid
+    // 3x3 grid + fill button row
+    const gridRow = document.createElement('div');
+    gridRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 12px;';
+
     this.gridContainer = document.createElement('div');
     this.gridContainer.style.cssText = `
       display: grid;
       grid-template-columns: repeat(3, 40px);
       grid-template-rows: repeat(3, 40px);
       gap: 2px;
-      margin-bottom: 12px;
     `;
-    this.element.appendChild(this.gridContainer);
+    gridRow.appendChild(this.gridContainer);
+
+    const fillBtn = document.createElement('button');
+    fillBtn.textContent = 'Fill';
+    fillBtn.title = 'Set all zones to active color';
+    fillBtn.style.cssText = `
+      background: #2a2a3a; color: #aaa; border: 1px solid #555;
+      padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;
+      align-self: center;
+    `;
+    fillBtn.addEventListener('click', () => this.paintAllZones());
+    gridRow.appendChild(fillBtn);
+
+    this.element.appendChild(gridRow);
 
     // WangId array display
     const wangLabel = document.createElement('div');
@@ -379,7 +394,7 @@ export class InspectorPanel {
     this.probabilityContainer.appendChild(label);
 
     const badge = document.createElement('span');
-    badge.textContent = `P:${parseFloat(prob.toFixed(2))}`;
+    badge.textContent = `P:${+prob.toPrecision(4)}`;
     badge.style.cssText = `
       font-size: 10px; color: ${isDefault ? '#888' : '#eeb300'};
       background: #2a2a2a; padding: 0 4px;
@@ -433,6 +448,40 @@ export class InspectorPanel {
     badge.replaceWith(input);
     input.focus();
     input.select();
+  }
+
+  private paintAllZones(): void {
+    const tileId = this.state.selectedTileId;
+    if (tileId < 0) return;
+    const ws = this.state.activeWangSet;
+    if (!ws) return;
+
+    const type = ws.type;
+    const colorId = this.state.activeColorId;
+
+    const fillWangid = (base: number[]): number[] => {
+      const wangid = [...base];
+      for (let i = 0; i < 8; i++) {
+        const isCorner = i % 2 === 1;
+        const isEdge = i % 2 === 0;
+        if ((type === 'corner' && isCorner) || (type === 'edge' && isEdge) || type === 'mixed') {
+          wangid[i] = colorId;
+        }
+      }
+      return wangid;
+    };
+
+    if (this.state.selectedTileIds.size > 1) {
+      const entries: Array<{ tileId: number; wangid: number[] }> = [];
+      for (const selId of this.state.selectedTileIds) {
+        const selWt = this.state.getWangTile(selId);
+        entries.push({ tileId: selId, wangid: fillWangid(selWt ? selWt.wangid : [0, 0, 0, 0, 0, 0, 0, 0]) });
+      }
+      this.state.setWangIdMulti(entries);
+    } else {
+      const wt = this.state.getWangTile(tileId);
+      this.state.setWangId(tileId, fillWangid(wt ? wt.wangid : [0, 0, 0, 0, 0, 0, 0, 0]));
+    }
   }
 
   private paintZone(tileId: number, wangIdx: number): void {

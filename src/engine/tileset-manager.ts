@@ -49,6 +49,24 @@ export class TilesetManager {
     }
   }
 
+  /** Reload WangSets from updated metadata */
+  reload(metadata: TilesetMetadata): void {
+    this.metadataJson = metadata;
+    this.metadata = metadata;
+
+    const { wangSets, transformations } = loadMetadata(metadata);
+    this.wangSets = wangSets;
+
+    for (const ws of this.wangSets) {
+      const variants = generateAllVariants(ws, transformations);
+      ws.setVariants(variants);
+
+      const { distances, nextHop } = computeColorDistances(ws);
+      ws.setDistanceMatrix(distances);
+      ws.setNextHopMatrix(nextHop);
+    }
+  }
+
   /** Get the first WangSet (convenience for single-set usage) */
   get primaryWangSet(): WangSet | undefined {
     return this.wangSets[0];

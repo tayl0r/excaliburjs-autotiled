@@ -111,6 +111,12 @@ export class TilesetPanel {
           return;
         }
 
+        // Cmd/Ctrl-click to toggle individual tiles in selection
+        if (e.metaKey || e.ctrlKey) {
+          this.state.toggleTileSelection(tileId);
+          return;
+        }
+
         this.state.selectTile(tileId);
       }
     });

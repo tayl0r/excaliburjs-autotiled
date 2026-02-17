@@ -24,7 +24,7 @@ export function floodFillTerrain(
   if (!map.inBounds(startX, startY)) return [];
 
   const oldColor = map.colorAt(startX, startY);
-  if (oldColor === newColor || oldColor === 0) return [];
+  if (oldColor === 0) return [];
 
   // 1. BFS to find all connected cells with oldColor (4-directional)
   const filled: Array<[number, number]> = [];

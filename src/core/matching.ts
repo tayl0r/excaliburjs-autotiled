@@ -95,7 +95,7 @@ export function findBestMatch(
     }
 
     if (totalPenalty === lowestPenalty) {
-      const probability = wangSet.wangIdProbability(wangId);
+      const probability = wangSet.wangIdProbability(wangId) * wangSet.tileProbability(cell.tileId);
       candidates.add(cell, probability);
     }
   }

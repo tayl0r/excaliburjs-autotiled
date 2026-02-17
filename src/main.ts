@@ -42,6 +42,11 @@ game.start('game', { loader }).then(() => {
     terrainImage.image
   );
 
+  // Reload game scene when editor closes
+  editor.onHide(() => {
+    gameScene.reloadMetadata(editor.getMetadata());
+  });
+
   // Toggle editor with 'T' key or Escape to close
   document.addEventListener('keydown', (e) => {
     if (e.key === 't' || e.key === 'T') {

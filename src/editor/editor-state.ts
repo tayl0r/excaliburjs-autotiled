@@ -126,6 +126,22 @@ export class EditorState {
     this.emit('selectedTileChanged');
   }
 
+  /** Toggle a tile in/out of the current selection (for Cmd/Ctrl-click) */
+  toggleTileSelection(tileId: number): void {
+    if (this._selectedTileIds.has(tileId)) {
+      this._selectedTileIds.delete(tileId);
+      if (this._selectedTileId === tileId) {
+        // Pick another selected tile as primary, or -1 if none left
+        const next = this._selectedTileIds.values().next();
+        this._selectedTileId = next.done ? -1 : next.value;
+      }
+    } else {
+      this._selectedTileIds.add(tileId);
+      this._selectedTileId = tileId;
+    }
+    this.emit('selectedTileChanged');
+  }
+
   /** Set the tile filter mode */
   setTileFilter(filter: TileFilter): void {
     if (this._tileFilter === filter) return;

@@ -26,6 +26,7 @@ export class TileEditor {
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private saveIndicator: HTMLDivElement;
   private filename: string;
+  private _onHide?: () => void;
 
   constructor(metadata: TilesetMetadata, image: HTMLImageElement) {
     this.state = new EditorState(metadata);
@@ -132,9 +133,12 @@ export class TileEditor {
   }
 
   toggle(): void {
+    const wasActive = this.overlay.isActive;
     this.overlay.toggle();
     if (this.overlay.isActive) {
       this.tilesetPanel.render();
+    } else if (wasActive) {
+      this._onHide?.();
     }
   }
 
@@ -144,7 +148,13 @@ export class TileEditor {
   }
 
   hide(): void {
+    const wasActive = this.overlay.isActive;
     this.overlay.hide();
+    if (wasActive) this._onHide?.();
+  }
+
+  onHide(callback: () => void): void {
+    this._onHide = callback;
   }
 
   setActiveColor(colorId: number): void {

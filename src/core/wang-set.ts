@@ -16,6 +16,8 @@ export class WangSet {
   colors: WangColor[];
   /** tileId -> WangId mapping (base tiles only, no transforms) */
   private tileMapping: Map<number, WangId> = new Map();
+  /** tileId -> probability weight (default 1.0) */
+  private tileProbabilities: Map<number, number> = new Map();
   /** Pre-computed variants (base + transforms). Call recomputeVariants() after changing tiles. */
   private variants: WangVariant[] = [];
   /** Color distance matrix [colorA][colorB]. -1 = no path. */
@@ -40,13 +42,17 @@ export class WangSet {
   }
 
   /** Add or update a tile -> WangId mapping */
-  addTileMapping(tileId: number, wangId: WangId): void {
+  addTileMapping(tileId: number, wangId: WangId, probability?: number): void {
     this.tileMapping.set(tileId, wangId);
+    if (probability !== undefined) {
+      this.tileProbabilities.set(tileId, probability);
+    }
   }
 
   /** Remove a tile mapping */
   removeTileMapping(tileId: number): void {
     this.tileMapping.delete(tileId);
+    this.tileProbabilities.delete(tileId);
   }
 
   /** Get all base tile mappings */
@@ -123,6 +129,11 @@ export class WangSet {
       }
     }
     return prob;
+  }
+
+  /** Get the probability weight for a tile (default 1.0) */
+  tileProbability(tileId: number): number {
+    return this.tileProbabilities.get(tileId) ?? 1.0;
   }
 
   /** Get a color by its 1-based ID */

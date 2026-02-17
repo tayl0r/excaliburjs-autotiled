@@ -80,6 +80,24 @@ export class AutotileTilemap {
     }
   }
 
+  /** Swap the WangSet and re-resolve all tiles from their painted colors */
+  updateWangSet(wangSet: WangSet): void {
+    this.wangSet = wangSet;
+    for (let y = 0; y < this.autoMap.height; y++) {
+      for (let x = 0; x < this.autoMap.width; x++) {
+        const color = this.autoMap.colorAt(x, y);
+        if (color > 0) {
+          applyTerrainPaint(this.autoMap, this.wangSet, x, y, color);
+        }
+      }
+    }
+    for (let y = 0; y < this.autoMap.height; y++) {
+      for (let x = 0; x < this.autoMap.width; x++) {
+        this.refreshTile(x, y);
+      }
+    }
+  }
+
   /** Fill terrain at (x, y) with flood fill and refresh affected tiles */
   fillTerrain(x: number, y: number, colorId: number): void {
     const affected = floodFillTerrain(this.autoMap, this.wangSet, x, y, colorId);

@@ -34,7 +34,7 @@ function loadWangSet(data: WangSetData): WangSet {
     if (wt.wangid.length !== 8) {
       throw new Error(`WangId for tile ${wt.tileid} must have exactly 8 elements, got ${wt.wangid.length}`);
     }
-    ws.addTileMapping(wt.tileid, WangId.fromArray(wt.wangid));
+    ws.addTileMapping(wt.tileid, WangId.fromArray(wt.wangid), wt.probability);
   }
 
   return ws;
