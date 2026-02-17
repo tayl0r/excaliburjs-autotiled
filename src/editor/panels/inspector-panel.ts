@@ -100,7 +100,11 @@ export class InspectorPanel {
       padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;
     `;
     clearBtn.addEventListener('click', () => {
-      if (this.state.selectedTileId >= 0) {
+      if (this.state.selectedTileIds.size > 1) {
+        for (const tileId of this.state.selectedTileIds) {
+          this.state.removeWangTile(tileId);
+        }
+      } else if (this.state.selectedTileId >= 0) {
         this.state.removeWangTile(this.state.selectedTileId);
       }
     });

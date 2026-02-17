@@ -66,15 +66,15 @@ export class RegionAssignPanel {
       return;
     }
 
-    // Color A select
-    const colorARow = this.createColorSelect('Color A:', 1, ws);
+    // Color A/B selects — default to the currently active color
+    const activeColor = this.state.activeColorId;
+    const colorARow = this.createColorSelect('Color A:', activeColor >= 1 ? activeColor : 1, ws);
     this.element.appendChild(colorARow);
 
-    // Color B select
-    const colorBRow = this.createColorSelect('Color B:', 2, ws);
+    const colorBRow = this.createColorSelect('Color B:', activeColor >= 1 ? activeColor : 2, ws);
     this.element.appendChild(colorBRow);
 
-    // Pattern select
+    // Pattern select — all patterns shown, non-matching ones disabled
     const patternRow = document.createElement('div');
     patternRow.style.cssText = 'display: flex; gap: 6px; align-items: center; margin-bottom: 8px;';
     const patternLabel = document.createElement('span');
@@ -84,19 +84,28 @@ export class RegionAssignPanel {
 
     const patternSelect = document.createElement('select');
     patternSelect.style.cssText = 'background: #1e1e3a; color: #e0e0e0; border: 1px solid #555; font-size: 11px; padding: 2px 4px; border-radius: 3px; flex: 1;';
+    let firstMatch = true;
     for (const pattern of ALL_PATTERNS) {
+      const matches = pattern.width === regionW && pattern.height === regionH;
       const opt = document.createElement('option');
       opt.value = pattern.name;
       opt.textContent = `${pattern.name} (${pattern.width}\u00D7${pattern.height})`;
+      opt.disabled = !matches;
+      if (matches && firstMatch) {
+        opt.selected = true;
+        firstMatch = false;
+      }
       patternSelect.appendChild(opt);
     }
     patternRow.appendChild(patternSelect);
     this.element.appendChild(patternRow);
 
     // Apply button
+    const hasMatch = ALL_PATTERNS.some(p => p.width === regionW && p.height === regionH);
     const applyBtn = document.createElement('button');
     applyBtn.textContent = 'Apply Pattern';
-    applyBtn.style.cssText = 'background: #333; color: #ccc; border: 1px solid #555; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; width: 100%;';
+    applyBtn.disabled = !hasMatch;
+    applyBtn.style.cssText = `background: #333; color: ${hasMatch ? '#ccc' : '#666'}; border: 1px solid #555; padding: 6px 12px; border-radius: 3px; cursor: ${hasMatch ? 'pointer' : 'not-allowed'}; font-size: 12px; width: 100%;`;
     applyBtn.addEventListener('click', () => {
       const colorASelect = this.element.querySelector('[data-role="colorA"]') as HTMLSelectElement;
       const colorBSelect = this.element.querySelector('[data-role="colorB"]') as HTMLSelectElement;
@@ -104,7 +113,8 @@ export class RegionAssignPanel {
       const colorB = parseInt(colorBSelect?.value ?? '2', 10);
 
       const patternName = patternSelect.value;
-      const pattern = ALL_PATTERNS.find(p => p.name === patternName) ?? ALL_PATTERNS[0];
+      const pattern = ALL_PATTERNS.find(p => p.name === patternName);
+      if (!pattern) return;
 
       // Origin = top-left of selection
       const originTileId = minRow * columns + minCol;

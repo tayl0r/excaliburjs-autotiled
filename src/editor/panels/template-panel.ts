@@ -89,12 +89,6 @@ export class TemplatePanel {
     const buttonContainer = document.createElement('div');
     buttonContainer.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
 
-    const autoFillBtn = document.createElement('button');
-    autoFillBtn.textContent = 'Auto-fill from selected tile';
-    autoFillBtn.style.cssText = this.buttonStyle();
-    autoFillBtn.addEventListener('click', () => this.autoFill());
-    buttonContainer.appendChild(autoFillBtn);
-
     const clearAllBtn = document.createElement('button');
     clearAllBtn.textContent = 'Clear All';
     clearAllBtn.style.cssText = `
@@ -275,30 +269,6 @@ export class TemplatePanel {
   }
 
   /**
-   * Auto-fill: read selectedTileId as origin, compute 16 tile IDs in a 4x4 block,
-   * and assign each with the appropriate WangId for its template slot.
-   */
-  private autoFill(): void {
-    const origin = this.state.selectedTileId;
-    if (origin < 0) return;
-
-    const { columns, tileCount } = this.state.metadata;
-    const [originCol] = colRowFromTileId(origin, columns);
-    if (originCol + 4 > columns) return; // Would wrap rows
-
-    for (let slotIndex = 0; slotIndex < 16; slotIndex++) {
-      const row = Math.floor(slotIndex / 4);
-      const col = slotIndex % 4;
-      const tileId = origin + row * columns + col;
-
-      if (tileId >= 0 && tileId < tileCount) {
-        const wangid = templateSlotWangId(slotIndex, this.state.templateColorA, this.state.templateColorB);
-        this.state.setWangId(tileId, wangid);
-      }
-    }
-  }
-
-  /**
    * Clear all 16 tile assignments from the active WangSet.
    */
   private clearAll(): void {
@@ -316,10 +286,4 @@ export class TemplatePanel {
     `;
   }
 
-  private buttonStyle(): string {
-    return `
-      background: #333; color: #ccc; border: 1px solid #555;
-      padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;
-    `;
-  }
 }
