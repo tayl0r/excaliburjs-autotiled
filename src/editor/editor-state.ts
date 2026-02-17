@@ -253,6 +253,64 @@ export class EditorState {
     }
   }
 
+  /** Set probability for a tile in the active WangSet. No-op if tile not tagged. */
+  setTileProbability(tileId: number, probability: number): void {
+    const ws = this.activeWangSet;
+    if (!ws) return;
+    const wt = ws.wangtiles.find(w => w.tileid === tileId);
+    if (!wt) return;
+    this.saveSnapshot();
+    wt.probability = probability;
+    this.emit('metadataChanged');
+  }
+
+  /** Set WangIds for multiple tiles in a single undo snapshot */
+  setWangIdMulti(entries: Array<{ tileId: number; wangid: number[] }>): void {
+    const ws = this.activeWangSet;
+    if (!ws || entries.length === 0) return;
+    this.saveSnapshot();
+    for (const { tileId, wangid } of entries) {
+      const existing = ws.wangtiles.find(wt => wt.tileid === tileId);
+      if (existing) {
+        existing.wangid = [...wangid];
+      } else {
+        ws.wangtiles.push({ tileid: tileId, wangid: [...wangid] });
+      }
+    }
+    this.emit('metadataChanged');
+  }
+
+  /** Set probability for multiple tiles in a single undo snapshot */
+  setTileProbabilityMulti(tileIds: number[], probability: number): void {
+    const ws = this.activeWangSet;
+    if (!ws || tileIds.length === 0) return;
+    const targets = tileIds
+      .map(id => ws.wangtiles.find(wt => wt.tileid === id))
+      .filter((wt): wt is WangTileData => wt !== undefined);
+    if (targets.length === 0) return;
+    this.saveSnapshot();
+    for (const wt of targets) {
+      wt.probability = probability;
+    }
+    this.emit('metadataChanged');
+  }
+
+  /** Remove wangtile entries for multiple tiles in a single undo snapshot */
+  removeWangTileMulti(tileIds: number[]): void {
+    const ws = this.activeWangSet;
+    if (!ws || tileIds.length === 0) return;
+    const indices = tileIds
+      .map(id => ws.wangtiles.findIndex(wt => wt.tileid === id))
+      .filter(idx => idx >= 0)
+      .sort((a, b) => b - a);
+    if (indices.length === 0) return;
+    this.saveSnapshot();
+    for (const idx of indices) {
+      ws.wangtiles.splice(idx, 1);
+    }
+    this.emit('metadataChanged');
+  }
+
   /** Add a new WangSet and select it */
   addWangSet(name: string, type: 'corner' | 'edge' | 'mixed'): void {
     this.saveSnapshot();
