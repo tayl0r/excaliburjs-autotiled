@@ -5,6 +5,7 @@ import { TilesetPanel } from './panels/tileset-panel.js';
 import { WangSetPanel } from './panels/wangset-panel.js';
 import { InspectorPanel } from './panels/inspector-panel.js';
 import { TemplatePanel } from './panels/template-panel.js';
+import { AnimationPanel } from './panels/animation-panel.js';
 
 /**
  * Top-level editor controller. Creates and wires all editor components.
@@ -17,6 +18,7 @@ export class TileEditor {
   private wangSetPanel: WangSetPanel;
   private inspectorPanel: InspectorPanel;
   private templatePanel: TemplatePanel;
+  private animationPanel: AnimationPanel;
   private inspectorTab!: HTMLButtonElement;
   private templateTab!: HTMLButtonElement;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -33,7 +35,10 @@ export class TileEditor {
     this.inspectorPanel = new InspectorPanel(this.state, image);
     this.templatePanel = new TemplatePanel(this.state, image);
 
+    this.animationPanel = new AnimationPanel(this.state);
+
     this.overlay.mountLeft(this.wangSetPanel.element);
+    this.overlay.mountLeft(this.animationPanel.element);
     this.overlay.mountCenter(this.tilesetPanel.element);
 
     // Right panel: tab bar + Inspector/Template panels
