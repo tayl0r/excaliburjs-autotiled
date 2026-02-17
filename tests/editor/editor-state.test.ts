@@ -67,3 +67,69 @@ describe('EditorState WangSet CRUD', () => {
     expect(count).toBe(3);
   });
 });
+
+describe('EditorState WangColor CRUD', () => {
+  function stateWithWangSet(): EditorState {
+    const state = new EditorState(makeMetadata());
+    state.addWangSet('Test', 'corner');
+    return state;
+  }
+
+  it('addColor appends a new color to the active WangSet', () => {
+    const state = stateWithWangSet();
+    state.addColor('Grass', '#00ff00');
+    const colors = state.activeWangSet!.colors;
+    expect(colors).toHaveLength(1);
+    expect(colors[0].name).toBe('Grass');
+    expect(colors[0].color).toBe('#00ff00');
+    expect(colors[0].probability).toBe(1.0);
+    expect(colors[0].tile).toBe(-1);
+  });
+
+  it('updateColor changes properties', () => {
+    const state = stateWithWangSet();
+    state.addColor('Grass', '#00ff00');
+    state.updateColor(0, { name: 'DarkGrass', color: '#006600' });
+    const c = state.activeWangSet!.colors[0];
+    expect(c.name).toBe('DarkGrass');
+    expect(c.color).toBe('#006600');
+    expect(c.probability).toBe(1.0); // unchanged
+  });
+
+  it('removeColor removes and shifts wangid references', () => {
+    const state = stateWithWangSet();
+    state.addColor('Grass', '#00ff00');  // id 1
+    state.addColor('Dirt', '#884400');   // id 2
+    state.addColor('Sand', '#ffee00');   // id 3
+
+    // Tag a tile: corners = [0, 2, 0, 3, 0, 1, 0, 2]
+    state.setWangId(0, [0, 2, 0, 3, 0, 1, 0, 2]);
+
+    // Remove Grass (color index 0, id 1) — Dirt becomes id 1, Sand becomes id 2
+    state.removeColor(0);
+
+    expect(state.activeWangSet!.colors).toHaveLength(2);
+    expect(state.activeWangSet!.colors[0].name).toBe('Dirt');
+
+    // WangId references should be shifted: old 2->1, old 3->2, old 1->0
+    const wt = state.getWangTile(0);
+    expect(wt!.wangid).toEqual([0, 1, 0, 2, 0, 0, 0, 1]);
+  });
+
+  it('removeColor with no wangtiles does not crash', () => {
+    const state = stateWithWangSet();
+    state.addColor('Grass', '#00ff00');
+    state.removeColor(0);
+    expect(state.activeWangSet!.colors).toHaveLength(0);
+  });
+
+  it('emits metadataChanged on color operations', () => {
+    const state = stateWithWangSet();
+    let count = 0;
+    state.on('metadataChanged', () => count++);
+    state.addColor('A', '#000');   // +1
+    state.updateColor(0, { name: 'B' }); // +1
+    state.removeColor(0);          // +1
+    expect(count).toBe(3);
+  });
+});

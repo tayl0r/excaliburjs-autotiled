@@ -146,6 +146,50 @@ export class EditorState {
     this.emit('metadataChanged');
   }
 
+  /** Add a new color to the active WangSet */
+  addColor(name: string, color: string): void {
+    const ws = this.activeWangSet;
+    if (!ws) return;
+    ws.colors.push({ name, color, probability: 1.0, tile: -1 });
+    this.emit('metadataChanged');
+  }
+
+  /** Update properties of a color in the active WangSet */
+  updateColor(colorIndex: number, updates: Partial<{ name: string; color: string; probability: number; tile: number }>): void {
+    const ws = this.activeWangSet;
+    if (!ws || !ws.colors[colorIndex]) return;
+    Object.assign(ws.colors[colorIndex], updates);
+    this.emit('metadataChanged');
+  }
+
+  /** Remove a color from the active WangSet and shift wangid references */
+  removeColor(colorIndex: number): void {
+    const ws = this.activeWangSet;
+    if (!ws || !ws.colors[colorIndex]) return;
+
+    const removedId = colorIndex + 1; // colors are 1-based in WangIds
+    ws.colors.splice(colorIndex, 1);
+
+    // Shift wangid references: removed -> 0, above removed -> decrement
+    for (const wt of ws.wangtiles) {
+      for (let i = 0; i < wt.wangid.length; i++) {
+        if (wt.wangid[i] === removedId) {
+          wt.wangid[i] = 0;
+        } else if (wt.wangid[i] > removedId) {
+          wt.wangid[i]--;
+        }
+      }
+    }
+
+    // Clamp active color
+    if (this._activeColorId > ws.colors.length) {
+      this._activeColorId = ws.colors.length === 0 ? 0 : ws.colors.length;
+      this.emit('activeColorChanged');
+    }
+
+    this.emit('metadataChanged');
+  }
+
   /** Replace the entire metadata (e.g., after loading from file) */
   setMetadata(metadata: TilesetMetadata): void {
     this._metadata = metadata;
