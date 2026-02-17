@@ -110,6 +110,42 @@ export class EditorState {
     }
   }
 
+  /** Add a new WangSet and select it */
+  addWangSet(name: string, type: 'corner' | 'edge' | 'mixed'): void {
+    this._metadata.wangsets.push({
+      name,
+      type,
+      tile: -1,
+      colors: [],
+      wangtiles: [],
+    });
+    this._activeWangSetIndex = this._metadata.wangsets.length - 1;
+    this.emit('activeWangSetChanged');
+    this.emit('metadataChanged');
+  }
+
+  /** Remove a WangSet by index and adjust selection */
+  removeWangSet(index: number): void {
+    if (index < 0 || index >= this._metadata.wangsets.length) return;
+    const prevIndex = this._activeWangSetIndex;
+    this._metadata.wangsets.splice(index, 1);
+    if (this._activeWangSetIndex >= this._metadata.wangsets.length) {
+      this._activeWangSetIndex = Math.max(0, this._metadata.wangsets.length - 1);
+    }
+    if (this._activeWangSetIndex !== prevIndex || index <= prevIndex) {
+      this.emit('activeWangSetChanged');
+    }
+    this.emit('metadataChanged');
+  }
+
+  /** Rename a WangSet by index */
+  renameWangSet(index: number, name: string): void {
+    const ws = this._metadata.wangsets[index];
+    if (!ws) return;
+    ws.name = name;
+    this.emit('metadataChanged');
+  }
+
   /** Replace the entire metadata (e.g., after loading from file) */
   setMetadata(metadata: TilesetMetadata): void {
     this._metadata = metadata;
