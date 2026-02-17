@@ -1,5 +1,8 @@
 import { TilesetMetadata, WangSetData, WangTileData, TransformationConfig, DEFAULT_TRANSFORMATIONS, AnimationData, AnimationFrameData } from '../core/metadata-schema.js';
 import { UndoManager } from './undo-manager.js';
+import { colRowFromTileId, tileIdFromColRow } from '../utils/tile-math.js';
+
+export type TileFilter = 'all' | 'tagged' | 'untagged';
 
 export type EditorEvent =
   | 'selectedTileChanged'
@@ -17,6 +20,8 @@ type Listener = () => void;
  */
 export class EditorState {
   private _selectedTileId: number = -1;
+  private _selectedTileIds: Set<number> = new Set();
+  private _tileFilter: TileFilter = 'all';
   private _activeWangSetIndex: number = 0;
   private _activeColorId: number = 1;
   private _metadata: TilesetMetadata;
@@ -36,6 +41,14 @@ export class EditorState {
 
   get selectedTileId(): number {
     return this._selectedTileId;
+  }
+
+  get selectedTileIds(): ReadonlySet<number> {
+    return this._selectedTileIds;
+  }
+
+  get tileFilter(): TileFilter {
+    return this._tileFilter;
   }
 
   get activeWangSetIndex(): number {
@@ -82,9 +95,42 @@ export class EditorState {
   // --- Setters (emit events) ---
 
   selectTile(tileId: number): void {
+    this._selectedTileIds.clear();
+    if (tileId >= 0) this._selectedTileIds.add(tileId);
     if (this._selectedTileId === tileId) return;
     this._selectedTileId = tileId;
     this.emit('selectedTileChanged');
+  }
+
+  /** Add a range of tiles to selection (for shift-click) */
+  selectTileRange(fromId: number, toId: number): void {
+    const { columns } = this._metadata;
+    const [fromCol, fromRow] = colRowFromTileId(fromId, columns);
+    const [toCol, toRow] = colRowFromTileId(toId, columns);
+
+    const minCol = Math.min(fromCol, toCol);
+    const maxCol = Math.max(fromCol, toCol);
+    const minRow = Math.min(fromRow, toRow);
+    const maxRow = Math.max(fromRow, toRow);
+
+    this._selectedTileIds.clear();
+    for (let r = minRow; r <= maxRow; r++) {
+      for (let c = minCol; c <= maxCol; c++) {
+        const id = tileIdFromColRow(c, r, columns);
+        if (id < this._metadata.tileCount) {
+          this._selectedTileIds.add(id);
+        }
+      }
+    }
+    this._selectedTileId = toId;
+    this.emit('selectedTileChanged');
+  }
+
+  /** Set the tile filter mode */
+  setTileFilter(filter: TileFilter): void {
+    if (this._tileFilter === filter) return;
+    this._tileFilter = filter;
+    this.emit('selectedTileChanged'); // Reuse event to trigger re-render
   }
 
   setActiveWangSet(index: number): void {

@@ -1,4 +1,4 @@
-import { EditorState } from '../editor-state.js';
+import { EditorState, TileFilter } from '../editor-state.js';
 import { colRowFromTileId, tileIdFromColRow } from '../../utils/tile-math.js';
 import { templateSlotWangId } from '../template-utils.js';
 
@@ -15,6 +15,7 @@ export class TilesetPanel {
   private image: HTMLImageElement;
   private hoveredTileId: number = -1;
   private tooltip: HTMLDivElement;
+  private filterButtons: HTMLButtonElement[] = [];
 
   constructor(state: EditorState, image: HTMLImageElement) {
     this.state = state;
@@ -27,6 +28,29 @@ export class TilesetPanel {
       position: relative;
       cursor: crosshair;
     `;
+
+    // Filter bar
+    const filterBar = document.createElement('div');
+    filterBar.style.cssText = `
+      display: flex; gap: 4px; padding: 4px 8px;
+      background: #16213e; border-bottom: 1px solid #333;
+    `;
+    const filters: TileFilter[] = ['all', 'tagged', 'untagged'];
+    for (const mode of filters) {
+      const btn = document.createElement('button');
+      btn.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+      btn.dataset.filter = mode;
+      btn.style.cssText = `
+        padding: 2px 10px; border: 1px solid #555; border-radius: 3px;
+        cursor: pointer; font-size: 11px; font-family: inherit;
+        background: ${mode === 'all' ? '#333' : 'transparent'};
+        color: ${mode === 'all' ? '#e0e0e0' : '#888'};
+      `;
+      btn.addEventListener('click', () => this.state.setTileFilter(mode));
+      filterBar.appendChild(btn);
+      this.filterButtons.push(btn);
+    }
+    this.element.appendChild(filterBar);
 
     this.canvas = document.createElement('canvas');
     this.canvas.style.cssText = 'image-rendering: pixelated;';
@@ -80,6 +104,13 @@ export class TilesetPanel {
           }
           return;
         }
+
+        // Shift-click for range selection
+        if (e.shiftKey && this.state.selectedTileId >= 0) {
+          this.state.selectTileRange(this.state.selectedTileId, tileId);
+          return;
+        }
+
         this.state.selectTile(tileId);
       }
     });
@@ -173,6 +204,33 @@ export class TilesetPanel {
     // Draw WangId overlays for tagged tiles
     this.drawWangOverlays(zoom);
 
+    // Draw filter dimming overlay
+    if (this.state.tileFilter !== 'all') {
+      const ws = this.state.activeWangSet;
+      const taggedTileIds = new Set(ws?.wangtiles.map(wt => wt.tileid) ?? []);
+      const tw = tileWidth * zoom;
+      const th = tileHeight * zoom;
+
+      for (let id = 0; id < tileCount; id++) {
+        const isTagged = taggedTileIds.has(id);
+        const shouldDim = (this.state.tileFilter === 'tagged' && !isTagged) ||
+                          (this.state.tileFilter === 'untagged' && isTagged);
+
+        if (shouldDim) {
+          const [col, row] = colRowFromTileId(id, columns);
+          this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          this.ctx.fillRect(col * tw, row * th, tw, th);
+        }
+      }
+    }
+
+    // Update filter button styles
+    for (const btn of this.filterButtons) {
+      const isActive = btn.dataset.filter === this.state.tileFilter;
+      btn.style.background = isActive ? '#333' : 'transparent';
+      btn.style.color = isActive ? '#e0e0e0' : '#888';
+    }
+
     // Draw light blue outline on tiles matching active WangSet + color
     this.drawActiveColorOutlines(zoom);
 
@@ -189,9 +247,9 @@ export class TilesetPanel {
       );
     }
 
-    // Draw selection highlight
-    if (this.state.selectedTileId >= 0) {
-      const [sc, sr] = colRowFromTileId(this.state.selectedTileId, columns);
+    // Draw selection highlights (multi-select)
+    for (const selId of this.state.selectedTileIds) {
+      const [sc, sr] = colRowFromTileId(selId, columns);
       this.ctx.strokeStyle = '#ffdd00';
       this.ctx.lineWidth = 2;
       this.ctx.strokeRect(
