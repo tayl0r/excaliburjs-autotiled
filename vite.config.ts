@@ -76,6 +76,9 @@ export default defineConfig({
   assetsInclude: ['**/*.png'],
   server: {
     port: 5200,
+    watch: {
+      ignored: ['**/assets/metadata/**'],
+    },
   },
   preview: {
     port: 5201,
