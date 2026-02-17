@@ -1,9 +1,12 @@
 import * as ex from 'excalibur';
 import { SimpleAutotileMap } from '../core/autotile-map.js';
 import { WangSet } from '../core/wang-set.js';
-import { createCell } from '../core/cell.js';
 import { applyTerrainPaint } from '../core/terrain-painter.js';
+import { floodFillTerrain } from '../core/flood-fill.js';
+import { AnimationData } from '../core/metadata-schema.js';
+import { createCell } from '../core/cell.js';
 import { SpriteResolver } from './sprite-resolver.js';
+import { AnimationController } from './animation-controller.js';
 
 export class AutotileTilemap {
   readonly tileMap: ex.TileMap;
@@ -12,6 +15,7 @@ export class AutotileTilemap {
   private spriteResolver: SpriteResolver;
   private tileWidth: number;
   private tileHeight: number;
+  private animController?: AnimationController;
 
   constructor(
     columns: number,
@@ -48,15 +52,14 @@ export class AutotileTilemap {
 
   /** Refresh the visual tile at (x, y) from the autoMap */
   refreshTile(x: number, y: number): void {
-    const tileId = this.autoMap.tileIdAt(x, y);
-    if (tileId < 0) return;
+    const cell = this.autoMap.cellAt(x, y);
+    if (cell.tileId < 0) return;
 
     const tile = this.tileMap.getTile(x, y);
     if (!tile) return;
 
     tile.clearGraphics();
 
-    const cell = createCell(tileId);
     const sprite = this.spriteResolver.resolve(cell);
     if (sprite) {
       tile.addGraphic(sprite);
@@ -73,6 +76,64 @@ export class AutotileTilemap {
     for (let y = 0; y < this.autoMap.height; y++) {
       for (let x = 0; x < this.autoMap.width; x++) {
         this.refreshTile(x, y);
+      }
+    }
+  }
+
+  /** Fill terrain at (x, y) with flood fill and refresh affected tiles */
+  fillTerrain(x: number, y: number, colorId: number): void {
+    const affected = floodFillTerrain(this.autoMap, this.wangSet, x, y, colorId);
+
+    for (const [ax, ay] of affected) {
+      this.refreshTile(ax, ay);
+    }
+  }
+
+  /** Set up animations from metadata */
+  setAnimations(animations: AnimationData[]): void {
+    if (animations.length === 0) return;
+    this.animController = new AnimationController();
+    for (const anim of animations) {
+      this.animController.addAnimation(anim);
+    }
+  }
+
+  /** Advance animation state and re-render affected cells */
+  updateAnimations(deltaMs: number): void {
+    if (!this.animController) return;
+
+    const changed = this.animController.update(deltaMs);
+    if (changed.length === 0) return;
+
+    // Re-render all tiles, applying animation offsets to their base tileId
+    for (let y = 0; y < this.autoMap.height; y++) {
+      for (let x = 0; x < this.autoMap.width; x++) {
+        const cell = this.autoMap.cellAt(x, y);
+        if (cell.tileId < 0) continue;
+
+        const tile = this.tileMap.getTile(x, y);
+        if (!tile) continue;
+
+        // Apply the first matching animation offset
+        // (in practice, each tile base ID would determine which animation applies)
+        let totalOffset = 0;
+        for (const name of changed) {
+          totalOffset += this.animController!.getCurrentOffset(name);
+        }
+
+        if (totalOffset !== 0) {
+          tile.clearGraphics();
+          const animatedCell = createCell(
+            cell.tileId + totalOffset,
+            cell.flipH,
+            cell.flipV,
+            cell.flipD
+          );
+          const sprite = this.spriteResolver.resolve(animatedCell);
+          if (sprite) {
+            tile.addGraphic(sprite);
+          }
+        }
       }
     }
   }

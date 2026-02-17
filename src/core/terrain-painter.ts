@@ -28,13 +28,33 @@ export function applyTerrainPaint(
   // 1. Set the painted color
   map.setColorAt(x, y, color);
 
-  // 2. Auto-insert intermediates via BFS outward from paint position
-  const colorChanged = new Set<string>();
-  colorChanged.add(`${x},${y}`);
+  // 2. Auto-insert intermediates from the single painted cell
+  const colorChanged = insertIntermediates(map, wangSet, [[x, y]]);
 
-  const queue: [number, number][] = [[x, y]];
+  // 3. Expand, sort, recompute
+  return recomputeTiles(map, wangSet, colorChanged, x, y);
+}
+
+/**
+ * BFS outward from seed positions to insert intermediate colors where
+ * color distance > 1. Returns the set of all positions whose color changed
+ * (including the seeds themselves).
+ */
+export function insertIntermediates(
+  map: AutotileMap,
+  wangSet: WangSet,
+  seedPositions: Array<[number, number]>
+): Set<string> {
+  const colorChanged = new Set<string>();
+  const queue: [number, number][] = [];
   const visited = new Set<string>();
-  visited.add(`${x},${y}`);
+
+  for (const [sx, sy] of seedPositions) {
+    const key = `${sx},${sy}`;
+    colorChanged.add(key);
+    visited.add(key);
+    queue.push([sx, sy]);
+  }
 
   while (queue.length > 0) {
     const [cx, cy] = queue.shift()!;
@@ -63,7 +83,21 @@ export function applyTerrainPaint(
     }
   }
 
-  // 3. Expand affected region: all color-changed cells + ±1 ring for tile corner propagation
+  return colorChanged;
+}
+
+/**
+ * Expand affected region by ±1 ring, sort center-outward, recompute tiles.
+ * Returns the list of affected positions.
+ */
+export function recomputeTiles(
+  map: AutotileMap,
+  wangSet: WangSet,
+  colorChanged: Set<string>,
+  centerX: number,
+  centerY: number
+): Array<[number, number]> {
+  // Expand affected region: all color-changed cells + ±1 ring for tile corner propagation
   const affectedSet = new Set<string>();
   for (const key of colorChanged) {
     const [cx, cy] = key.split(',').map(Number);
@@ -78,17 +112,19 @@ export function applyTerrainPaint(
     }
   }
 
-  // 4. Sort affected positions center-outward (Manhattan distance from paint origin)
+  // Sort affected positions center-outward (Manhattan distance from center)
   const affected: Array<[number, number]> = [];
   for (const key of affectedSet) {
     const [ax, ay] = key.split(',').map(Number);
     affected.push([ax, ay]);
   }
   affected.sort(
-    (a, b) => (Math.abs(a[0] - x) + Math.abs(a[1] - y)) - (Math.abs(b[0] - x) + Math.abs(b[1] - y))
+    (a, b) =>
+      (Math.abs(a[0] - centerX) + Math.abs(a[1] - centerY)) -
+      (Math.abs(b[0] - centerX) + Math.abs(b[1] - centerY))
   );
 
-  // 5. Recompute tiles center-outward
+  // Recompute tiles center-outward
   for (const [ax, ay] of affected) {
     const cellColor = map.colorAt(ax, ay);
     if (cellColor === 0) continue;
@@ -97,7 +133,7 @@ export function applyTerrainPaint(
     const cell = findBestMatch(wangSet, desired, wangSet.type);
 
     if (cell) {
-      map.setTileAt(ax, ay, cell.tileId);
+      map.setCellAt(ax, ay, cell);
     }
   }
 
@@ -151,7 +187,6 @@ function desiredWangIdFromColors(
 
     for (let i = 0; i < 8; i++) {
       const isCorner = i % 2 === 1;
-      const isEdge = i % 2 === 0;
       if (type === 'edge' && isCorner) continue;
 
       const [dx, dy] = NEIGHBOR_OFFSETS[i];

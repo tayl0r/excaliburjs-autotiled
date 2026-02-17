@@ -8,6 +8,7 @@ import { computeColorDistances } from '../../src/core/color-distance.js';
 import { generateAllVariants } from '../../src/core/variant-generator.js';
 import { applyTerrainPaint } from '../../src/core/terrain-painter.js';
 import { DEFAULT_TRANSFORMATIONS } from '../../src/core/metadata-schema.js';
+import { createCell } from '../../src/core/cell.js';
 
 // Helper: create a 2-color corner WangSet with 16 tiles
 function createGrassDirtWangSet(): WangSet {
@@ -105,10 +106,10 @@ describe('wangIdFromSurroundings', () => {
 
     // Place tile 15 (all dirt) at diagonal neighbors
     // TopLeft neighbor (1,1) → our index 7, reads their opposite index 3 (BottomRight)
-    map.setTileAt(1, 1, 15);
+    map.setCellAt(1, 1, createCell(15));
     map.setColorAt(1, 1, 2);
     // TopRight neighbor (3,1) → our index 1, reads their opposite index 5 (BottomLeft)
-    map.setTileAt(3, 1, 15);
+    map.setCellAt(3, 1, createCell(15));
     map.setColorAt(3, 1, 2);
 
     const desired = wangIdFromSurroundings(map, 2, 2, ws);
@@ -297,6 +298,71 @@ describe('findBestMatch with penalty scoring', () => {
     const desired = WangId.fromArray([0, 3, 0, 3, 0, 2, 0, 2]);
     const cell = findBestMatch(ws, desired, 'corner');
     expect(cell).toBeDefined();
+  });
+});
+
+describe('Cell flip flags preserved through map storage', () => {
+  it('stores and retrieves flip flags from setCellAt/cellAt', () => {
+    const map = new SimpleAutotileMap(3, 3);
+    map.setCellAt(1, 1, createCell(5, true, false, true));
+    const cell = map.cellAt(1, 1);
+    expect(cell.tileId).toBe(5);
+    expect(cell.flipH).toBe(true);
+    expect(cell.flipV).toBe(false);
+    expect(cell.flipD).toBe(true);
+  });
+
+  it('preserves flip flags when terrain paint resolves a flipped variant', () => {
+    // Create a WangSet with limited tiles + allowFlipH so flipping is required
+    const grass: WangColor = { id: 1, name: 'Grass', color: '#00ff00', imageTileId: 0, probability: 1.0 };
+    const dirt: WangColor = { id: 2, name: 'Dirt', color: '#8b4513', imageTileId: 15, probability: 1.0 };
+    const ws = new WangSet('Ground', 'corner', [grass, dirt]);
+
+    // Only provide tiles where TL differs from TR but BR=BL
+    // Tile 4: TL=Grass, TR=Dirt, BR=Grass, BL=Grass  (only TR is dirt)
+    ws.addTileMapping(4, WangId.fromArray([0, 2, 0, 1, 0, 1, 0, 1]));
+    // Tile 0: all grass
+    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 1]));
+    // Tile 15: all dirt
+    ws.addTileMapping(15, WangId.fromArray([0, 2, 0, 2, 0, 2, 0, 2]));
+
+    // No tile 8 (TL=Dirt, TR=Grass) — it must come from flipH of tile 4
+    const transforms = { allowRotate: false, allowFlipH: true, allowFlipV: false, preferUntransformed: true };
+    const variants = generateAllVariants(ws, transforms);
+    ws.setVariants(variants);
+
+    const { distances, nextHop } = computeColorDistances(ws);
+    ws.setDistanceMatrix(distances);
+    ws.setNextHopMatrix(nextHop);
+
+    // Desired: TL=Dirt, TR=Grass, BR=Grass, BL=Grass (like tile 8 which we don't have)
+    const desired = WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 2]);
+    const cell = findBestMatch(ws, desired, 'corner');
+    expect(cell).toBeDefined();
+    expect(cell!.tileId).toBe(4); // Base tile 4, flipped
+    expect(cell!.flipH).toBe(true); // Must be horizontally flipped
+
+    // Now verify the full round-trip through terrain paint
+    const map = new SimpleAutotileMap(5, 5, 1);
+    for (let y = 0; y < 5; y++) {
+      for (let x = 0; x < 5; x++) {
+        applyTerrainPaint(map, ws, x, y, 1);
+      }
+    }
+
+    // Paint dirt at (2,2)
+    applyTerrainPaint(map, ws, 2, 2, 2);
+
+    // Tile at (1,2): TL=Grass, TR=Dirt(2,2), BR=Grass, BL=Grass → tile 4, no flip
+    const cellLeft = map.cellAt(1, 2);
+    expect(cellLeft.tileId).toBe(4);
+    expect(cellLeft.flipH).toBe(false);
+
+    // Tile at (2,2): TL=Dirt(2,2), TR=Grass(3,2), BR=Grass(3,3), BL=Grass(2,3)
+    // This is [0,1,0,1,0,1,0,2] = TL=Dirt only, which is flipH of tile 4
+    const cellCenter = map.cellAt(2, 2);
+    expect(cellCenter.tileId).toBe(4); // flipped tile 4
+    expect(cellCenter.flipH).toBe(true);
   });
 });
 

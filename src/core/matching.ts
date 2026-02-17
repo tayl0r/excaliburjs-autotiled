@@ -26,7 +26,7 @@ export function wangIdFromSurroundings(
       continue;
     }
 
-    const neighborTileId = map.tileIdAt(nx, ny);
+    const neighborTileId = map.cellAt(nx, ny).tileId;
     if (neighborTileId < 0) {
       // No tile placed, use painted color as a hint
       const neighborColor = map.colorAt(nx, ny);

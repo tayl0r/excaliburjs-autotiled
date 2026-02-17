@@ -1,3 +1,5 @@
+import { Cell, EMPTY_CELL } from './cell.js';
+
 /** The painted terrain color per grid cell. This is what the user paints. */
 export interface AutotileMap {
   readonly width: number;
@@ -9,11 +11,11 @@ export interface AutotileMap {
   /** Set the painted terrain color at (x, y) */
   setColorAt(x: number, y: number, color: number): void;
 
-  /** Get the resolved tile ID at (x, y). Returns -1 if empty. */
-  tileIdAt(x: number, y: number): number;
+  /** Get the resolved Cell at (x, y). Returns EMPTY_CELL if out of bounds or empty. */
+  cellAt(x: number, y: number): Cell;
 
-  /** Set the resolved tile at (x, y) */
-  setTileAt(x: number, y: number, tileId: number): void;
+  /** Set the resolved Cell at (x, y) */
+  setCellAt(x: number, y: number, cell: Cell): void;
 
   /** Check if (x, y) is within bounds */
   inBounds(x: number, y: number): boolean;
@@ -22,11 +24,11 @@ export interface AutotileMap {
 /** Simple in-memory implementation of AutotileMap */
 export class SimpleAutotileMap implements AutotileMap {
   private colors: number[];
-  private tiles: number[];
+  private cells: Cell[];
 
   constructor(public readonly width: number, public readonly height: number, defaultColor = 0) {
     this.colors = new Array(width * height).fill(defaultColor);
-    this.tiles = new Array(width * height).fill(-1);
+    this.cells = new Array(width * height).fill(EMPTY_CELL);
   }
 
   inBounds(x: number, y: number): boolean {
@@ -43,13 +45,18 @@ export class SimpleAutotileMap implements AutotileMap {
     this.colors[y * this.width + x] = color;
   }
 
-  tileIdAt(x: number, y: number): number {
-    if (!this.inBounds(x, y)) return -1;
-    return this.tiles[y * this.width + x];
+  cellAt(x: number, y: number): Cell {
+    if (!this.inBounds(x, y)) return EMPTY_CELL;
+    return this.cells[y * this.width + x];
   }
 
-  setTileAt(x: number, y: number, tileId: number): void {
+  setCellAt(x: number, y: number, cell: Cell): void {
     if (!this.inBounds(x, y)) return;
-    this.tiles[y * this.width + x] = tileId;
+    this.cells[y * this.width + x] = cell;
+  }
+
+  /** Convenience read-only shorthand for cellAt(x,y).tileId */
+  tileIdAt(x: number, y: number): number {
+    return this.cellAt(x, y).tileId;
   }
 }

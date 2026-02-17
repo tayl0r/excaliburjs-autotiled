@@ -2,7 +2,7 @@ import * as ex from 'excalibur';
 import { TilesetManager } from './tileset-manager.js';
 import { SpriteResolver } from './sprite-resolver.js';
 import { AutotileTilemap } from './autotile-tilemap.js';
-import { InputHandler } from './input-handler.js';
+import { InputHandler, ToolMode } from './input-handler.js';
 
 const MAP_COLS = 20;
 const MAP_ROWS = 20;
@@ -12,6 +12,7 @@ export class GameScene extends ex.Scene {
   private autotileTilemap!: AutotileTilemap;
   private inputHandler!: InputHandler;
   private hud!: HTMLDivElement;
+  private toolIndicator!: HTMLDivElement;
 
   constructor(tilesetManager: TilesetManager) {
     super();
@@ -46,6 +47,12 @@ export class GameScene extends ex.Scene {
     this.add(this.autotileTilemap.tileMap);
     this.autotileTilemap.initializeAll(1);
 
+    // Set up animations if available
+    const animations = this.tilesetManager.animations;
+    if (animations.length > 0) {
+      this.autotileTilemap.setAnimations(animations);
+    }
+
     // Set up camera
     const tileW = this.tilesetManager.metadata.tileWidth;
     const tileH = this.tilesetManager.metadata.tileHeight;
@@ -58,6 +65,37 @@ export class GameScene extends ex.Scene {
     // Set up input
     this.inputHandler = new InputHandler(engine, this.autotileTilemap);
     this.inputHandler.initialize();
+
+    // Keyboard shortcuts: B=brush, G=fill
+    engine.input.keyboard.on('press', (evt) => {
+      if (evt.key === ex.Keys.B) {
+        this.inputHandler.setToolMode('brush');
+      } else if (evt.key === ex.Keys.G) {
+        this.inputHandler.setToolMode('fill');
+      }
+    });
+
+    // Tool mode indicator
+    this.toolIndicator = document.createElement('div');
+    this.toolIndicator.id = 'tool-indicator';
+    this.toolIndicator.style.cssText = `
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      padding: 6px 12px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      font-family: monospace;
+      font-size: 14px;
+      border-radius: 4px;
+      z-index: 10;
+    `;
+    this.updateToolIndicator('brush');
+    document.body.appendChild(this.toolIndicator);
+
+    this.inputHandler.setOnToolModeChange((mode) => {
+      this.updateToolIndicator(mode);
+    });
 
     // Create HUD from WangSet colors
     this.createHUD(wangSet);
@@ -116,7 +154,17 @@ export class GameScene extends ex.Scene {
     });
   }
 
+  onPreUpdate(_engine: ex.Engine, delta: number): void {
+    this.autotileTilemap?.updateAnimations(delta);
+  }
+
+  private updateToolIndicator(mode: ToolMode): void {
+    const label = mode === 'brush' ? 'Brush (B)' : 'Fill (G)';
+    this.toolIndicator.textContent = label;
+  }
+
   onDeactivate(): void {
     this.hud?.remove();
+    this.toolIndicator?.remove();
   }
 }
