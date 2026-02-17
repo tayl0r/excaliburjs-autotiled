@@ -133,3 +133,41 @@ describe('EditorState WangColor CRUD', () => {
     expect(count).toBe(3);
   });
 });
+
+describe('EditorState template mode', () => {
+  it('templateMode defaults to false', () => {
+    const state = new EditorState(makeMetadata());
+    expect(state.templateMode).toBe(false);
+  });
+
+  it('setTemplateMode toggles and emits', () => {
+    const state = new EditorState(makeMetadata());
+    let count = 0;
+    state.on('templateModeChanged', () => count++);
+    state.setTemplateMode(true);
+    expect(state.templateMode).toBe(true);
+    expect(count).toBe(1);
+  });
+
+  it('activeTemplateSlot defaults to -1', () => {
+    const state = new EditorState(makeMetadata());
+    expect(state.activeTemplateSlot).toBe(-1);
+  });
+
+  it('setActiveTemplateSlot updates and emits', () => {
+    const state = new EditorState(makeMetadata());
+    let count = 0;
+    state.on('templateSlotChanged', () => count++);
+    state.setActiveTemplateSlot(5);
+    expect(state.activeTemplateSlot).toBe(5);
+    expect(count).toBe(1);
+  });
+
+  it('setTemplateMode(false) resets activeTemplateSlot', () => {
+    const state = new EditorState(makeMetadata());
+    state.setTemplateMode(true);
+    state.setActiveTemplateSlot(5);
+    state.setTemplateMode(false);
+    expect(state.activeTemplateSlot).toBe(-1);
+  });
+});

@@ -5,7 +5,9 @@ export type EditorEvent =
   | 'activeWangSetChanged'
   | 'activeColorChanged'
   | 'metadataChanged'
-  | 'zoomChanged';
+  | 'zoomChanged'
+  | 'templateModeChanged'
+  | 'templateSlotChanged';
 
 type Listener = () => void;
 
@@ -18,6 +20,8 @@ export class EditorState {
   private _activeColorId: number = 1;
   private _metadata: TilesetMetadata;
   private _zoom: number = 2;
+  private _templateMode = false;
+  private _activeTemplateSlot = -1;
   private listeners = new Map<EditorEvent, Set<Listener>>();
 
   constructor(metadata: TilesetMetadata) {
@@ -50,6 +54,14 @@ export class EditorState {
     return this._metadata.wangsets[this._activeWangSetIndex];
   }
 
+  get templateMode(): boolean {
+    return this._templateMode;
+  }
+
+  get activeTemplateSlot(): number {
+    return this._activeTemplateSlot;
+  }
+
   // --- Setters (emit events) ---
 
   selectTile(tileId: number): void {
@@ -73,6 +85,19 @@ export class EditorState {
   setZoom(zoom: number): void {
     this._zoom = Math.max(1, Math.min(8, zoom));
     this.emit('zoomChanged');
+  }
+
+  setTemplateMode(on: boolean): void {
+    if (this._templateMode === on) return;
+    this._templateMode = on;
+    if (!on) this._activeTemplateSlot = -1;
+    this.emit('templateModeChanged');
+  }
+
+  setActiveTemplateSlot(slot: number): void {
+    if (this._activeTemplateSlot === slot) return;
+    this._activeTemplateSlot = slot;
+    this.emit('templateSlotChanged');
   }
 
   // --- Metadata mutation ---
