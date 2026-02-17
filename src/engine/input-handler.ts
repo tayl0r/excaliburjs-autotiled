@@ -1,7 +1,7 @@
 import * as ex from 'excalibur';
 import { AutotileTilemap } from './autotile-tilemap.js';
 
-export type ToolMode = 'brush' | 'fill';
+export type ToolMode = 'brush' | 'fill' | 'tiledata';
 
 export class InputHandler {
   private engine: ex.Engine;
@@ -11,6 +11,7 @@ export class InputHandler {
   private toolMode: ToolMode = 'brush';
   private onColorChange?: (color: number) => void;
   private onToolModeChange?: (mode: ToolMode) => void;
+  private onTileInspect?: (x: number, y: number) => void;
 
   constructor(engine: ex.Engine, tilemap: AutotileTilemap) {
     this.engine = engine;
@@ -22,6 +23,8 @@ export class InputHandler {
     this.engine.input.pointers.primary.on('down', (evt) => {
       if (this.toolMode === 'fill') {
         this.fillAt(evt.worldPos);
+      } else if (this.toolMode === 'tiledata') {
+        this.inspectAt(evt.worldPos);
       } else {
         this.isPainting = true;
         this.paintAt(evt.worldPos);
@@ -66,6 +69,10 @@ export class InputHandler {
     this.onToolModeChange = callback;
   }
 
+  setOnTileInspect(callback: (x: number, y: number) => void): void {
+    this.onTileInspect = callback;
+  }
+
   private paintAt(worldPos: ex.Vector): void {
     const tilePos = this.tilemap.worldToTile(worldPos.x, worldPos.y);
     if (!tilePos) return;
@@ -78,5 +85,12 @@ export class InputHandler {
     if (!tilePos) return;
     const [col, row] = tilePos;
     this.tilemap.fillTerrain(col, row, this.activeColor);
+  }
+
+  private inspectAt(worldPos: ex.Vector): void {
+    const tilePos = this.tilemap.worldToTile(worldPos.x, worldPos.y);
+    if (!tilePos) return;
+    const [col, row] = tilePos;
+    this.onTileInspect?.(col, row);
   }
 }

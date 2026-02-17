@@ -12,7 +12,8 @@ export class GameScene extends ex.Scene {
   private autotileTilemap!: AutotileTilemap;
   private inputHandler!: InputHandler;
   private hud!: HTMLDivElement;
-  private toolIndicator!: HTMLDivElement;
+  private toolbar!: HTMLDivElement;
+  private toolButtons!: Map<ToolMode, HTMLButtonElement>;
 
   constructor(tilesetManager: TilesetManager) {
     super();
@@ -75,26 +76,11 @@ export class GameScene extends ex.Scene {
       }
     });
 
-    // Tool mode indicator
-    this.toolIndicator = document.createElement('div');
-    this.toolIndicator.id = 'tool-indicator';
-    this.toolIndicator.style.cssText = `
-      position: absolute;
-      top: 16px;
-      left: 16px;
-      padding: 6px 12px;
-      background: rgba(0,0,0,0.7);
-      color: #fff;
-      font-family: monospace;
-      font-size: 14px;
-      border-radius: 4px;
-      z-index: 10;
-    `;
-    this.updateToolIndicator('brush');
-    document.body.appendChild(this.toolIndicator);
+    // Top toolbar
+    this.createToolbar();
 
     this.inputHandler.setOnToolModeChange((mode) => {
-      this.updateToolIndicator(mode);
+      this.updateToolbarSelection(mode);
     });
 
     // Create HUD from WangSet colors
@@ -158,13 +144,99 @@ export class GameScene extends ex.Scene {
     this.autotileTilemap?.updateAnimations(delta);
   }
 
-  private updateToolIndicator(mode: ToolMode): void {
-    const label = mode === 'brush' ? 'Brush (B)' : 'Fill (G)';
-    this.toolIndicator.textContent = label;
+  private createToolbar(): void {
+    this.toolbar = document.createElement('div');
+    this.toolbar.id = 'toolbar';
+    this.toolbar.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 36px;
+      background: rgba(30, 30, 30, 0.75);
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 0 8px;
+      z-index: 10;
+    `;
+
+    this.toolButtons = new Map();
+
+    const tools: Array<{ mode: ToolMode; label: string; shortcut: string }> = [
+      { mode: 'brush', label: 'Brush', shortcut: 'B' },
+      { mode: 'fill', label: 'Fill', shortcut: 'G' },
+      { mode: 'tiledata', label: 'Tile Data', shortcut: 'T' },
+    ];
+
+    for (const tool of tools) {
+      const btn = document.createElement('button');
+      btn.dataset.tool = tool.mode;
+      btn.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: #ccc;
+        font-family: system-ui, sans-serif;
+        font-size: 13px;
+        cursor: pointer;
+        height: 28px;
+      `;
+
+      const label = document.createElement('span');
+      label.textContent = tool.label;
+
+      const kbd = document.createElement('kbd');
+      kbd.textContent = tool.shortcut;
+      kbd.style.cssText = `
+        font-family: system-ui, sans-serif;
+        font-size: 11px;
+        color: #888;
+        background: rgba(255,255,255,0.1);
+        border-radius: 3px;
+        padding: 1px 5px;
+      `;
+
+      btn.appendChild(label);
+      btn.appendChild(kbd);
+
+      if (tool.mode === 'tiledata') {
+        // Tile Data toggles the editor overlay via synthetic keypress
+        btn.addEventListener('click', () => {
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'T' }));
+        });
+      } else {
+        btn.addEventListener('click', () => {
+          this.inputHandler.setToolMode(tool.mode);
+        });
+      }
+
+      this.toolbar.appendChild(btn);
+      this.toolButtons.set(tool.mode, btn);
+    }
+
+    document.body.appendChild(this.toolbar);
+    this.updateToolbarSelection(this.inputHandler.getToolMode());
+  }
+
+  private updateToolbarSelection(activeMode: ToolMode): void {
+    for (const [mode, btn] of this.toolButtons) {
+      if (mode === activeMode) {
+        btn.style.background = 'rgba(255,255,255,0.15)';
+        btn.style.color = '#fff';
+      } else {
+        btn.style.background = 'transparent';
+        btn.style.color = '#ccc';
+      }
+    }
   }
 
   onDeactivate(): void {
     this.hud?.remove();
-    this.toolIndicator?.remove();
+    this.toolbar?.remove();
   }
 }

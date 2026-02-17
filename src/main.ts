@@ -38,9 +38,9 @@ game.start('game', { loader }).then(() => {
     terrainImage.image
   );
 
-  // Toggle editor with 'E' key or Escape to close
+  // Toggle editor with 'T' key or Escape to close
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'e' || e.key === 'E') {
+    if (e.key === 't' || e.key === 'T') {
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         editor.toggle();
       }
