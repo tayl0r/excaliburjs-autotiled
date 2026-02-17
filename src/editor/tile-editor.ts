@@ -96,6 +96,22 @@ export class TileEditor {
 
     // Auto-save on metadata changes
     this.state.on('metadataChanged', () => this.scheduleSave());
+
+    // Undo/Redo keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (!this.overlay.isActive) return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        this.state.undo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
+        e.preventDefault();
+        this.state.redo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        this.state.redo();
+      }
+    });
   }
 
   get isActive(): boolean {

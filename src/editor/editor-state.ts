@@ -1,4 +1,5 @@
 import { TilesetMetadata, WangSetData, WangTileData } from '../core/metadata-schema.js';
+import { UndoManager } from './undo-manager.js';
 
 export type EditorEvent =
   | 'selectedTileChanged'
@@ -25,6 +26,7 @@ export class EditorState {
   private _templateColorA: number = 1;
   private _templateColorB: number = 2;
   private listeners = new Map<EditorEvent, Set<Listener>>();
+  private undoManager = new UndoManager();
 
   constructor(metadata: TilesetMetadata) {
     this._metadata = metadata;
@@ -122,6 +124,37 @@ export class EditorState {
     this.emit('templateModeChanged');
   }
 
+  // --- Undo/Redo ---
+
+  private saveSnapshot(): void {
+    this.undoManager.pushSnapshot(this._metadata);
+  }
+
+  undo(): void {
+    const prev = this.undoManager.undo(this._metadata);
+    if (prev) {
+      this._metadata = prev;
+      // Clamp active WangSet index
+      if (this._activeWangSetIndex >= this._metadata.wangsets.length) {
+        this._activeWangSetIndex = Math.max(0, this._metadata.wangsets.length - 1);
+      }
+      this.emit('metadataChanged');
+      this.emit('activeWangSetChanged');
+    }
+  }
+
+  redo(): void {
+    const next = this.undoManager.redo(this._metadata);
+    if (next) {
+      this._metadata = next;
+      if (this._activeWangSetIndex >= this._metadata.wangsets.length) {
+        this._activeWangSetIndex = Math.max(0, this._metadata.wangsets.length - 1);
+      }
+      this.emit('metadataChanged');
+      this.emit('activeWangSetChanged');
+    }
+  }
+
   // --- Metadata mutation ---
 
   /** Get the WangTile data for a tile ID in the active WangSet, if it exists */
@@ -135,6 +168,7 @@ export class EditorState {
   setWangId(tileId: number, wangid: number[]): void {
     const ws = this.activeWangSet;
     if (!ws) return;
+    this.saveSnapshot();
 
     const existing = ws.wangtiles.find(wt => wt.tileid === tileId);
     if (existing) {
@@ -152,6 +186,7 @@ export class EditorState {
 
     const idx = ws.wangtiles.findIndex(wt => wt.tileid === tileId);
     if (idx >= 0) {
+      this.saveSnapshot();
       ws.wangtiles.splice(idx, 1);
       this.emit('metadataChanged');
     }
@@ -159,6 +194,7 @@ export class EditorState {
 
   /** Add a new WangSet and select it */
   addWangSet(name: string, type: 'corner' | 'edge' | 'mixed'): void {
+    this.saveSnapshot();
     this._metadata.wangsets.push({
       name,
       type,
@@ -174,6 +210,7 @@ export class EditorState {
   /** Remove a WangSet by index and adjust selection */
   removeWangSet(index: number): void {
     if (index < 0 || index >= this._metadata.wangsets.length) return;
+    this.saveSnapshot();
     const prevIndex = this._activeWangSetIndex;
     this._metadata.wangsets.splice(index, 1);
     if (this._activeWangSetIndex >= this._metadata.wangsets.length) {
@@ -189,6 +226,7 @@ export class EditorState {
   renameWangSet(index: number, name: string): void {
     const ws = this._metadata.wangsets[index];
     if (!ws) return;
+    this.saveSnapshot();
     ws.name = name;
     this.emit('metadataChanged');
   }
@@ -197,6 +235,7 @@ export class EditorState {
   addColor(name: string, color: string): void {
     const ws = this.activeWangSet;
     if (!ws) return;
+    this.saveSnapshot();
     ws.colors.push({ name, color, probability: 1.0, tile: -1 });
     this.emit('metadataChanged');
   }
@@ -205,6 +244,7 @@ export class EditorState {
   updateColor(colorIndex: number, updates: Partial<{ name: string; color: string; probability: number; tile: number }>): void {
     const ws = this.activeWangSet;
     if (!ws || !ws.colors[colorIndex]) return;
+    this.saveSnapshot();
     Object.assign(ws.colors[colorIndex], updates);
     this.emit('metadataChanged');
   }
@@ -213,6 +253,7 @@ export class EditorState {
   removeColor(colorIndex: number): void {
     const ws = this.activeWangSet;
     if (!ws || !ws.colors[colorIndex]) return;
+    this.saveSnapshot();
 
     const removedId = colorIndex + 1; // colors are 1-based in WangIds
     ws.colors.splice(colorIndex, 1);
