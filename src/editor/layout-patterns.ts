@@ -26,7 +26,21 @@ export const STANDARD_4X4_BINARY: LayoutPattern = {
   ]),
 };
 
-export const ALL_PATTERNS: LayoutPattern[] = [STANDARD_4X4_BINARY];
+export const FANTASY_1X16: LayoutPattern = {
+  name: 'Fantasy 1x16',
+  width: 16,
+  height: 1,
+  mapping: makeMapping([
+    // mapping: [col, row, TL, TR, BR, BL]
+    // wangid indices: TL=7, TR=1, BR=3, BL=5
+    [0,0,  1,1,1,1], [1,0,  2,1,1,1], [2,0,  1,2,1,1], [3,0,  2,2,1,1],
+    [4,0,  1,1,1,2], [5,0,  2,1,1,2], [6,0,  1,2,1,2], [7,0,  2,2,1,2],
+    [8,0,  1,1,2,1], [9,0,  2,1,2,1], [10,0, 1,2,2,1], [11,0, 2,2,2,1],
+    [12,0, 1,1,2,2], [13,0, 2,1,2,2], [14,0, 1,2,2,2], [15,0, 2,2,2,2],
+  ]),
+};
+
+export const ALL_PATTERNS: LayoutPattern[] = [STANDARD_4X4_BINARY, FANTASY_1X16];
 
 /**
  * Apply a layout pattern to a rectangular region of tiles.

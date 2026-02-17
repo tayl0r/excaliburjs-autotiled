@@ -44,6 +44,9 @@ export class TileEditor {
     this.overlay.mountLeft(this.animationPanel.element);
     this.overlay.mountCenter(this.tilesetPanel.element);
 
+    // Undo/Redo buttons in top bar
+    this.createUndoRedoButtons();
+
     // Right panel: tab bar + Inspector/Template panels
     const rightWrapper = document.createElement('div');
     rightWrapper.style.cssText = 'display: flex; flex-direction: column; height: 100%;';
@@ -110,13 +113,14 @@ export class TileEditor {
     document.addEventListener('keydown', (e) => {
       if (!this.overlay.isActive) return;
 
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      const key = e.key.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && key === 'z' && !e.shiftKey) {
         e.preventDefault();
         this.state.undo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
+      } else if ((e.ctrlKey || e.metaKey) && key === 'z' && e.shiftKey) {
         e.preventDefault();
         this.state.redo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+      } else if ((e.ctrlKey || e.metaKey) && key === 'y') {
         e.preventDefault();
         this.state.redo();
       }
@@ -150,6 +154,33 @@ export class TileEditor {
   /** Get the current metadata (for saving or applying to game) */
   getMetadata(): TilesetMetadata {
     return this.state.metadata;
+  }
+
+  private createUndoRedoButtons(): void {
+    const container = document.createElement('div');
+    container.style.cssText = 'display: flex; gap: 2px; margin-left: 12px;';
+
+    const btnStyle = `
+      background: #333; color: #ccc; border: 1px solid #555;
+      padding: 3px 10px; border-radius: 3px; cursor: pointer;
+      font-size: 12px; font-family: inherit;
+    `;
+
+    const undoBtn = document.createElement('button');
+    undoBtn.textContent = 'Undo';
+    undoBtn.title = 'Undo (Ctrl+Z)';
+    undoBtn.style.cssText = btnStyle;
+    undoBtn.addEventListener('click', () => this.state.undo());
+    container.appendChild(undoBtn);
+
+    const redoBtn = document.createElement('button');
+    redoBtn.textContent = 'Redo';
+    redoBtn.title = 'Redo (Ctrl+Shift+Z)';
+    redoBtn.style.cssText = btnStyle;
+    redoBtn.addEventListener('click', () => this.state.redo());
+    container.appendChild(redoBtn);
+
+    this.overlay.mountTopBar(container);
   }
 
   /** Schedule a save after 5 seconds of inactivity */

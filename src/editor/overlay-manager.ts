@@ -4,6 +4,7 @@
  */
 export class OverlayManager {
   private overlay: HTMLDivElement;
+  private topBar!: HTMLDivElement;
   private leftSidebar!: HTMLDivElement;
   private centerPanel!: HTMLDivElement;
   private rightPanel!: HTMLDivElement;
@@ -48,8 +49,8 @@ export class OverlayManager {
     `;
 
     // Top bar
-    const topBar = document.createElement('div');
-    topBar.style.cssText = `
+    this.topBar = document.createElement('div');
+    this.topBar.style.cssText = `
       grid-column: 1 / -1;
       background: #16213e;
       display: flex;
@@ -59,8 +60,13 @@ export class OverlayManager {
     `;
     const title = document.createElement('span');
     title.textContent = 'Tile Metadata Editor';
-    title.style.cssText = 'font-weight: 600; font-size: 14px; flex: 1;';
-    topBar.appendChild(title);
+    title.style.cssText = 'font-weight: 600; font-size: 14px;';
+    this.topBar.appendChild(title);
+
+    // Spacer to push close button to the right
+    const spacer = document.createElement('div');
+    spacer.style.flex = '1';
+    this.topBar.appendChild(spacer);
 
     const closeBtn = document.createElement('button');
     closeBtn.textContent = 'Close (Esc)';
@@ -69,7 +75,7 @@ export class OverlayManager {
       padding: 4px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;
     `;
     closeBtn.addEventListener('click', () => this.hide());
-    topBar.appendChild(closeBtn);
+    this.topBar.appendChild(closeBtn);
 
     // Left sidebar (WangSet panel)
     this.leftSidebar = document.createElement('div');
@@ -97,7 +103,7 @@ export class OverlayManager {
       padding: 8px;
     `;
 
-    grid.appendChild(topBar);
+    grid.appendChild(this.topBar);
     grid.appendChild(this.leftSidebar);
     grid.appendChild(this.centerPanel);
     grid.appendChild(this.rightPanel);
@@ -121,6 +127,12 @@ export class OverlayManager {
   toggle(): void {
     if (this._active) this.hide();
     else this.show();
+  }
+
+  /** Mount an element into the top bar (inserted before the spacer/close button) */
+  mountTopBar(element: HTMLElement): void {
+    const spacer = this.topBar.querySelector('[style*="flex: 1"]') ?? this.topBar.lastChild;
+    this.topBar.insertBefore(element, spacer);
   }
 
   /** Mount an element into the left sidebar */
