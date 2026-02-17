@@ -157,6 +157,143 @@ describe('EditorState WangColor CRUD', () => {
   });
 });
 
+describe('EditorState tile probability', () => {
+  function stateWithTaggedTile(): EditorState {
+    const state = new EditorState(makeMetadata());
+    state.addWangSet('Test', 'corner');
+    state.addColor('Grass', '#00ff00');
+    state.setWangId(0, [0, 1, 0, 1, 0, 1, 0, 1]);
+    return state;
+  }
+
+  it('setTileProbability sets probability on existing wangtile', () => {
+    const state = stateWithTaggedTile();
+    state.setTileProbability(0, 0.5);
+    expect(state.getWangTile(0)!.probability).toBe(0.5);
+  });
+
+  it('probability is undefined by default (treated as 1.0)', () => {
+    const state = stateWithTaggedTile();
+    expect(state.getWangTile(0)!.probability).toBeUndefined();
+  });
+
+  it('is no-op when tile has no wangtile entry', () => {
+    const state = stateWithTaggedTile();
+    state.setTileProbability(5, 0.5);
+    expect(state.getWangTile(5)).toBeUndefined();
+  });
+
+  it('emits metadataChanged', () => {
+    const state = stateWithTaggedTile();
+    let count = 0;
+    state.on('metadataChanged', () => count++);
+    state.setTileProbability(0, 0.5);
+    expect(count).toBe(1);
+  });
+
+  it('supports undo', () => {
+    const state = stateWithTaggedTile();
+    state.setTileProbability(0, 0.3);
+    state.undo();
+    expect(state.getWangTile(0)!.probability).toBeUndefined();
+  });
+});
+
+describe('EditorState setWangIdMulti', () => {
+  function stateWithWangSet(): EditorState {
+    const state = new EditorState(makeMetadata());
+    state.addWangSet('Test', 'corner');
+    state.addColor('Grass', '#00ff00');
+    return state;
+  }
+
+  it('updates multiple tiles in one operation', () => {
+    const state = stateWithWangSet();
+    const wangid = [0, 1, 0, 1, 0, 1, 0, 1];
+    state.setWangIdMulti([
+      { tileId: 0, wangid },
+      { tileId: 1, wangid },
+      { tileId: 2, wangid },
+    ]);
+    expect(state.getWangTile(0)!.wangid).toEqual(wangid);
+    expect(state.getWangTile(1)!.wangid).toEqual(wangid);
+    expect(state.getWangTile(2)!.wangid).toEqual(wangid);
+  });
+
+  it('creates single undo snapshot', () => {
+    const state = stateWithWangSet();
+    state.setWangIdMulti([
+      { tileId: 0, wangid: [0, 1, 0, 1, 0, 1, 0, 1] },
+      { tileId: 1, wangid: [0, 1, 0, 1, 0, 1, 0, 1] },
+    ]);
+    state.undo();
+    expect(state.getWangTile(0)).toBeUndefined();
+    expect(state.getWangTile(1)).toBeUndefined();
+  });
+
+  it('emits metadataChanged once', () => {
+    const state = stateWithWangSet();
+    let count = 0;
+    state.on('metadataChanged', () => count++);
+    state.setWangIdMulti([
+      { tileId: 0, wangid: [0, 1, 0, 1, 0, 1, 0, 1] },
+      { tileId: 1, wangid: [0, 1, 0, 1, 0, 1, 0, 1] },
+    ]);
+    expect(count).toBe(1);
+  });
+
+  it('empty array is a no-op', () => {
+    const state = stateWithWangSet();
+    let count = 0;
+    state.on('metadataChanged', () => count++);
+    state.setWangIdMulti([]);
+    expect(count).toBe(0);
+  });
+});
+
+describe('EditorState setTileProbabilityMulti', () => {
+  function stateWithTaggedTiles(): EditorState {
+    const state = new EditorState(makeMetadata());
+    state.addWangSet('Test', 'corner');
+    state.addColor('Grass', '#00ff00');
+    state.setWangId(0, [0, 1, 0, 1, 0, 1, 0, 1]);
+    state.setWangId(1, [0, 1, 0, 1, 0, 1, 0, 1]);
+    state.setWangId(2, [0, 1, 0, 1, 0, 1, 0, 1]);
+    return state;
+  }
+
+  it('sets probability on multiple tiles', () => {
+    const state = stateWithTaggedTiles();
+    state.setTileProbabilityMulti([0, 1, 2], 0.5);
+    expect(state.getWangTile(0)!.probability).toBe(0.5);
+    expect(state.getWangTile(1)!.probability).toBe(0.5);
+    expect(state.getWangTile(2)!.probability).toBe(0.5);
+  });
+
+  it('creates single undo snapshot', () => {
+    const state = stateWithTaggedTiles();
+    state.setTileProbabilityMulti([0, 1], 0.5);
+    state.undo();
+    expect(state.getWangTile(0)!.probability).toBeUndefined();
+    expect(state.getWangTile(1)!.probability).toBeUndefined();
+  });
+
+  it('skips tiles with no wangtile entry', () => {
+    const state = stateWithTaggedTiles();
+    state.setTileProbabilityMulti([0, 5], 0.5);
+    expect(state.getWangTile(0)!.probability).toBe(0.5);
+    expect(state.getWangTile(5)).toBeUndefined();
+  });
+
+  it('empty array is a no-op', () => {
+    const state = stateWithTaggedTiles();
+    let count = 0;
+    state.on('metadataChanged', () => count++);
+    state.setTileProbabilityMulti([], 0.5);
+    expect(count).toBe(0);
+  });
+});
+
 describe('EditorState template mode', () => {
   it('templateMode defaults to false', () => {
     const state = new EditorState(makeMetadata());

@@ -36,6 +36,7 @@ export interface WangColorData {
 export interface WangTileData {
   tileid: number;
   wangid: number[];
+  probability?: number;  // Relative weight for tile selection (default 1.0)
 }
 
 export interface AnimationData {
