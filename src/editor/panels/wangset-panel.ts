@@ -457,7 +457,7 @@ export class WangSetPanel {
       const ws = this.state.activeWangSet;
       const prob = ws?.colors[colorIndex]?.probability ?? 1.0;
       const probBadge = document.createElement('span');
-      probBadge.textContent = `P:${prob}`;
+      probBadge.textContent = `P:${parseFloat(prob.toFixed(2))}`;
       const isDefault = prob === 1.0;
       probBadge.style.cssText = `
         font-size: 10px; color: ${isDefault ? '#888' : '#eeb300'};
