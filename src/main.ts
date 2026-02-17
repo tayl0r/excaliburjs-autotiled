@@ -2,16 +2,18 @@ import * as ex from 'excalibur';
 import { TilesetManager } from './engine/tileset-manager.js';
 import { GameScene } from './engine/game-scene.js';
 import { TileEditor } from './editor/tile-editor.js';
-import terrainMetadata from '../assets/metadata/terrain.autotile.json';
 import { TilesetMetadata } from './core/metadata-schema.js';
 
 // Load terrain image
 const terrainImage = new ex.ImageSource('/assets/TimeFantasy_TILES_6.24.17/TILESETS/terrain.png');
 
+// Fetch metadata at runtime so we always get the latest saved version
+const terrainMetadata: TilesetMetadata = await fetch('/assets/metadata/terrain.autotile.json').then(r => r.json());
+
 // Create tileset manager
 const tilesetManager = new TilesetManager(
   terrainImage,
-  terrainMetadata as TilesetMetadata
+  terrainMetadata
 );
 
 // Create the game scene, passing the tileset manager
@@ -32,9 +34,11 @@ loader.suppressPlayButton = true;
 
 game.addScene('game', gameScene);
 game.start('game', { loader }).then(() => {
+  console.log('[metadata] Loaded terrain.autotile.json:', JSON.parse(JSON.stringify(terrainMetadata)));
+
   // Initialize tile editor after resources are loaded
   const editor = new TileEditor(
-    terrainMetadata as TilesetMetadata,
+    terrainMetadata,
     terrainImage.image
   );
 

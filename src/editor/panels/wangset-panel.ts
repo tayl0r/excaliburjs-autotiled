@@ -15,6 +15,8 @@ export class WangSetPanel {
   private listContainer!: HTMLDivElement;
   /** Track whether the completeness missing-list is expanded */
   private missingExpanded = false;
+  /** Suppress re-renders while color picker popup is open */
+  private colorPickerOpen = false;
 
   constructor(state: EditorState) {
     this.state = state;
@@ -40,6 +42,8 @@ export class WangSetPanel {
   }
 
   render(): void {
+    if (this.colorPickerOpen) return;
+
     // Clear existing content
     while (this.listContainer.firstChild) {
       this.listContainer.removeChild(this.listContainer.firstChild);
@@ -298,23 +302,27 @@ export class WangSetPanel {
     `;
 
     if (colorIndex !== undefined) {
-      // Make swatch open a hidden color picker on click
       swatch.style.cursor = 'pointer';
       swatch.title = 'Click to change color';
       swatch.addEventListener('click', (e) => {
         e.stopPropagation();
+
+        this.colorPickerOpen = true;
         const picker = document.createElement('input');
         picker.type = 'color';
         picker.value = hexColor;
         picker.style.cssText = 'position: absolute; opacity: 0; pointer-events: none;';
-        swatch.appendChild(picker);
         picker.addEventListener('input', () => {
           swatch.style.background = picker.value;
           this.state.updateColor(colorIndex, { color: picker.value });
         });
-        const removePicker = () => { if (picker.parentNode) picker.remove(); };
-        picker.addEventListener('change', removePicker);
-        picker.addEventListener('blur', removePicker);
+        picker.addEventListener('change', () => {
+          this.state.updateColor(colorIndex, { color: picker.value });
+          picker.remove();
+          this.colorPickerOpen = false;
+          this.render();
+        });
+        row.appendChild(picker);
         picker.click();
       });
     }

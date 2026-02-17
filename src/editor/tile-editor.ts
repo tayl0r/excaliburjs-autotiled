@@ -189,12 +189,7 @@ export class TileEditor {
         `${meta.wangsets.length} WangSet(s),`,
         `${totalColors} colors,`,
         `${totalTiles} tagged tiles`,
-        meta.wangsets.map(ws => ({
-          name: ws.name,
-          type: ws.type,
-          colors: ws.colors.map(c => c.name),
-          tiles: ws.wangtiles.map(wt => wt.tileid),
-        }))
+        JSON.parse(JSON.stringify(meta))
       );
 
       this.showIndicator('Saved', 2000);
