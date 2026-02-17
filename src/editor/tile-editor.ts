@@ -4,6 +4,7 @@ import { EditorState } from './editor-state.js';
 import { TilesetPanel } from './panels/tileset-panel.js';
 import { WangSetPanel } from './panels/wangset-panel.js';
 import { InspectorPanel } from './panels/inspector-panel.js';
+import { TemplatePanel } from './panels/template-panel.js';
 
 /**
  * Top-level editor controller. Creates and wires all editor components.
@@ -15,6 +16,9 @@ export class TileEditor {
   private tilesetPanel: TilesetPanel;
   private wangSetPanel: WangSetPanel;
   private inspectorPanel: InspectorPanel;
+  private templatePanel: TemplatePanel;
+  private inspectorTab!: HTMLButtonElement;
+  private templateTab!: HTMLButtonElement;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private saveIndicator: HTMLDivElement;
   private filename: string;
@@ -27,10 +31,57 @@ export class TileEditor {
     this.tilesetPanel = new TilesetPanel(this.state, image);
     this.wangSetPanel = new WangSetPanel(this.state);
     this.inspectorPanel = new InspectorPanel(this.state, image);
+    this.templatePanel = new TemplatePanel(this.state, image);
 
     this.overlay.mountLeft(this.wangSetPanel.element);
     this.overlay.mountCenter(this.tilesetPanel.element);
-    this.overlay.mountRight(this.inspectorPanel.element);
+
+    // Right panel: tab bar + Inspector/Template panels
+    const rightWrapper = document.createElement('div');
+    rightWrapper.style.cssText = 'display: flex; flex-direction: column; height: 100%;';
+
+    // Tab bar
+    const tabBar = document.createElement('div');
+    tabBar.style.cssText = 'display: flex; gap: 0; border-bottom: 1px solid #333; margin-bottom: 8px;';
+
+    const tabBtnStyle = 'padding: 6px 16px; border: none; cursor: pointer; font-size: 12px; font-family: inherit;';
+    const activeTabStyle = `${tabBtnStyle} background: #1e1e3a; color: #e0e0e0; border-bottom: 2px solid #6666cc;`;
+    const inactiveTabStyle = `${tabBtnStyle} background: transparent; color: #888; border-bottom: 2px solid transparent;`;
+
+    this.inspectorTab = document.createElement('button');
+    this.inspectorTab.textContent = 'Inspector';
+    this.inspectorTab.style.cssText = activeTabStyle;
+    this.inspectorTab.addEventListener('click', () => {
+      this.state.setTemplateMode(false);
+    });
+
+    this.templateTab = document.createElement('button');
+    this.templateTab.textContent = 'Template';
+    this.templateTab.style.cssText = inactiveTabStyle;
+    this.templateTab.addEventListener('click', () => {
+      this.state.setTemplateMode(true);
+    });
+
+    tabBar.appendChild(this.inspectorTab);
+    tabBar.appendChild(this.templateTab);
+    rightWrapper.appendChild(tabBar);
+
+    // Panel containers
+    this.inspectorPanel.element.style.display = 'block';
+    this.templatePanel.element.style.display = 'none';
+    rightWrapper.appendChild(this.inspectorPanel.element);
+    rightWrapper.appendChild(this.templatePanel.element);
+
+    this.overlay.mountRight(rightWrapper);
+
+    // Listen for template mode changes to toggle panel visibility and tab states
+    this.state.on('templateModeChanged', () => {
+      const isTemplate = this.state.templateMode;
+      this.inspectorPanel.element.style.display = isTemplate ? 'none' : 'block';
+      this.templatePanel.element.style.display = isTemplate ? 'block' : 'none';
+      this.inspectorTab.style.cssText = isTemplate ? inactiveTabStyle : activeTabStyle;
+      this.templateTab.style.cssText = isTemplate ? activeTabStyle : inactiveTabStyle;
+    });
 
     // Save indicator (shown in top bar area)
     this.saveIndicator = document.createElement('div');

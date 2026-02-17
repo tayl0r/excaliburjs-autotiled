@@ -22,6 +22,8 @@ export class EditorState {
   private _zoom: number = 2;
   private _templateMode = false;
   private _activeTemplateSlot = -1;
+  private _templateColorA: number = 1;
+  private _templateColorB: number = 2;
   private listeners = new Map<EditorEvent, Set<Listener>>();
 
   constructor(metadata: TilesetMetadata) {
@@ -62,6 +64,14 @@ export class EditorState {
     return this._activeTemplateSlot;
   }
 
+  get templateColorA(): number {
+    return this._templateColorA;
+  }
+
+  get templateColorB(): number {
+    return this._templateColorB;
+  }
+
   // --- Setters (emit events) ---
 
   selectTile(tileId: number): void {
@@ -98,6 +108,18 @@ export class EditorState {
     if (this._activeTemplateSlot === slot) return;
     this._activeTemplateSlot = slot;
     this.emit('templateSlotChanged');
+  }
+
+  setTemplateColorA(colorId: number): void {
+    if (this._templateColorA === colorId) return;
+    this._templateColorA = colorId;
+    this.emit('templateModeChanged');
+  }
+
+  setTemplateColorB(colorId: number): void {
+    if (this._templateColorB === colorId) return;
+    this._templateColorB = colorId;
+    this.emit('templateModeChanged');
   }
 
   // --- Metadata mutation ---

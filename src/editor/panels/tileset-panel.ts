@@ -1,5 +1,6 @@
 import { EditorState } from '../editor-state.js';
 import { colRowFromTileId, tileIdFromColRow } from '../../utils/tile-math.js';
+import { templateSlotWangId } from '../template-utils.js';
 
 /**
  * Spritesheet viewer panel rendered on an HTML canvas.
@@ -56,12 +57,29 @@ export class TilesetPanel {
     this.state.on('zoomChanged', () => this.render());
     this.state.on('activeWangSetChanged', () => this.render());
     this.state.on('activeColorChanged', () => this.render());
+    this.state.on('templateSlotChanged', () => this.render());
+    this.state.on('templateModeChanged', () => this.render());
   }
 
   private setupEvents(): void {
     this.canvas.addEventListener('click', (e) => {
       const tileId = this.tileIdAtMouse(e);
       if (tileId >= 0) {
+        if (this.state.templateMode && this.state.activeTemplateSlot >= 0) {
+          const wangid = templateSlotWangId(
+            this.state.activeTemplateSlot,
+            this.state.templateColorA,
+            this.state.templateColorB,
+          );
+          this.state.setWangId(tileId, wangid);
+          // Advance to next slot, deactivate after last
+          if (this.state.activeTemplateSlot < 15) {
+            this.state.setActiveTemplateSlot(this.state.activeTemplateSlot + 1);
+          } else {
+            this.state.setActiveTemplateSlot(-1);
+          }
+          return;
+        }
         this.state.selectTile(tileId);
       }
     });

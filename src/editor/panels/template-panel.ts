@@ -13,10 +13,6 @@ export class TemplatePanel {
   private state: EditorState;
   private image: HTMLImageElement;
 
-  /** Local color selections (1-based color IDs). Task 4 will move these to EditorState. */
-  private _colorA = 1;
-  private _colorB = 2;
-
   /** Local mapping: slotIndex -> tileId */
   private slotAssignments = new Map<number, number>();
 
@@ -34,6 +30,7 @@ export class TemplatePanel {
     this.state.on('templateSlotChanged', () => this.render());
     this.state.on('metadataChanged', () => this.render());
     this.state.on('activeWangSetChanged', () => this.render());
+    this.state.on('templateModeChanged', () => this.render());
 
     this.render();
   }
@@ -58,8 +55,7 @@ export class TemplatePanel {
     this.colorASelect = document.createElement('select');
     this.colorASelect.style.cssText = this.selectStyle();
     this.colorASelect.addEventListener('change', () => {
-      this._colorA = parseInt(this.colorASelect.value, 10);
-      this.render();
+      this.state.setTemplateColorA(parseInt(this.colorASelect.value, 10));
     });
     colorRow.appendChild(this.colorASelect);
 
@@ -72,8 +68,7 @@ export class TemplatePanel {
     this.colorBSelect = document.createElement('select');
     this.colorBSelect.style.cssText = this.selectStyle();
     this.colorBSelect.addEventListener('change', () => {
-      this._colorB = parseInt(this.colorBSelect.value, 10);
-      this.render();
+      this.state.setTemplateColorB(parseInt(this.colorBSelect.value, 10));
     });
     colorRow.appendChild(this.colorBSelect);
 
@@ -126,8 +121,8 @@ export class TemplatePanel {
     const colors = ws?.colors ?? [];
 
     // Preserve current values
-    const prevA = this._colorA;
-    const prevB = this._colorB;
+    const prevA = this.state.templateColorA;
+    const prevB = this.state.templateColorB;
 
     for (const select of [this.colorASelect, this.colorBSelect]) {
       while (select.firstChild) select.removeChild(select.firstChild);
@@ -142,11 +137,11 @@ export class TemplatePanel {
 
     // Clamp selections to valid range
     const maxColorId = colors.length;
-    if (prevA < 1 || prevA > maxColorId) this._colorA = maxColorId >= 1 ? 1 : 0;
-    if (prevB < 1 || prevB > maxColorId) this._colorB = maxColorId >= 2 ? 2 : maxColorId;
+    if (prevA < 1 || prevA > maxColorId) this.state.setTemplateColorA(maxColorId >= 1 ? 1 : 0);
+    if (prevB < 1 || prevB > maxColorId) this.state.setTemplateColorB(maxColorId >= 2 ? 2 : maxColorId);
 
-    this.colorASelect.value = String(this._colorA);
-    this.colorBSelect.value = String(this._colorB);
+    this.colorASelect.value = String(this.state.templateColorA);
+    this.colorBSelect.value = String(this.state.templateColorB);
   }
 
   /**
@@ -156,10 +151,10 @@ export class TemplatePanel {
   private rebuildAssignments(): void {
     this.slotAssignments.clear();
     const ws = this.state.activeWangSet;
-    if (!ws || this._colorA === 0 || this._colorB === 0) return;
+    if (!ws || this.state.templateColorA === 0 || this.state.templateColorB === 0) return;
 
     for (let slotIndex = 0; slotIndex < 16; slotIndex++) {
-      const expected = templateSlotWangId(slotIndex, this._colorA, this._colorB);
+      const expected = templateSlotWangId(slotIndex, this.state.templateColorA, this.state.templateColorB);
       const match = ws.wangtiles.find(wt =>
         wt.wangid[1] === expected[1] &&
         wt.wangid[3] === expected[3] &&
@@ -237,7 +232,7 @@ export class TemplatePanel {
 
     for (const corner of corners) {
       const letter = slot[corner.key]; // 'A' or 'B'
-      const colorId = letter === 'A' ? this._colorA : this._colorB;
+      const colorId = letter === 'A' ? this.state.templateColorA : this.state.templateColorB;
       const colorData = colorId > 0 && colorId <= colors.length ? colors[colorId - 1] : undefined;
       const displayColor = colorData ? colorData.color : '#555';
 
@@ -297,7 +292,7 @@ export class TemplatePanel {
       const tileId = origin + row * columns + col;
 
       if (tileId >= 0 && tileId < tileCount) {
-        const wangid = templateSlotWangId(slotIndex, this._colorA, this._colorB);
+        const wangid = templateSlotWangId(slotIndex, this.state.templateColorA, this.state.templateColorB);
         this.state.setWangId(tileId, wangid);
       }
     }
