@@ -15,6 +15,7 @@ export class InspectorPanel {
   private gridContainer!: HTMLDivElement;
   private wangIdDisplay!: HTMLDivElement;
   private infoDisplay!: HTMLDivElement;
+  private probabilityContainer!: HTMLDivElement;
   private adjacencyContainer!: HTMLDivElement;
   private adjacencyLabel!: HTMLDivElement;
 
@@ -89,6 +90,11 @@ export class InspectorPanel {
     `;
     this.element.appendChild(this.wangIdDisplay);
 
+    // Tile probability
+    this.probabilityContainer = document.createElement('div');
+    this.probabilityContainer.style.cssText = 'margin-top: 8px; margin-bottom: 8px;';
+    this.element.appendChild(this.probabilityContainer);
+
     // Action buttons
     const actions = document.createElement('div');
     actions.style.cssText = 'margin-top: 12px; display: flex; flex-direction: column; gap: 4px;';
@@ -138,6 +144,7 @@ export class InspectorPanel {
       this.clearPreview();
       this.clearGrid();
       this.wangIdDisplay.textContent = '—';
+      this.probabilityContainer.textContent = '';
       this.clearAdjacencyPreview();
       return;
     }
@@ -157,6 +164,8 @@ export class InspectorPanel {
     this.wangIdDisplay.textContent = wt
       ? `[${wt.wangid.join(', ')}]`
       : 'Not tagged';
+
+    this.renderProbability(tileId);
 
     // Adjacency preview
     this.drawAdjacencyPreview(tileId);
@@ -350,6 +359,78 @@ export class InspectorPanel {
     }
     this.adjacencyLabel.style.display = 'none';
     this.adjacencyContainer.style.display = 'none';
+  }
+
+  private renderProbability(tileId: number): void {
+    while (this.probabilityContainer.firstChild) {
+      this.probabilityContainer.removeChild(this.probabilityContainer.firstChild);
+    }
+    const wt = this.state.getWangTile(tileId);
+    if (!wt) return;
+
+    const prob = wt.probability ?? 1.0;
+    const isDefault = prob === 1.0;
+
+    const label = document.createElement('span');
+    label.textContent = 'Tile Prob ';
+    label.style.cssText = 'font-size: 11px; color: #888;';
+    this.probabilityContainer.appendChild(label);
+
+    const badge = document.createElement('span');
+    badge.textContent = `P:${parseFloat(prob.toFixed(2))}`;
+    badge.style.cssText = `
+      font-size: 10px; color: ${isDefault ? '#888' : '#eeb300'};
+      background: #2a2a2a; padding: 0 4px;
+      border-radius: 2px; border: 1px solid ${isDefault ? '#444' : '#887700'};
+      cursor: pointer; user-select: none;
+    `;
+    badge.title = 'Click to edit tile probability';
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.startTileProbabilityEdit(badge, tileId);
+    });
+    this.probabilityContainer.appendChild(badge);
+  }
+
+  private startTileProbabilityEdit(badge: HTMLSpanElement, tileId: number): void {
+    const wt = this.state.getWangTile(tileId);
+    if (!wt) return;
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.step = '0.1';
+    input.value = String(wt.probability ?? 1.0);
+    input.style.cssText = `
+      width: 48px; background: #1e1e3a; color: #e0e0e0; border: 1px solid #6666cc;
+      font-size: 11px; padding: 1px 4px; border-radius: 2px; outline: none;
+    `;
+
+    let committed = false;
+    const commit = () => {
+      if (committed) return;
+      committed = true;
+      const val = parseFloat(input.value);
+      if (!isNaN(val) && val >= 0) {
+        if (this.state.selectedTileIds.size > 1) {
+          this.state.setTileProbabilityMulti([...this.state.selectedTileIds], val);
+        } else {
+          this.state.setTileProbability(tileId, val);
+        }
+      }
+      this.render();
+    };
+
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      else if (e.key === 'Escape') { committed = true; this.render(); }
+    });
+    input.addEventListener('blur', commit);
+
+    badge.replaceWith(input);
+    input.focus();
+    input.select();
   }
 
   private paintZone(tileId: number, wangIdx: number): void {
