@@ -171,6 +171,9 @@ export class WangSetPanel {
     });
     this.listContainer.appendChild(addWsBtn);
 
+    // Transformations section
+    this.listContainer.appendChild(this.createTransformationsSection());
+
     // Keyboard hint
     const hint = document.createElement('div');
     hint.textContent = 'Keys 0-9: select color';
@@ -360,6 +363,77 @@ export class WangSetPanel {
     }
 
     return row;
+  }
+
+  /**
+   * Create the Transformations configuration section.
+   * Provides checkboxes for flip/rotate options and an impact display
+   * showing base tile count and effective variant multiplier.
+   */
+  private createTransformationsSection(): HTMLDivElement {
+    const section = document.createElement('div');
+    section.style.cssText = 'margin-top: 16px;';
+
+    const header = document.createElement('h3');
+    header.textContent = 'Transformations';
+    header.style.cssText = 'margin: 0 0 8px 0; font-size: 13px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;';
+    section.appendChild(header);
+
+    const config = this.state.transformations;
+
+    const checkboxes: { label: string; key: keyof typeof config }[] = [
+      { label: 'Allow Flip H', key: 'allowFlipH' },
+      { label: 'Allow Flip V', key: 'allowFlipV' },
+      { label: 'Allow Rotation', key: 'allowRotate' },
+      { label: 'Prefer Untransformed', key: 'preferUntransformed' },
+    ];
+
+    for (const cb of checkboxes) {
+      const labelEl = document.createElement('label');
+      labelEl.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; cursor: pointer;';
+
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = config[cb.key];
+      input.addEventListener('change', () => {
+        this.state.setTransformations({ [cb.key]: input.checked });
+      });
+      labelEl.appendChild(input);
+
+      const span = document.createElement('span');
+      span.textContent = cb.label;
+      labelEl.appendChild(span);
+
+      section.appendChild(labelEl);
+    }
+
+    // Impact display
+    const { wangsets } = this.state.metadata;
+    let baseTiles = 0;
+    for (const ws of wangsets) {
+      baseTiles += ws.wangtiles.length;
+    }
+
+    let multiplier = 1;
+    if (config.allowFlipH) multiplier *= 2;
+    if (config.allowFlipV) multiplier *= 2;
+    if (config.allowRotate) multiplier *= 4;
+    // When all three are enabled the theoretical max is 8 (not 16),
+    // because some flip+rotate combinations are equivalent.
+    // The combined product 2*2*4=16 overcounts; cap at 8.
+    if (multiplier > 8) multiplier = 8;
+
+    const impact = document.createElement('div');
+    impact.style.cssText = 'font-size: 11px; color: #888; margin-top: 6px; padding: 4px;';
+    if (baseTiles > 0) {
+      const effective = baseTiles * multiplier;
+      impact.textContent = `${baseTiles} base tiles \u2192 up to ${effective} effective variants (${multiplier}x)`;
+    } else {
+      impact.textContent = 'No base tiles defined yet';
+    }
+    section.appendChild(impact);
+
+    return section;
   }
 
   /**

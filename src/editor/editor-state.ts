@@ -1,4 +1,4 @@
-import { TilesetMetadata, WangSetData, WangTileData } from '../core/metadata-schema.js';
+import { TilesetMetadata, WangSetData, WangTileData, TransformationConfig, DEFAULT_TRANSFORMATIONS } from '../core/metadata-schema.js';
 import { UndoManager } from './undo-manager.js';
 
 export type EditorEvent =
@@ -74,6 +74,11 @@ export class EditorState {
     return this._templateColorB;
   }
 
+  /** Get the current transformation config, with defaults */
+  get transformations(): TransformationConfig {
+    return this._metadata.transformations ?? DEFAULT_TRANSFORMATIONS;
+  }
+
   // --- Setters (emit events) ---
 
   selectTile(tileId: number): void {
@@ -122,6 +127,16 @@ export class EditorState {
     if (this._templateColorB === colorId) return;
     this._templateColorB = colorId;
     this.emit('templateModeChanged');
+  }
+
+  /** Update transformation config */
+  setTransformations(config: Partial<TransformationConfig>): void {
+    this.saveSnapshot();
+    if (!this._metadata.transformations) {
+      this._metadata.transformations = { ...DEFAULT_TRANSFORMATIONS };
+    }
+    Object.assign(this._metadata.transformations, config);
+    this.emit('metadataChanged');
   }
 
   // --- Undo/Redo ---
