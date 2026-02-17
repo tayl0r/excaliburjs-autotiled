@@ -271,6 +271,52 @@ export class WangSetPanel {
   }
 
   /**
+   * Replace a probability badge with an inline number input.
+   */
+  private startInlineProbabilityEdit(badge: HTMLSpanElement, colorIndex: number): void {
+    const ws = this.state.activeWangSet;
+    if (!ws) return;
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.max = '1';
+    input.step = '0.1';
+    input.value = String(ws.colors[colorIndex].probability);
+    input.style.cssText = `
+      width: 48px; background: #1e1e3a; color: #e0e0e0; border: 1px solid #6666cc;
+      font-size: 11px; padding: 1px 4px; border-radius: 2px; outline: none;
+    `;
+
+    let committed = false;
+    const commit = () => {
+      if (committed) return;
+      committed = true;
+      const val = parseFloat(input.value);
+      if (!isNaN(val) && val >= 0 && val <= 1) {
+        this.state.updateColor(colorIndex, { probability: val });
+      }
+      this.render();
+    };
+
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commit();
+      } else if (e.key === 'Escape') {
+        committed = true;
+        this.render();
+      }
+    });
+    input.addEventListener('blur', commit);
+
+    badge.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  /**
    * Create a color row. When colorIndex is provided (for real colors, not erase),
    * enables inline rename, color picker, and delete.
    */
@@ -342,6 +388,27 @@ export class WangSetPanel {
       });
     }
     row.appendChild(label);
+
+    // Probability badge (for real colors) — click to expand to inline input
+    if (colorIndex !== undefined) {
+      const ws = this.state.activeWangSet;
+      const prob = ws?.colors[colorIndex]?.probability ?? 1.0;
+      const probBadge = document.createElement('span');
+      probBadge.textContent = `P:${prob}`;
+      const isDefault = prob === 1.0;
+      probBadge.style.cssText = `
+        font-size: 10px; color: ${isDefault ? '#888' : '#eeb300'};
+        background: #2a2a2a; padding: 0 4px;
+        border-radius: 2px; border: 1px solid ${isDefault ? '#444' : '#887700'};
+        cursor: pointer; user-select: none;
+      `;
+      probBadge.title = 'Click to edit probability';
+      probBadge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.startInlineProbabilityEdit(probBadge, colorIndex!);
+      });
+      row.appendChild(probBadge);
+    }
 
     // Keyboard shortcut badge
     const key = document.createElement('span');
