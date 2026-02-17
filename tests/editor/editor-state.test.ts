@@ -132,6 +132,29 @@ describe('EditorState WangColor CRUD', () => {
     state.removeColor(0);          // +1
     expect(count).toBe(3);
   });
+
+  it('updateColor changes probability', () => {
+    const state = stateWithWangSet();
+    state.addColor('Grass', '#00ff00');
+    state.updateColor(0, { probability: 0.5 });
+    expect(state.activeWangSet!.colors[0].probability).toBe(0.5);
+  });
+
+  it('updateColor sets representative tile', () => {
+    const state = stateWithWangSet();
+    state.addColor('Grass', '#00ff00');
+    expect(state.activeWangSet!.colors[0].tile).toBe(-1);
+    state.updateColor(0, { tile: 42 });
+    expect(state.activeWangSet!.colors[0].tile).toBe(42);
+  });
+
+  it('updateColor clears representative tile back to -1', () => {
+    const state = stateWithWangSet();
+    state.addColor('Grass', '#00ff00');
+    state.updateColor(0, { tile: 42 });
+    state.updateColor(0, { tile: -1 });
+    expect(state.activeWangSet!.colors[0].tile).toBe(-1);
+  });
 });
 
 describe('EditorState template mode', () => {
