@@ -55,6 +55,7 @@ export class TilesetPanel {
     this.state.on('metadataChanged', () => this.render());
     this.state.on('zoomChanged', () => this.render());
     this.state.on('activeWangSetChanged', () => this.render());
+    this.state.on('activeColorChanged', () => this.render());
   }
 
   private setupEvents(): void {
@@ -154,6 +155,9 @@ export class TilesetPanel {
     // Draw WangId overlays for tagged tiles
     this.drawWangOverlays(zoom);
 
+    // Draw light blue outline on tiles matching active WangSet + color
+    this.drawActiveColorOutlines(zoom);
+
     // Draw hover highlight
     if (this.hoveredTileId >= 0) {
       const [hc, hr] = colRowFromTileId(this.hoveredTileId, columns);
@@ -177,6 +181,30 @@ export class TilesetPanel {
         sr * tileHeight * zoom + 1,
         tileWidth * zoom - 2,
         tileHeight * zoom - 2
+      );
+    }
+  }
+
+  private drawActiveColorOutlines(zoom: number): void {
+    const ws = this.state.activeWangSet;
+    const colorId = this.state.activeColorId;
+    if (!ws || colorId <= 0) return;
+
+    const { tileWidth, tileHeight, columns } = this.state.metadata;
+    const tw = tileWidth * zoom;
+    const th = tileHeight * zoom;
+
+    this.ctx.strokeStyle = 'rgba(100, 180, 255, 0.7)';
+    this.ctx.lineWidth = 2;
+
+    for (const wt of ws.wangtiles) {
+      if (!wt.wangid.includes(colorId)) continue;
+      const [col, row] = colRowFromTileId(wt.tileid, columns);
+      this.ctx.strokeRect(
+        col * tw + 1,
+        row * th + 1,
+        tw - 2,
+        th - 2,
       );
     }
   }
