@@ -39,6 +39,7 @@ export class WangSetPanel {
     });
     this.state.on('activeColorChanged', () => this.render());
     this.state.on('metadataChanged', () => this.render());
+    this.state.on('selectedTileChanged', () => this.render());
 
     this.render();
   }
@@ -149,6 +150,31 @@ export class WangSetPanel {
             this.state.addColor(name, hexColor);
           });
           colorsList.appendChild(addColorBtn);
+
+          // "Set Rep Tile" button — assigns selected tile as representative for active color
+          const setRepBtn = document.createElement('button');
+          setRepBtn.textContent = 'Set Rep Tile';
+          const activeColor = this.state.activeColorId;
+          const hasSelection = this.state.selectedTileId >= 0;
+          const hasActiveColor = activeColor >= 1;
+          setRepBtn.disabled = !hasSelection || !hasActiveColor;
+          setRepBtn.title = hasSelection && hasActiveColor
+            ? `Set tile #${this.state.selectedTileId} as representative for active color`
+            : 'Select a tile and a color first';
+          setRepBtn.style.cssText = `
+            background: #333; color: ${setRepBtn.disabled ? '#666' : '#ccc'};
+            border: 1px solid #555;
+            cursor: ${setRepBtn.disabled ? 'not-allowed' : 'pointer'};
+            font-size: 11px; padding: 4px 10px;
+            border-radius: 3px; margin-top: 4px; width: 100%;
+          `;
+          setRepBtn.addEventListener('click', () => {
+            if (this.state.selectedTileId >= 0 && this.state.activeColorId >= 1) {
+              const ci = this.state.activeColorId - 1; // 0-based index
+              this.state.updateColor(ci, { tile: this.state.selectedTileId });
+            }
+          });
+          colorsList.appendChild(setRepBtn);
 
           wsDiv.appendChild(colorsList);
 
@@ -339,6 +365,43 @@ export class WangSetPanel {
     row.addEventListener('click', () => {
       this.state.setActiveColor(colorId);
     });
+
+    // Representative tile thumbnail (for real colors)
+    if (colorIndex !== undefined) {
+      const ws = this.state.activeWangSet;
+      const repTile = ws?.colors[colorIndex]?.tile ?? -1;
+      const thumb = document.createElement('canvas');
+      thumb.width = 14;
+      thumb.height = 14;
+      thumb.style.cssText = `
+        width: 14px; height: 14px; flex-shrink: 0;
+        border-radius: 2px;
+        ${repTile === -1
+          ? 'border: 1px dashed rgba(255,255,255,0.2);'
+          : 'border: 1px solid rgba(255,255,255,0.3);'}
+      `;
+
+      if (repTile >= 0) {
+        const ctx = thumb.getContext('2d');
+        if (ctx) {
+          const { tileWidth, tileHeight, columns } = this.state.metadata;
+          const sx = (repTile % columns) * tileWidth;
+          const sy = Math.floor(repTile / columns) * tileHeight;
+          ctx.drawImage(this.image, sx, sy, tileWidth, tileHeight, 0, 0, 14, 14);
+        }
+        thumb.title = `Representative tile #${repTile} (right-click to clear)`;
+        thumb.style.cursor = 'pointer';
+        thumb.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.state.updateColor(colorIndex!, { tile: -1 });
+        });
+      } else {
+        thumb.title = 'No representative tile set';
+      }
+
+      row.appendChild(thumb);
+    }
 
     // Color swatch — clickable to open a color picker for real colors
     const swatch = document.createElement('div');
