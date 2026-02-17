@@ -1,5 +1,6 @@
 import { EditorState } from '../editor-state.js';
 import { colRowFromTileId } from '../../utils/tile-math.js';
+import { computeAdjacencyPreview } from '../adjacency-preview.js';
 
 /**
  * Tile inspector panel with WangId zone editor.
@@ -14,6 +15,8 @@ export class InspectorPanel {
   private gridContainer!: HTMLDivElement;
   private wangIdDisplay!: HTMLDivElement;
   private infoDisplay!: HTMLDivElement;
+  private adjacencyContainer!: HTMLDivElement;
+  private adjacencyLabel!: HTMLDivElement;
 
   constructor(state: EditorState, image: HTMLImageElement) {
     this.state = state;
@@ -104,6 +107,23 @@ export class InspectorPanel {
     actions.appendChild(clearBtn);
 
     this.element.appendChild(actions);
+
+    // Adjacency Preview label
+    this.adjacencyLabel = document.createElement('div');
+    this.adjacencyLabel.textContent = 'Adjacency Preview';
+    this.adjacencyLabel.style.cssText = 'font-size: 11px; color: #888; margin-top: 12px; margin-bottom: 4px;';
+    this.element.appendChild(this.adjacencyLabel);
+
+    // Adjacency Preview 3x3 grid
+    this.adjacencyContainer = document.createElement('div');
+    this.adjacencyContainer.style.cssText = `
+      display: grid;
+      grid-template-columns: repeat(3, 40px);
+      grid-template-rows: repeat(3, 40px);
+      gap: 2px;
+      margin-bottom: 12px;
+    `;
+    this.element.appendChild(this.adjacencyContainer);
   }
 
   render(): void {
@@ -114,6 +134,7 @@ export class InspectorPanel {
       this.clearPreview();
       this.clearGrid();
       this.wangIdDisplay.textContent = '—';
+      this.clearAdjacencyPreview();
       return;
     }
 
@@ -132,6 +153,9 @@ export class InspectorPanel {
     this.wangIdDisplay.textContent = wt
       ? `[${wt.wangid.join(', ')}]`
       : 'Not tagged';
+
+    // Adjacency preview
+    this.drawAdjacencyPreview(tileId);
   }
 
   private drawPreview(tileId: number): void {
@@ -240,6 +264,88 @@ export class InspectorPanel {
     while (this.gridContainer.firstChild) {
       this.gridContainer.removeChild(this.gridContainer.firstChild);
     }
+  }
+
+  private drawAdjacencyPreview(tileId: number): void {
+    while (this.adjacencyContainer.firstChild) {
+      this.adjacencyContainer.removeChild(this.adjacencyContainer.firstChild);
+    }
+
+    const ws = this.state.activeWangSet;
+    const wt = this.state.getWangTile(tileId);
+
+    if (!ws || !wt) {
+      this.adjacencyLabel.style.display = 'none';
+      this.adjacencyContainer.style.display = 'none';
+      return;
+    }
+
+    this.adjacencyLabel.style.display = '';
+    this.adjacencyContainer.style.display = 'grid';
+
+    const result = computeAdjacencyPreview(wt.wangid, ws);
+
+    // Set the center tile's actual tileId
+    if (result.tiles[4]) {
+      result.tiles[4].tileId = tileId;
+    }
+
+    const { tileWidth, tileHeight, columns } = this.state.metadata;
+
+    for (let i = 0; i < 9; i++) {
+      const tile = result.tiles[i];
+      const isCenter = i === 4;
+
+      if (tile && tile.tileId >= 0) {
+        // Draw the tile image on a small canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = 40;
+        canvas.height = 40;
+        canvas.style.cssText = `
+          image-rendering: pixelated;
+          border: 2px solid ${isCenter ? '#cc0' : '#333'};
+          border-radius: 3px;
+          background: #111;
+        `;
+
+        const ctx = canvas.getContext('2d')!;
+        ctx.imageSmoothingEnabled = false;
+        const [col, row] = colRowFromTileId(tile.tileId, columns);
+        ctx.drawImage(
+          this.image,
+          col * tileWidth, row * tileHeight, tileWidth, tileHeight,
+          0, 0, 40, 40,
+        );
+
+        this.adjacencyContainer.appendChild(canvas);
+      } else {
+        // Empty cell with "?" indicator
+        const cell = document.createElement('div');
+        cell.style.cssText = `
+          width: 40px;
+          height: 40px;
+          background: #1a1a1a;
+          border: 1px solid #333;
+          border-radius: 3px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          color: #444;
+          box-sizing: border-box;
+        `;
+        cell.textContent = '?';
+        this.adjacencyContainer.appendChild(cell);
+      }
+    }
+  }
+
+  private clearAdjacencyPreview(): void {
+    while (this.adjacencyContainer.firstChild) {
+      this.adjacencyContainer.removeChild(this.adjacencyContainer.firstChild);
+    }
+    this.adjacencyLabel.style.display = 'none';
+    this.adjacencyContainer.style.display = 'none';
   }
 
   private paintZone(tileId: number, wangIdx: number): void {
