@@ -469,8 +469,9 @@ export class EditorState {
         const existing = ws.wangtiles.find(w => w.tileid === targetTileId);
         if (existing) {
           existing.wangid = [...wt.wangid];
+          existing.probability = wt.probability;
         } else {
-          ws.wangtiles.push({ tileid: targetTileId, wangid: [...wt.wangid] });
+          ws.wangtiles.push({ tileid: targetTileId, wangid: [...wt.wangid], probability: wt.probability });
         }
       }
     }

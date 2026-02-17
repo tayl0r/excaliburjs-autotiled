@@ -122,9 +122,7 @@ export class RegionAssignPanel {
         pattern, originTileId, columns, this.state.metadata.tileCount, colorA, colorB
       );
 
-      for (const [tileId, wangid] of assignments) {
-        this.state.setWangId(tileId, wangid);
-      }
+      this.state.setWangIdMulti(assignments.map(([tileId, wangid]) => ({ tileId, wangid })));
     });
     this.element.appendChild(applyBtn);
   }
