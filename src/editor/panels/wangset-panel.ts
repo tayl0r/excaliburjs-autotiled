@@ -12,14 +12,16 @@ import type { WangSetData } from '../../core/metadata-schema.js';
 export class WangSetPanel {
   readonly element: HTMLDivElement;
   private state: EditorState;
+  private image: HTMLImageElement;
   private listContainer!: HTMLDivElement;
   /** Track whether the completeness missing-list is expanded */
   private missingExpanded = false;
   /** Suppress re-renders while color picker popup is open */
   private colorPickerOpen = false;
 
-  constructor(state: EditorState) {
+  constructor(state: EditorState, image: HTMLImageElement) {
     this.state = state;
+    this.image = image;
 
     this.element = document.createElement('div');
 

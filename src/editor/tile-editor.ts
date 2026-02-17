@@ -33,7 +33,7 @@ export class TileEditor {
     this.filename = metadata.tilesetImage.replace(/\.\w+$/, '') + '.autotile.json';
 
     this.tilesetPanel = new TilesetPanel(this.state, image);
-    this.wangSetPanel = new WangSetPanel(this.state);
+    this.wangSetPanel = new WangSetPanel(this.state, image);
     this.inspectorPanel = new InspectorPanel(this.state, image);
     this.templatePanel = new TemplatePanel(this.state, image);
 
