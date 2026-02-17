@@ -202,6 +202,7 @@ export class WangSetPanel {
     };
 
     input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
       if (e.key === 'Enter') {
         e.preventDefault();
         commit();
@@ -244,6 +245,7 @@ export class WangSetPanel {
     };
 
     input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
       if (e.key === 'Enter') {
         e.preventDefault();
         commit();
