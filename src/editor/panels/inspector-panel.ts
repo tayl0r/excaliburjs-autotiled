@@ -107,9 +107,7 @@ export class InspectorPanel {
     `;
     clearBtn.addEventListener('click', () => {
       if (this.state.selectedTileIds.size > 1) {
-        for (const tileId of this.state.selectedTileIds) {
-          this.state.removeWangTile(tileId);
-        }
+        this.state.removeWangTileMulti([...this.state.selectedTileIds]);
       } else if (this.state.selectedTileId >= 0) {
         this.state.removeWangTile(this.state.selectedTileId);
       }
@@ -151,7 +149,11 @@ export class InspectorPanel {
 
     // Info
     const [col, row] = colRowFromTileId(tileId, this.state.metadata.columns);
-    this.infoDisplay.textContent = `Tile ${tileId} (col ${col}, row ${row})`;
+    if (this.state.selectedTileIds.size > 1) {
+      this.infoDisplay.textContent = `${this.state.selectedTileIds.size} tiles selected (primary: ${tileId})`;
+    } else {
+      this.infoDisplay.textContent = `Tile ${tileId} (col ${col}, row ${row})`;
+    }
 
     // Preview
     this.drawPreview(tileId);
@@ -438,9 +440,20 @@ export class InspectorPanel {
     const wangid = wt ? [...wt.wangid] : [0, 0, 0, 0, 0, 0, 0, 0];
 
     const colorId = this.state.activeColorId;
-    // Toggle: if already this color, set to 0 (erase)
-    wangid[wangIdx] = wangid[wangIdx] === colorId ? 0 : colorId;
+    const newColor = wangid[wangIdx] === colorId ? 0 : colorId;
+    wangid[wangIdx] = newColor;
 
-    this.state.setWangId(tileId, wangid);
+    if (this.state.selectedTileIds.size > 1) {
+      const entries: Array<{ tileId: number; wangid: number[] }> = [];
+      for (const selId of this.state.selectedTileIds) {
+        const selWt = this.state.getWangTile(selId);
+        const selWangid = selWt ? [...selWt.wangid] : [0, 0, 0, 0, 0, 0, 0, 0];
+        selWangid[wangIdx] = newColor;
+        entries.push({ tileId: selId, wangid: selWangid });
+      }
+      this.state.setWangIdMulti(entries);
+    } else {
+      this.state.setWangId(tileId, wangid);
+    }
   }
 }
