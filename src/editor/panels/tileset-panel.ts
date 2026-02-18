@@ -27,16 +27,13 @@ export class TilesetPanel {
     this.element = document.createElement('div');
     this.element.style.cssText = `
       width: 100%; height: 100%;
-      overflow: auto;
+      display: flex; flex-direction: column;
       position: relative;
-      cursor: crosshair;
     `;
 
-    // Sticky header that stays fixed at top while canvas scrolls
-    const stickyHeader = document.createElement('div');
-    stickyHeader.style.cssText = `
-      position: sticky; top: 0; z-index: 10;
-    `;
+    // Fixed header (does not scroll)
+    const fixedHeader = document.createElement('div');
+    fixedHeader.style.cssText = `flex-shrink: 0;`;
 
     // Tileset tab bar (one tab per tileset)
     this.tilesetTabBar = document.createElement('div');
@@ -45,7 +42,7 @@ export class TilesetPanel {
       background: #0e1628; border-bottom: 1px solid #333;
     `;
     this.buildTilesetTabs();
-    stickyHeader.appendChild(this.tilesetTabBar);
+    fixedHeader.appendChild(this.tilesetTabBar);
 
     // Filter bar
     const filterBar = document.createElement('div');
@@ -68,12 +65,17 @@ export class TilesetPanel {
       filterBar.appendChild(btn);
       this.filterButtons.push(btn);
     }
-    stickyHeader.appendChild(filterBar);
-    this.element.appendChild(stickyHeader);
+    fixedHeader.appendChild(filterBar);
+    this.element.appendChild(fixedHeader);
+
+    // Scrollable canvas area
+    const scrollArea = document.createElement('div');
+    scrollArea.style.cssText = `flex: 1; overflow: auto; cursor: crosshair;`;
 
     this.canvas = document.createElement('canvas');
     this.canvas.style.cssText = 'image-rendering: pixelated;';
-    this.element.appendChild(this.canvas);
+    scrollArea.appendChild(this.canvas);
+    this.element.appendChild(scrollArea);
 
     this.ctx = this.canvas.getContext('2d')!;
     this.ctx.imageSmoothingEnabled = false;
@@ -199,12 +201,12 @@ export class TilesetPanel {
       this.render();
     });
 
-    // Zoom with scroll wheel
+    // Zoom with scroll wheel / pinch — multiplicative for smooth feel
     this.element.addEventListener('wheel', (e) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        const delta = e.deltaY > 0 ? -1 : 1;
-        this.state.setZoom(this.state.zoom + delta);
+        const factor = Math.pow(1.01, -e.deltaY);
+        this.state.setZoom(this.state.zoom * factor);
       }
     }, { passive: false });
   }

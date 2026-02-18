@@ -206,7 +206,9 @@ export class EditorState {
   }
 
   setZoom(zoom: number): void {
-    this._zoom = Math.max(1, Math.min(8, zoom));
+    const clamped = Math.max(1, Math.min(8, zoom));
+    if (clamped === this._zoom) return;
+    this._zoom = clamped;
     this.emit('zoomChanged');
   }
 

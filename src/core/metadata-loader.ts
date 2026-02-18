@@ -25,6 +25,7 @@ function loadWangSet(data: WangSetData): WangSet {
     name: c.name,
     color: c.color,
     imageTileId: c.tile,
+    tilesetIndex: c.tileset ?? 0,
     probability: c.probability ?? 1.0,
   }));
 

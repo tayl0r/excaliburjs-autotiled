@@ -103,9 +103,6 @@ export class GameScene extends ex.Scene {
       max-width: 90%;
     `;
 
-    const ts = this.tilesetManager.primaryTileset;
-    const tilesetImage = this.tilesetManager.getImage(0);
-
     for (const color of wangSet.colors) {
       const btn = document.createElement('button');
       btn.dataset.colorId = String(color.id);
@@ -120,7 +117,10 @@ export class GameScene extends ex.Scene {
         cursor: pointer;
       `;
 
-      // Tile thumbnail
+      // Tile thumbnail — use the color's tileset index
+      const tsi = color.tilesetIndex;
+      const tilesetImage = this.tilesetManager.getImage(tsi);
+      const ts = this.tilesetManager.metadata.tilesets[tsi] ?? this.tilesetManager.primaryTileset;
       if (tilesetImage && color.imageTileId >= 0) {
         const thumb = document.createElement('canvas');
         thumb.width = 16;

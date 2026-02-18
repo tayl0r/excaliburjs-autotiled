@@ -6,6 +6,8 @@ export interface WangColor {
   color: string;
   /** Representative tile ID for UI thumbnails (-1 = none) */
   imageTileId: number;
+  /** Tileset index for the representative tile */
+  tilesetIndex: number;
   /** Weight for random selection (default 1.0) */
   probability: number;
 }
