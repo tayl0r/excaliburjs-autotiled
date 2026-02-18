@@ -1,7 +1,6 @@
 import { EditorState } from '../editor-state.js';
 import type { TileAnimation } from '../../core/metadata-schema.js';
 import { colRowFromTileId } from '../../utils/tile-math.js';
-import { computeAdjacencyPreview } from '../adjacency-preview.js';
 import { wangColorHex } from '../../core/wang-color.js';
 
 const EMPTY_WANGID = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -21,8 +20,6 @@ export class InspectorPanel {
   private wangIdDisplay!: HTMLDivElement;
   private infoDisplay!: HTMLDivElement;
   private probabilityContainer!: HTMLDivElement;
-  private adjacencyContainer!: HTMLDivElement;
-  private adjacencyLabel!: HTMLDivElement;
 
   // Slot for externally-mounted panels above animation
   private externalSlot!: HTMLDivElement;
@@ -147,23 +144,6 @@ export class InspectorPanel {
 
     this.wangIdSection.appendChild(actions);
 
-    // Adjacency Preview label
-    this.adjacencyLabel = document.createElement('div');
-    this.adjacencyLabel.textContent = 'Adjacency Preview';
-    this.adjacencyLabel.style.cssText = 'font-size: 11px; color: #888; margin-top: 12px; margin-bottom: 4px;';
-    this.wangIdSection.appendChild(this.adjacencyLabel);
-
-    // Adjacency Preview 3x3 grid
-    this.adjacencyContainer = document.createElement('div');
-    this.adjacencyContainer.style.cssText = `
-      display: grid;
-      grid-template-columns: repeat(3, 40px);
-      grid-template-rows: repeat(3, 40px);
-      gap: 2px;
-      margin-bottom: 12px;
-    `;
-    this.wangIdSection.appendChild(this.adjacencyContainer);
-
     // Slot for externally-mounted panels (e.g. RegionAssignPanel) above animation
     this.externalSlot = document.createElement('div');
     this.wangIdSection.appendChild(this.externalSlot);
@@ -183,7 +163,6 @@ export class InspectorPanel {
 
   render(): void {
     this.cleanUpAnimPreview();
-    this.wangIdSection.style.display = 'block';
     this.renderWangIdSection();
   }
 
@@ -196,16 +175,15 @@ export class InspectorPanel {
       this.clearGrid();
       this.wangIdDisplay.textContent = '\u2014';
       this.probabilityContainer.textContent = '';
-      this.clearAdjacencyPreview();
       this.renderAnimationSection();
       return;
     }
 
     // Info
-    const [col, row] = colRowFromTileId(tileId, this.state.columns);
     if (this.state.selectedTileIds.size > 1) {
       this.infoDisplay.textContent = `${this.state.selectedTileIds.size} tiles selected (primary: ${tileId})`;
     } else {
+      const [col, row] = colRowFromTileId(tileId, this.state.columns);
       this.infoDisplay.textContent = `Tile ${tileId} (col ${col}, row ${row})`;
     }
 
@@ -222,9 +200,6 @@ export class InspectorPanel {
       : 'Not tagged';
 
     this.renderProbability(tileId);
-
-    // Adjacency preview
-    this.drawAdjacencyPreview(tileId);
 
     // Animation section
     this.renderAnimationSection();
@@ -718,81 +693,6 @@ export class InspectorPanel {
 
   private clearGrid(): void {
     this.gridContainer.replaceChildren();
-  }
-
-  private drawAdjacencyPreview(tileId: number): void {
-    this.adjacencyContainer.replaceChildren();
-
-    const ws = this.state.activeWangSet;
-    const wt = this.state.getWangTile(tileId);
-
-    if (!ws || !wt) {
-      this.adjacencyLabel.style.display = 'none';
-      this.adjacencyContainer.style.display = 'none';
-      return;
-    }
-
-    this.adjacencyLabel.style.display = '';
-    this.adjacencyContainer.style.display = 'grid';
-
-    const result = computeAdjacencyPreview(wt.wangid, ws);
-
-    if (result.tiles[4]) {
-      result.tiles[4].tileId = tileId;
-    }
-
-    const { tileWidth, tileHeight, columns } = this.state;
-
-    for (let i = 0; i < 9; i++) {
-      const tile = result.tiles[i];
-      const isCenter = i === 4;
-
-      if (tile && tile.tileId >= 0) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 40;
-        canvas.height = 40;
-        canvas.style.cssText = `
-          image-rendering: pixelated;
-          border: 2px solid ${isCenter ? '#cc0' : '#333'};
-          border-radius: 3px;
-          background: #111;
-        `;
-
-        const ctx = canvas.getContext('2d')!;
-        ctx.imageSmoothingEnabled = false;
-        const [col, row] = colRowFromTileId(tile.tileId, columns);
-        ctx.drawImage(
-          this.images[this.state.activeTilesetIndex],
-          col * tileWidth, row * tileHeight, tileWidth, tileHeight,
-          0, 0, 40, 40,
-        );
-
-        this.adjacencyContainer.appendChild(canvas);
-      } else {
-        const cell = document.createElement('div');
-        cell.style.cssText = `
-          width: 40px;
-          height: 40px;
-          background: #1a1a1a;
-          border: 1px solid #333;
-          border-radius: 3px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 14px;
-          color: #444;
-          box-sizing: border-box;
-        `;
-        cell.textContent = '?';
-        this.adjacencyContainer.appendChild(cell);
-      }
-    }
-  }
-
-  private clearAdjacencyPreview(): void {
-    this.adjacencyContainer.replaceChildren();
-    this.adjacencyLabel.style.display = 'none';
-    this.adjacencyContainer.style.display = 'none';
   }
 
   private renderProbability(tileId: number): void {

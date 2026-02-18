@@ -74,7 +74,7 @@
 | Method C: Region auto-detect with layout patterns | Done | `src/editor/panels/region-assign-panel.ts` + `layout-patterns.ts` |
 | Color overlay rendering on tagged tiles | Done | `src/editor/overlay-manager.ts` — colored triangles/rectangles |
 | Completeness validation | Done | `src/editor/completeness-checker.ts` — with expandable missing list in panel |
-| Adjacency preview (3x3 grid) | Done | `src/editor/adjacency-preview.ts` — wired into inspector panel |
+| Adjacency preview (3x3 grid) | Removed | Was in `src/editor/adjacency-preview.ts`; removed from inspector panel |
 | Transformation configuration (flip H/V, rotation) | Done | Checkboxes in WangSet panel with impact multiplier display |
 | Transformation preview (show all variants) | Not done | No UI to view generated variants for a selected tile |
 | Animation frame support | Done | `src/editor/panels/animation-panel.ts` — frame sync, offset editing, auto-copy tags |
@@ -97,7 +97,7 @@
 | `Ctrl+S` save | Yes | Not done (auto-save only) |
 | `Ctrl+Z` / `Ctrl+Shift+Z` undo/redo | Yes | Done |
 | `T` open template view | Yes | Done (toggles entire editor) |
-| `P` toggle adjacency preview | Yes | Not done |
+| `P` toggle adjacency preview | Yes | N/A — adjacency preview removed |
 
 ---
 
@@ -250,7 +250,7 @@ Verification: `tsc --noEmit` clean, 186 tests passing.
 - Template panel with 4x4 grid and auto-fill
 - WangSet and WangColor CRUD (state + UI)
 - Completeness validation with status display
-- Adjacency preview (3x3 grid)
+- ~~Adjacency preview (3x3 grid) — removed~~
 - Color overlay rendering
 - Transformation configuration UI
 - Per-tile animation system (inline inspector editor, copy/paste with offset, apply to color, animated tile badges)
