@@ -1,5 +1,6 @@
 import { EditorState } from '../editor-state.js';
 import { checkCompleteness } from '../completeness-checker.js';
+import { wangColorHex } from '../../core/wang-color.js';
 import type { WangSetData } from '../../core/metadata-schema.js';
 
 /**
@@ -12,16 +13,14 @@ import type { WangSetData } from '../../core/metadata-schema.js';
 export class WangSetPanel {
   readonly element: HTMLDivElement;
   private state: EditorState;
-  private image: HTMLImageElement;
+  private images: HTMLImageElement[];
   private listContainer!: HTMLDivElement;
   /** Track whether the completeness missing-list is expanded */
   private missingExpanded = false;
-  /** Suppress re-renders while color picker popup is open */
-  private colorPickerOpen = false;
 
-  constructor(state: EditorState, image: HTMLImageElement) {
+  constructor(state: EditorState, images: HTMLImageElement[]) {
     this.state = state;
-    this.image = image;
+    this.images = images;
 
     this.element = document.createElement('div');
 
@@ -45,8 +44,6 @@ export class WangSetPanel {
   }
 
   render(): void {
-    if (this.colorPickerOpen) return;
-
     // Clear existing content
     while (this.listContainer.firstChild) {
       this.listContainer.removeChild(this.listContainer.firstChild);
@@ -125,12 +122,12 @@ export class WangSetPanel {
           colorsList.style.cssText = 'margin-top: 4px; padding-left: 4px;';
 
           // Color 0 = "Erase" option
-          const eraseRow = this.createColorRow(0, 'Erase', '#333', '0');
+          const eraseRow = this.createColorRow(0, 'Erase', '0');
           colorsList.appendChild(eraseRow);
 
           ws.colors.forEach((color, ci) => {
             const colorId = ci + 1; // 1-based
-            const row = this.createColorRow(colorId, color.name, color.color, String(colorId), ci);
+            const row = this.createColorRow(colorId, color.name, String(colorId), ci);
             colorsList.appendChild(row);
           });
 
@@ -144,10 +141,7 @@ export class WangSetPanel {
           `;
           addColorBtn.addEventListener('click', () => {
             const n = ws.colors.length + 1;
-            const name = `Color ${n}`;
-            const hue = (ws.colors.length * 137) % 360; // golden-angle rotation
-            const hexColor = this.hslToHex(hue, 70, 50);
-            this.state.addColor(name, hexColor);
+            this.state.addColor(`Color ${n}`);
           });
           colorsList.appendChild(addColorBtn);
 
@@ -171,7 +165,7 @@ export class WangSetPanel {
           setRepBtn.addEventListener('click', () => {
             if (this.state.selectedTileId >= 0 && this.state.activeColorId >= 1) {
               const ci = this.state.activeColorId - 1; // 0-based index
-              this.state.updateColor(ci, { tile: this.state.selectedTileId });
+              this.state.updateColor(ci, { tile: this.state.selectedTileId, tileset: this.state.activeTilesetIndex });
             }
           });
           colorsList.appendChild(setRepBtn);
@@ -344,12 +338,11 @@ export class WangSetPanel {
 
   /**
    * Create a color row. When colorIndex is provided (for real colors, not erase),
-   * enables inline rename, color picker, and delete.
+   * enables inline rename and delete.
    */
   private createColorRow(
     colorId: number,
     name: string,
-    hexColor: string,
     shortcut: string,
     colorIndex?: number,
   ): HTMLDivElement {
@@ -384,17 +377,19 @@ export class WangSetPanel {
       if (repTile >= 0) {
         const ctx = thumb.getContext('2d');
         if (ctx) {
-          const { tileWidth, tileHeight, columns } = this.state.metadata;
-          const sx = (repTile % columns) * tileWidth;
-          const sy = Math.floor(repTile / columns) * tileHeight;
-          ctx.drawImage(this.image, sx, sy, tileWidth, tileHeight, 0, 0, 14, 14);
+          const repTileset = ws?.colors[colorIndex]?.tileset ?? 0;
+          const ts = this.state.metadata.tilesets[repTileset] ?? this.state.metadata.tilesets[0];
+          const img = this.images[repTileset] ?? this.images[0];
+          const sx = (repTile % ts.columns) * ts.tileWidth;
+          const sy = Math.floor(repTile / ts.columns) * ts.tileHeight;
+          ctx.drawImage(img, sx, sy, ts.tileWidth, ts.tileHeight, 0, 0, 14, 14);
         }
         thumb.title = `Representative tile #${repTile} (right-click to clear)`;
         thumb.style.cursor = 'pointer';
         thumb.addEventListener('contextmenu', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          this.state.updateColor(colorIndex!, { tile: -1 });
+          this.state.updateColor(colorIndex!, { tile: -1, tileset: undefined });
         });
       } else {
         thumb.title = 'No representative tile set';
@@ -403,40 +398,14 @@ export class WangSetPanel {
       row.appendChild(thumb);
     }
 
-    // Color swatch — clickable to open a color picker for real colors
+    // Color swatch — static color from palette
     const swatch = document.createElement('div');
     swatch.style.cssText = `
       width: 14px; height: 14px; border-radius: 2px;
-      background: ${hexColor};
+      background: ${wangColorHex(colorId)};
       border: 1px solid rgba(255,255,255,0.3);
       flex-shrink: 0;
     `;
-
-    if (colorIndex !== undefined) {
-      swatch.style.cursor = 'pointer';
-      swatch.title = 'Click to change color';
-      swatch.addEventListener('click', (e) => {
-        e.stopPropagation();
-
-        this.colorPickerOpen = true;
-        const picker = document.createElement('input');
-        picker.type = 'color';
-        picker.value = hexColor;
-        picker.style.cssText = 'position: absolute; opacity: 0; pointer-events: none;';
-        picker.addEventListener('input', () => {
-          swatch.style.background = picker.value;
-          this.state.updateColor(colorIndex, { color: picker.value });
-        });
-        picker.addEventListener('change', () => {
-          this.state.updateColor(colorIndex, { color: picker.value });
-          picker.remove();
-          this.colorPickerOpen = false;
-          this.render();
-        });
-        row.appendChild(picker);
-        picker.click();
-      });
-    }
     row.appendChild(swatch);
 
     // Name label (supports inline rename for real colors on dblclick)
@@ -652,18 +621,4 @@ export class WangSetPanel {
     return color ? color.name : `Color ${colorId}`;
   }
 
-  /**
-   * Convert HSL values to a hex color string.
-   */
-  private hslToHex(h: number, s: number, l: number): string {
-    const sNorm = s / 100;
-    const lNorm = l / 100;
-    const a = sNorm * Math.min(lNorm, 1 - lNorm);
-    const f = (n: number) => {
-      const k = (n + h / 30) % 12;
-      const color = lNorm - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-      return Math.round(255 * color).toString(16).padStart(2, '0');
-    };
-    return `#${f(0)}${f(8)}${f(4)}`;
-  }
 }

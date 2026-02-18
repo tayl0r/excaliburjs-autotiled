@@ -27,10 +27,6 @@ function createMockSpriteSheet() {
 }
 
 // We test the resolve logic by importing the actual module with mocked excalibur
-// Instead, we extract the flip logic into a testable form by using the real module
-// with a mock spriteSheet
-
-// Since SpriteResolver depends on excalibur types, we mock the module
 vi.mock('excalibur', () => ({
   default: {},
 }));
@@ -38,10 +34,16 @@ vi.mock('excalibur', () => ({
 // Import after mocking
 const { SpriteResolver } = await import('../../src/engine/sprite-resolver.js');
 
+/** Helper: create resolver with one mock tileset (columns=10) */
+function createResolver() {
+  const sheet = createMockSpriteSheet();
+  const resolver = new SpriteResolver([{ sheet: sheet as any, columns: 10 }]);
+  return { resolver, sheet };
+}
+
 describe('SpriteResolver flipD decomposition', () => {
   function resolve(flipH: boolean, flipV: boolean, flipD: boolean) {
-    const sheet = createMockSpriteSheet();
-    const resolver = new SpriteResolver(sheet as any, 10);
+    const { resolver } = createResolver();
     const cell = createCell(0, flipH, flipV, flipD);
     const sprite = resolver.resolve(cell);
     return sprite as ReturnType<typeof createMockSprite>;
@@ -106,8 +108,7 @@ describe('SpriteResolver flipD decomposition', () => {
 
 describe('SpriteResolver caching', () => {
   it('same Cell returns same sprite instance', () => {
-    const sheet = createMockSpriteSheet();
-    const resolver = new SpriteResolver(sheet as any, 10);
+    const { resolver } = createResolver();
     const cell = createCell(5, true, false, false);
     const sprite1 = resolver.resolve(cell);
     const sprite2 = resolver.resolve(cell);
@@ -115,8 +116,7 @@ describe('SpriteResolver caching', () => {
   });
 
   it('different Cells return different sprite instances', () => {
-    const sheet = createMockSpriteSheet();
-    const resolver = new SpriteResolver(sheet as any, 10);
+    const { resolver } = createResolver();
     const cell1 = createCell(5, false, false, false);
     const cell2 = createCell(5, true, false, false);
     const sprite1 = resolver.resolve(cell1);
@@ -125,12 +125,53 @@ describe('SpriteResolver caching', () => {
   });
 
   it('clearCache invalidates cache', () => {
-    const sheet = createMockSpriteSheet();
-    const resolver = new SpriteResolver(sheet as any, 10);
+    const { resolver } = createResolver();
     const cell = createCell(5);
     const sprite1 = resolver.resolve(cell);
     resolver.clearCache();
     const sprite2 = resolver.resolve(cell);
     expect(sprite1).not.toBe(sprite2);
+  });
+});
+
+describe('SpriteResolver multi-tileset', () => {
+  it('resolves from correct tileset based on tilesetIndex', () => {
+    const sheet0 = createMockSpriteSheet();
+    const sheet1 = createMockSpriteSheet();
+    const resolver = new SpriteResolver([
+      { sheet: sheet0 as any, columns: 10 },
+      { sheet: sheet1 as any, columns: 20 },
+    ]);
+
+    // Cell from tileset 0
+    const cell0 = createCell(5, false, false, false, 0);
+    resolver.resolve(cell0);
+    expect(sheet0.getSprite).toHaveBeenCalled();
+
+    // Cell from tileset 1
+    const cell1 = createCell(5, false, false, false, 1);
+    resolver.resolve(cell1);
+    expect(sheet1.getSprite).toHaveBeenCalled();
+  });
+
+  it('returns undefined for out-of-range tilesetIndex', () => {
+    const { resolver } = createResolver();
+    const cell = createCell(0, false, false, false, 99);
+    expect(resolver.resolve(cell)).toBeUndefined();
+  });
+
+  it('cells from different tilesets with same tileId are cached separately', () => {
+    const sheet0 = createMockSpriteSheet();
+    const sheet1 = createMockSpriteSheet();
+    const resolver = new SpriteResolver([
+      { sheet: sheet0 as any, columns: 10 },
+      { sheet: sheet1 as any, columns: 20 },
+    ]);
+
+    const cell0 = createCell(5, false, false, false, 0);
+    const cell1 = createCell(5, false, false, false, 1);
+    const sprite0 = resolver.resolve(cell0);
+    const sprite1 = resolver.resolve(cell1);
+    expect(sprite0).not.toBe(sprite1);
   });
 });

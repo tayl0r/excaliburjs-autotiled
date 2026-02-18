@@ -1,37 +1,46 @@
 import * as ex from 'excalibur';
-import { TilesetMetadata, AnimationData } from '../core/metadata-schema.js';
+import { ProjectMetadata, TilesetDef, AnimationData } from '../core/metadata-schema.js';
 import { WangSet } from '../core/wang-set.js';
 import { loadMetadata } from '../core/metadata-loader.js';
 import { generateAllVariants } from '../core/variant-generator.js';
 import { computeColorDistances } from '../core/color-distance.js';
+import { TilesetSheet } from './sprite-resolver.js';
 
 export class TilesetManager {
-  spriteSheet!: ex.SpriteSheet;
+  spriteSheets: TilesetSheet[] = [];
   wangSets: WangSet[] = [];
-  metadata!: TilesetMetadata;
+  metadata!: ProjectMetadata;
 
-  private imageSource: ex.ImageSource;
-  private metadataJson: TilesetMetadata;
+  private imageSources: ex.ImageSource[];
+  private metadataJson: ProjectMetadata;
 
-  constructor(imageSource: ex.ImageSource, metadataJson: TilesetMetadata) {
-    this.imageSource = imageSource;
+  constructor(imageSources: ex.ImageSource[], metadataJson: ProjectMetadata) {
+    this.imageSources = imageSources;
     this.metadataJson = metadataJson;
+  }
+
+  /** The primary tileset definition (tilesets[0]) */
+  get primaryTileset(): TilesetDef {
+    return this.metadata.tilesets[0];
   }
 
   /** Initialize after resources are loaded */
   initialize(): void {
     this.metadata = this.metadataJson;
 
-    // Create SpriteSheet
-    const rows = Math.ceil(this.metadata.tileCount / this.metadata.columns);
-    this.spriteSheet = ex.SpriteSheet.fromImageSource({
-      image: this.imageSource,
-      grid: {
-        rows,
-        columns: this.metadata.columns,
-        spriteWidth: this.metadata.tileWidth,
-        spriteHeight: this.metadata.tileHeight,
-      },
+    // Create one SpriteSheet per tileset
+    this.spriteSheets = this.metadata.tilesets.map((ts, i) => {
+      const rows = Math.ceil(ts.tileCount / ts.columns);
+      const sheet = ex.SpriteSheet.fromImageSource({
+        image: this.imageSources[i],
+        grid: {
+          rows,
+          columns: ts.columns,
+          spriteWidth: ts.tileWidth,
+          spriteHeight: ts.tileHeight,
+        },
+      });
+      return { sheet, columns: ts.columns };
     });
 
     // Load WangSets from metadata
@@ -50,7 +59,7 @@ export class TilesetManager {
   }
 
   /** Reload WangSets from updated metadata */
-  reload(metadata: TilesetMetadata): void {
+  reload(metadata: ProjectMetadata): void {
     this.metadataJson = metadata;
     this.metadata = metadata;
 
@@ -65,6 +74,11 @@ export class TilesetManager {
       ws.setDistanceMatrix(distances);
       ws.setNextHopMatrix(nextHop);
     }
+  }
+
+  /** Get the HTMLImageElement for a tileset by index */
+  getImage(tilesetIndex: number): HTMLImageElement | undefined {
+    return this.imageSources[tilesetIndex]?.image;
   }
 
   /** Get the first WangSet (convenience for single-set usage) */

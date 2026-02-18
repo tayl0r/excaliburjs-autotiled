@@ -145,7 +145,8 @@ export class AutotileTilemap {
             cell.tileId + totalOffset,
             cell.flipH,
             cell.flipV,
-            cell.flipD
+            cell.flipD,
+            cell.tilesetIndex
           );
           const sprite = this.spriteResolver.resolve(animatedCell);
           if (sprite) {

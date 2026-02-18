@@ -29,17 +29,17 @@ export class GameScene extends ex.Scene {
       return;
     }
 
+    const ts = this.tilesetManager.primaryTileset;
     const spriteResolver = new SpriteResolver(
-      this.tilesetManager.spriteSheet,
-      this.tilesetManager.metadata.columns
+      this.tilesetManager.spriteSheets
     );
 
     // Create autotile tilemap with the primary WangSet
     this.autotileTilemap = new AutotileTilemap(
       MAP_COLS,
       MAP_ROWS,
-      this.tilesetManager.metadata.tileWidth,
-      this.tilesetManager.metadata.tileHeight,
+      ts.tileWidth,
+      ts.tileHeight,
       wangSet,
       spriteResolver,
       1 // default to Grass
@@ -55,8 +55,8 @@ export class GameScene extends ex.Scene {
     }
 
     // Set up camera
-    const tileW = this.tilesetManager.metadata.tileWidth;
-    const tileH = this.tilesetManager.metadata.tileHeight;
+    const tileW = ts.tileWidth;
+    const tileH = ts.tileHeight;
     this.camera.pos = ex.vec(
       (MAP_COLS * tileW) / 2,
       (MAP_ROWS * tileH) / 2
@@ -103,21 +103,42 @@ export class GameScene extends ex.Scene {
       max-width: 90%;
     `;
 
+    const ts = this.tilesetManager.primaryTileset;
+    const tilesetImage = this.tilesetManager.getImage(0);
+
     for (const color of wangSet.colors) {
       const btn = document.createElement('button');
-      btn.textContent = color.name;
       btn.dataset.colorId = String(color.id);
       btn.style.cssText = `
-        padding: 6px 12px;
-        border: 2px solid #fff;
+        display: flex; align-items: center; gap: 6px;
+        padding: 4px 10px;
+        border: 2px solid rgba(255,255,255,0.3);
         border-radius: 4px;
-        background: ${color.color};
+        background: rgba(30, 30, 50, 0.85);
         color: #fff;
-        font-weight: bold;
         font-size: 12px;
         cursor: pointer;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
       `;
+
+      // Tile thumbnail
+      if (tilesetImage && color.imageTileId >= 0) {
+        const thumb = document.createElement('canvas');
+        thumb.width = 16;
+        thumb.height = 16;
+        thumb.style.cssText = 'width: 16px; height: 16px; image-rendering: pixelated; flex-shrink: 0;';
+        const ctx = thumb.getContext('2d');
+        if (ctx) {
+          ctx.imageSmoothingEnabled = false;
+          const sx = (color.imageTileId % ts.columns) * ts.tileWidth;
+          const sy = Math.floor(color.imageTileId / ts.columns) * ts.tileHeight;
+          ctx.drawImage(tilesetImage, sx, sy, ts.tileWidth, ts.tileHeight, 0, 0, 16, 16);
+        }
+        btn.appendChild(thumb);
+      }
+
+      const label = document.createElement('span');
+      label.textContent = color.name;
+      btn.appendChild(label);
 
       btn.addEventListener('click', () => {
         this.inputHandler.setActiveColor(color.id);
@@ -141,7 +162,7 @@ export class GameScene extends ex.Scene {
   }
 
   /** Reload WangSet data from updated metadata and re-resolve all tiles */
-  reloadMetadata(metadata: import('../core/metadata-schema.js').TilesetMetadata): void {
+  reloadMetadata(metadata: import('../core/metadata-schema.js').ProjectMetadata): void {
     this.tilesetManager.reload(metadata);
     const wangSet = this.tilesetManager.primaryWangSet;
     if (!wangSet) return;

@@ -14,8 +14,8 @@ export function generateAllVariants(
   const variants: WangVariant[] = [];
   const mappings = wangSet.getTileMappings();
 
-  for (const [tileId, baseWangId] of mappings) {
-    const baseCell = createCell(tileId);
+  for (const { tilesetIndex, tileId, wangId: baseWangId } of mappings) {
+    const baseCell = createCell(tileId, false, false, false, tilesetIndex);
 
     // Start with the original
     const orientations: Array<{ wangId: WangId; cell: Cell }> = [
@@ -71,7 +71,7 @@ export function generateAllVariants(
 
 /** Rotate a cell 90 CW n times using flip flags */
 function rotateCellCW(cell: Cell, n: number): Cell {
-  let { tileId, flipH, flipV, flipD } = cell;
+  let { tileId, flipH, flipV, flipD, tilesetIndex } = cell;
   for (let i = 0; i < n; i++) {
     const newFlipH = flipV;
     const newFlipV = !flipH;
@@ -80,19 +80,19 @@ function rotateCellCW(cell: Cell, n: number): Cell {
     flipV = newFlipV;
     flipD = newFlipD;
   }
-  return createCell(tileId, flipH, flipV, flipD);
+  return createCell(tileId, flipH, flipV, flipD, tilesetIndex);
 }
 
 function flipCellH(cell: Cell): Cell {
   if (cell.flipD) {
-    return createCell(cell.tileId, cell.flipH, !cell.flipV, cell.flipD);
+    return createCell(cell.tileId, cell.flipH, !cell.flipV, cell.flipD, cell.tilesetIndex);
   }
-  return createCell(cell.tileId, !cell.flipH, cell.flipV, cell.flipD);
+  return createCell(cell.tileId, !cell.flipH, cell.flipV, cell.flipD, cell.tilesetIndex);
 }
 
 function flipCellV(cell: Cell): Cell {
   if (cell.flipD) {
-    return createCell(cell.tileId, !cell.flipH, cell.flipV, cell.flipD);
+    return createCell(cell.tileId, !cell.flipH, cell.flipV, cell.flipD, cell.tilesetIndex);
   }
-  return createCell(cell.tileId, cell.flipH, !cell.flipV, cell.flipD);
+  return createCell(cell.tileId, cell.flipH, !cell.flipV, cell.flipD, cell.tilesetIndex);
 }

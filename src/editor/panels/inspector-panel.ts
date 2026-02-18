@@ -1,6 +1,7 @@
 import { EditorState } from '../editor-state.js';
 import { colRowFromTileId } from '../../utils/tile-math.js';
 import { computeAdjacencyPreview } from '../adjacency-preview.js';
+import { wangColorHex } from '../../core/wang-color.js';
 
 /**
  * Tile inspector panel with WangId zone editor.
@@ -10,7 +11,7 @@ import { computeAdjacencyPreview } from '../adjacency-preview.js';
 export class InspectorPanel {
   readonly element: HTMLDivElement;
   private state: EditorState;
-  private image: HTMLImageElement;
+  private images: HTMLImageElement[];
   private previewCanvas!: HTMLCanvasElement;
   private gridContainer!: HTMLDivElement;
   private wangIdDisplay!: HTMLDivElement;
@@ -19,9 +20,9 @@ export class InspectorPanel {
   private adjacencyContainer!: HTMLDivElement;
   private adjacencyLabel!: HTMLDivElement;
 
-  constructor(state: EditorState, image: HTMLImageElement) {
+  constructor(state: EditorState, images: HTMLImageElement[]) {
     this.state = state;
-    this.image = image;
+    this.images = images;
 
     this.element = document.createElement('div');
     this.buildUI();
@@ -163,7 +164,7 @@ export class InspectorPanel {
     }
 
     // Info
-    const [col, row] = colRowFromTileId(tileId, this.state.metadata.columns);
+    const [col, row] = colRowFromTileId(tileId, this.state.columns);
     if (this.state.selectedTileIds.size > 1) {
       this.infoDisplay.textContent = `${this.state.selectedTileIds.size} tiles selected (primary: ${tileId})`;
     } else {
@@ -193,11 +194,11 @@ export class InspectorPanel {
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, 128, 128);
 
-    const { tileWidth, tileHeight, columns } = this.state.metadata;
+    const { tileWidth, tileHeight, columns } = this.state;
     const [col, row] = colRowFromTileId(tileId, columns);
 
     ctx.drawImage(
-      this.image,
+      this.images[this.state.activeTilesetIndex],
       col * tileWidth, row * tileHeight, tileWidth, tileHeight,
       0, 0, 128, 128
     );
@@ -255,8 +256,7 @@ export class InspectorPanel {
           || type === 'mixed';
 
         const colorId = wangid[wangIdx];
-        const colorData = ws && colorId > 0 ? ws.colors[colorId - 1] : undefined;
-        const bgColor = colorData ? colorData.color : '#222';
+        const bgColor = colorId > 0 ? wangColorHex(colorId) : '#222';
 
         cell.style.cssText = `
           background: ${bgColor};
@@ -320,7 +320,7 @@ export class InspectorPanel {
       result.tiles[4].tileId = tileId;
     }
 
-    const { tileWidth, tileHeight, columns } = this.state.metadata;
+    const { tileWidth, tileHeight, columns } = this.state;
 
     for (let i = 0; i < 9; i++) {
       const tile = result.tiles[i];
@@ -342,7 +342,7 @@ export class InspectorPanel {
         ctx.imageSmoothingEnabled = false;
         const [col, row] = colRowFromTileId(tile.tileId, columns);
         ctx.drawImage(
-          this.image,
+          this.images[this.state.activeTilesetIndex],
           col * tileWidth, row * tileHeight, tileWidth, tileHeight,
           0, 0, 40, 40,
         );

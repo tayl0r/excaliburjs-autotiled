@@ -1,10 +1,10 @@
-import { TilesetMetadata, WangSetData, DEFAULT_TRANSFORMATIONS } from './metadata-schema.js';
+import { TilesetMetadata, ProjectMetadata, WangSetData, DEFAULT_TRANSFORMATIONS } from './metadata-schema.js';
 import { WangSet, WangSetType } from './wang-set.js';
 import { WangColor } from './wang-color.js';
 import { WangId } from './wang-id.js';
 
-/** Load and parse tileset metadata from a JSON object */
-export function loadMetadata(json: TilesetMetadata): {
+/** Load and parse metadata from a ProjectMetadata or legacy TilesetMetadata JSON object */
+export function loadMetadata(json: ProjectMetadata | TilesetMetadata): {
   wangSets: WangSet[];
   transformations: typeof DEFAULT_TRANSFORMATIONS;
 } {
@@ -34,7 +34,7 @@ function loadWangSet(data: WangSetData): WangSet {
     if (wt.wangid.length !== 8) {
       throw new Error(`WangId for tile ${wt.tileid} must have exactly 8 elements, got ${wt.wangid.length}`);
     }
-    ws.addTileMapping(wt.tileid, WangId.fromArray(wt.wangid), wt.probability);
+    ws.addTileMapping(wt.tileset ?? 0, wt.tileid, WangId.fromArray(wt.wangid), wt.probability);
   }
 
   return ws;
@@ -67,18 +67,20 @@ export function validateMetadata(json: TilesetMetadata): string[] {
       errors.push(`${prefix}: must have at least one color`);
     }
 
-    const seenTileIds = new Set<number>();
+    const seenTileIds = new Set<string>();
     for (let ti = 0; ti < (ws.wangtiles ?? []).length; ti++) {
       const wt = ws.wangtiles[ti];
       const tPrefix = `${prefix}.wangtiles[${ti}]`;
+      const tilesetIdx = wt.tileset ?? 0;
 
       if (wt.tileid < 0 || wt.tileid >= json.tileCount) {
         errors.push(`${tPrefix}: tileid ${wt.tileid} out of range [0, ${json.tileCount})`);
       }
-      if (seenTileIds.has(wt.tileid)) {
+      const tileKey = `${tilesetIdx}:${wt.tileid}`;
+      if (seenTileIds.has(tileKey)) {
         errors.push(`${tPrefix}: duplicate tileid ${wt.tileid}`);
       }
-      seenTileIds.add(wt.tileid);
+      seenTileIds.add(tileKey);
 
       if (!wt.wangid || wt.wangid.length !== 8) {
         errors.push(`${tPrefix}: wangid must be 8 elements`);
@@ -98,6 +100,53 @@ export function validateMetadata(json: TilesetMetadata): string[] {
         if (ws.type === 'edge' && i % 2 === 1 && c !== 0) {
           errors.push(`${tPrefix}: edge type but wangid[${i}] (corner) = ${c}, should be 0`);
         }
+      }
+    }
+  }
+
+  return errors;
+}
+
+/** Validate ProjectMetadata structure. Returns array of error strings (empty = valid). */
+export function validateProjectMetadata(json: ProjectMetadata): string[] {
+  const errors: string[] = [];
+
+  if (json.version !== 2) errors.push(`Invalid version: ${json.version}`);
+  if (!json.tilesets || json.tilesets.length === 0) errors.push('Must have at least one tileset');
+
+  for (let ti = 0; ti < (json.tilesets ?? []).length; ti++) {
+    const ts = json.tilesets[ti];
+    const prefix = `tilesets[${ti}]`;
+    if (!ts.tilesetImage) errors.push(`${prefix}: missing tilesetImage`);
+    if (!ts.tileWidth || ts.tileWidth <= 0) errors.push(`${prefix}: invalid tileWidth`);
+    if (!ts.tileHeight || ts.tileHeight <= 0) errors.push(`${prefix}: invalid tileHeight`);
+    if (!ts.columns || ts.columns <= 0) errors.push(`${prefix}: invalid columns`);
+    if (!ts.tileCount || ts.tileCount <= 0) errors.push(`${prefix}: invalid tileCount`);
+  }
+
+  if (!json.wangsets || !Array.isArray(json.wangsets)) {
+    errors.push('Missing or invalid wangsets array');
+    return errors;
+  }
+
+  for (let si = 0; si < json.wangsets.length; si++) {
+    const ws = json.wangsets[si];
+    const prefix = `wangsets[${si}]`;
+
+    if (!ws.name) errors.push(`${prefix}: missing name`);
+    if (!['corner', 'edge', 'mixed'].includes(ws.type)) {
+      errors.push(`${prefix}: invalid type "${ws.type}"`);
+    }
+
+    for (let wti = 0; wti < (ws.wangtiles ?? []).length; wti++) {
+      const wt = ws.wangtiles[wti];
+      const tPrefix = `${prefix}.wangtiles[${wti}]`;
+      const tsIdx = wt.tileset ?? 0;
+
+      if (tsIdx < 0 || tsIdx >= json.tilesets.length) {
+        errors.push(`${tPrefix}: tileset index ${tsIdx} out of range [0, ${json.tilesets.length})`);
+      } else if (wt.tileid < 0 || wt.tileid >= json.tilesets[tsIdx].tileCount) {
+        errors.push(`${tPrefix}: tileid ${wt.tileid} out of range for tileset ${tsIdx}`);
       }
     }
   }

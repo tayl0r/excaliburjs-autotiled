@@ -2,18 +2,32 @@ import * as ex from 'excalibur';
 import { TilesetManager } from './engine/tileset-manager.js';
 import { GameScene } from './engine/game-scene.js';
 import { TileEditor } from './editor/tile-editor.js';
-import { TilesetMetadata } from './core/metadata-schema.js';
-
-// Load terrain image
-const terrainImage = new ex.ImageSource('/assets/TimeFantasy_TILES_6.24.17/TILESETS/terrain.png');
+import { migrateToProjectMetadata } from './core/metadata-migration.js';
 
 // Fetch metadata at runtime so we always get the latest saved version
-const terrainMetadata: TilesetMetadata = await fetch('/assets/metadata/terrain.autotile.json').then(r => r.json());
+// Try project.autotile.json first, fall back to legacy terrain.autotile.json
+async function loadMetadata() {
+  const projectResp = await fetch('/assets/metadata/project.autotile.json');
+  if (projectResp.ok) {
+    const raw = await projectResp.json();
+    return migrateToProjectMetadata(raw);
+  }
+  const legacyResp = await fetch('/assets/metadata/terrain.autotile.json');
+  const raw = await legacyResp.json();
+  return migrateToProjectMetadata(raw);
+}
 
-// Create tileset manager
+const projectMetadata = await loadMetadata();
+
+// Create ImageSource for each tileset defined in the project metadata
+const tilesetImages = projectMetadata.tilesets.map(
+  ts => new ex.ImageSource(`/assets/TimeFantasy_TILES_6.24.17/TILESETS/${ts.tilesetImage}`)
+);
+
+// Create tileset manager with all tileset images
 const tilesetManager = new TilesetManager(
-  terrainImage,
-  terrainMetadata
+  tilesetImages,
+  projectMetadata
 );
 
 // Create the game scene, passing the tileset manager
@@ -29,17 +43,21 @@ const game = new ex.Engine({
   antialiasing: false,
 });
 
-const loader = new ex.Loader([terrainImage]);
+// Load all tileset images
+const loader = new ex.Loader(tilesetImages);
 loader.suppressPlayButton = true;
 
 game.addScene('game', gameScene);
 game.start('game', { loader }).then(() => {
-  console.log('[metadata] Loaded terrain.autotile.json:', JSON.parse(JSON.stringify(terrainMetadata)));
+  console.log('[metadata] Loaded project metadata:', JSON.parse(JSON.stringify(projectMetadata)));
 
-  // Initialize tile editor after resources are loaded
+  // Get HTMLImageElement for each loaded tileset
+  const images = tilesetImages.map(src => src.image);
+
+  // Initialize tile editor with all tileset images
   const editor = new TileEditor(
-    terrainMetadata,
-    terrainImage.image
+    projectMetadata,
+    images
   );
 
   // Reload game scene when editor closes

@@ -45,11 +45,11 @@ describe('loadMetadata', () => {
   it('loads WangIds correctly', () => {
     const { wangSets } = loadMetadata(validMetadata);
     const ws = wangSets[0];
-    const w0 = ws.wangIdOf(0);
+    const w0 = ws.wangIdOf(0, 0);
     expect(w0).toBeDefined();
     expect(w0!.toArray()).toEqual([0, 1, 0, 1, 0, 1, 0, 1]);
 
-    const w1 = ws.wangIdOf(1);
+    const w1 = ws.wangIdOf(0, 1);
     expect(w1).toBeDefined();
     expect(w1!.indexColor(1)).toBe(2); // TopRight = Dirt
   });

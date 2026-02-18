@@ -1,4 +1,4 @@
-import { TilesetMetadata } from '../core/metadata-schema.js';
+import { ProjectMetadata } from '../core/metadata-schema.js';
 import { OverlayManager } from './overlay-manager.js';
 import { EditorState } from './editor-state.js';
 import { TilesetPanel } from './panels/tileset-panel.js';
@@ -28,15 +28,15 @@ export class TileEditor {
   private filename: string;
   private _onHide?: () => void;
 
-  constructor(metadata: TilesetMetadata, image: HTMLImageElement) {
+  constructor(metadata: ProjectMetadata, images: HTMLImageElement[]) {
     this.state = new EditorState(metadata);
     this.overlay = new OverlayManager();
-    this.filename = metadata.tilesetImage.replace(/\.\w+$/, '') + '.autotile.json';
+    this.filename = 'project.autotile.json';
 
-    this.tilesetPanel = new TilesetPanel(this.state, image);
-    this.wangSetPanel = new WangSetPanel(this.state, image);
-    this.inspectorPanel = new InspectorPanel(this.state, image);
-    this.templatePanel = new TemplatePanel(this.state, image);
+    this.tilesetPanel = new TilesetPanel(this.state, images);
+    this.wangSetPanel = new WangSetPanel(this.state, images);
+    this.inspectorPanel = new InspectorPanel(this.state, images);
+    this.templatePanel = new TemplatePanel(this.state, images);
 
     this.animationPanel = new AnimationPanel(this.state);
     this.regionAssignPanel = new RegionAssignPanel(this.state);
@@ -162,7 +162,7 @@ export class TileEditor {
   }
 
   /** Get the current metadata (for saving or applying to game) */
-  getMetadata(): TilesetMetadata {
+  getMetadata(): ProjectMetadata {
     return this.state.metadata;
   }
 

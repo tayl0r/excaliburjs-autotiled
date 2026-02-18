@@ -1,8 +1,17 @@
-import { TilesetMetadata, WangSetData, WangTileData, TransformationConfig, DEFAULT_TRANSFORMATIONS, AnimationData, AnimationFrameData } from '../core/metadata-schema.js';
+import { ProjectMetadata, TilesetDef, WangSetData, WangTileData, TransformationConfig, DEFAULT_TRANSFORMATIONS, AnimationData, AnimationFrameData } from '../core/metadata-schema.js';
+import { wangColorHex } from '../core/wang-color.js';
 import { UndoManager } from './undo-manager.js';
 import { colRowFromTileId, tileIdFromColRow } from '../utils/tile-math.js';
 
 export type TileFilter = 'all' | 'tagged' | 'untagged';
+
+export interface WangRegionClipboard {
+  width: number;
+  height: number;
+  sourceColorA: number;
+  sourceColorB: number;
+  entries: Map<string, number[]>;  // "relCol,relRow" → wangid
+}
 
 export type EditorEvent =
   | 'selectedTileChanged'
@@ -11,7 +20,9 @@ export type EditorEvent =
   | 'metadataChanged'
   | 'zoomChanged'
   | 'templateModeChanged'
-  | 'templateSlotChanged';
+  | 'templateSlotChanged'
+  | 'activeTilesetChanged'
+  | 'clipboardChanged';
 
 type Listener = () => void;
 
@@ -24,16 +35,18 @@ export class EditorState {
   private _tileFilter: TileFilter = 'all';
   private _activeWangSetIndex: number = 0;
   private _activeColorId: number = 1;
-  private _metadata: TilesetMetadata;
+  private _metadata: ProjectMetadata;
+  private _activeTilesetIndex: number = 0;
   private _zoom: number = 2;
   private _templateMode = false;
   private _activeTemplateSlot = -1;
   private _templateColorA: number = 1;
   private _templateColorB: number = 2;
+  private _wangClipboard: WangRegionClipboard | null = null;
   private listeners = new Map<EditorEvent, Set<Listener>>();
   private undoManager = new UndoManager();
 
-  constructor(metadata: TilesetMetadata) {
+  constructor(metadata: ProjectMetadata) {
     this._metadata = metadata;
   }
 
@@ -59,7 +72,7 @@ export class EditorState {
     return this._activeColorId;
   }
 
-  get metadata(): TilesetMetadata {
+  get metadata(): ProjectMetadata {
     return this._metadata;
   }
 
@@ -92,7 +105,38 @@ export class EditorState {
     return this._metadata.transformations ?? DEFAULT_TRANSFORMATIONS;
   }
 
+  /** Active tileset index */
+  get activeTilesetIndex(): number {
+    return this._activeTilesetIndex;
+  }
+
+  /** Active tileset definition */
+  get activeTileset(): TilesetDef {
+    return this._metadata.tilesets[this._activeTilesetIndex];
+  }
+
+  get wangClipboard(): WangRegionClipboard | null {
+    return this._wangClipboard;
+  }
+
+  /** Convenience getters scoped to active tileset */
+  get columns(): number { return this.activeTileset.columns; }
+  get tileCount(): number { return this.activeTileset.tileCount; }
+  get tileWidth(): number { return this.activeTileset.tileWidth; }
+  get tileHeight(): number { return this.activeTileset.tileHeight; }
+
   // --- Setters (emit events) ---
+
+  setActiveTileset(index: number): void {
+    if (this._activeTilesetIndex === index) return;
+    if (index < 0 || index >= this._metadata.tilesets.length) return;
+    this._activeTilesetIndex = index;
+    // Clear selection when switching tilesets
+    this._selectedTileId = -1;
+    this._selectedTileIds.clear();
+    this.emit('activeTilesetChanged');
+    this.emit('selectedTileChanged');
+  }
 
   selectTile(tileId: number): void {
     this._selectedTileIds.clear();
@@ -104,7 +148,7 @@ export class EditorState {
 
   /** Add a range of tiles to selection (for shift-click) */
   selectTileRange(fromId: number, toId: number): void {
-    const { columns } = this._metadata;
+    const columns = this.columns;
     const [fromCol, fromRow] = colRowFromTileId(fromId, columns);
     const [toCol, toRow] = colRowFromTileId(toId, columns);
 
@@ -117,7 +161,7 @@ export class EditorState {
     for (let r = minRow; r <= maxRow; r++) {
       for (let c = minCol; c <= maxCol; c++) {
         const id = tileIdFromColRow(c, r, columns);
-        if (id < this._metadata.tileCount) {
+        if (id < this.tileCount) {
           this._selectedTileIds.add(id);
         }
       }
@@ -201,6 +245,96 @@ export class EditorState {
     this.emit('metadataChanged');
   }
 
+  // --- Clipboard (copy/paste WangId regions) ---
+
+  copyWangRegion(): void {
+    const selectedIds = this._selectedTileIds;
+    if (selectedIds.size === 0) return;
+
+    const columns = this.columns;
+    let minCol = Infinity, maxCol = -1, minRow = Infinity, maxRow = -1;
+    for (const id of selectedIds) {
+      const [c, r] = colRowFromTileId(id, columns);
+      minCol = Math.min(minCol, c);
+      maxCol = Math.max(maxCol, c);
+      minRow = Math.min(minRow, r);
+      maxRow = Math.max(maxRow, r);
+    }
+
+    const entries = new Map<string, number[]>();
+    for (const id of selectedIds) {
+      const wt = this.getWangTile(id);
+      if (!wt) continue;
+      const [c, r] = colRowFromTileId(id, columns);
+      entries.set(`${c - minCol},${r - minRow}`, [...wt.wangid]);
+    }
+
+    // Detect Color A from the TL corner (wangid index 7) of the top-left tile
+    const topLeftWangid = entries.get('0,0');
+    const sourceColorA = topLeftWangid?.[7] ?? 0;
+
+    // Color B is the first other non-zero color found across all entries
+    let sourceColorB = 0;
+    for (const wangid of entries.values()) {
+      for (const v of wangid) {
+        if (v !== 0 && v !== sourceColorA) { sourceColorB = v; break; }
+      }
+      if (sourceColorB !== 0) break;
+    }
+
+    this._wangClipboard = {
+      width: maxCol - minCol + 1,
+      height: maxRow - minRow + 1,
+      sourceColorA,
+      sourceColorB,
+      entries,
+    };
+    this.emit('clipboardChanged');
+  }
+
+  pasteWangRegion(newColorA: number, newColorB: number): boolean {
+    if (!this._wangClipboard) return false;
+
+    const selectedIds = this._selectedTileIds;
+    if (selectedIds.size === 0) return false;
+
+    const columns = this.columns;
+    let minCol = Infinity, maxCol = -1, minRow = Infinity, maxRow = -1;
+    for (const id of selectedIds) {
+      const [c, r] = colRowFromTileId(id, columns);
+      minCol = Math.min(minCol, c);
+      maxCol = Math.max(maxCol, c);
+      minRow = Math.min(minRow, r);
+      maxRow = Math.max(maxRow, r);
+    }
+    const regionW = maxCol - minCol + 1;
+    const regionH = maxRow - minRow + 1;
+
+    if (regionW !== this._wangClipboard.width || regionH !== this._wangClipboard.height) {
+      return false;
+    }
+
+    const { sourceColorA, sourceColorB, entries } = this._wangClipboard;
+    const remapped: Array<{ tileId: number; wangid: number[] }> = [];
+
+    for (const [key, wangid] of entries) {
+      const [rc, rr] = key.split(',').map(Number);
+      const tileId = tileIdFromColRow(minCol + rc, minRow + rr, columns);
+
+      const newWangid = wangid.map(v => {
+        if (v === sourceColorA) return newColorA;
+        if (v === sourceColorB) return newColorB;
+        return v;
+      });
+      remapped.push({ tileId, wangid: newWangid });
+    }
+
+    if (remapped.length > 0) {
+      this.setWangIdMulti(remapped);
+    }
+    return true;
+  }
+
   // --- Undo/Redo ---
 
   private saveSnapshot(): void {
@@ -234,11 +368,11 @@ export class EditorState {
 
   // --- Metadata mutation ---
 
-  /** Get the WangTile data for a tile ID in the active WangSet, if it exists */
+  /** Get the WangTile data for a tile ID in the active WangSet (filtered by active tileset) */
   getWangTile(tileId: number): WangTileData | undefined {
     const ws = this.activeWangSet;
     if (!ws) return undefined;
-    return ws.wangtiles.find(wt => wt.tileid === tileId);
+    return ws.wangtiles.find(wt => wt.tileid === tileId && (wt.tileset ?? 0) === this._activeTilesetIndex);
   }
 
   /** Set or update the WangId for a tile in the active WangSet */
@@ -247,11 +381,11 @@ export class EditorState {
     if (!ws) return;
     this.saveSnapshot();
 
-    const existing = ws.wangtiles.find(wt => wt.tileid === tileId);
+    const existing = ws.wangtiles.find(wt => wt.tileid === tileId && (wt.tileset ?? 0) === this._activeTilesetIndex);
     if (existing) {
       existing.wangid = [...wangid];
     } else {
-      ws.wangtiles.push({ tileid: tileId, wangid: [...wangid] });
+      ws.wangtiles.push({ tileid: tileId, wangid: [...wangid], tileset: this._activeTilesetIndex });
     }
     this.emit('metadataChanged');
   }
@@ -261,7 +395,7 @@ export class EditorState {
     const ws = this.activeWangSet;
     if (!ws) return;
 
-    const idx = ws.wangtiles.findIndex(wt => wt.tileid === tileId);
+    const idx = ws.wangtiles.findIndex(wt => wt.tileid === tileId && (wt.tileset ?? 0) === this._activeTilesetIndex);
     if (idx >= 0) {
       this.saveSnapshot();
       ws.wangtiles.splice(idx, 1);
@@ -273,7 +407,7 @@ export class EditorState {
   setTileProbability(tileId: number, probability: number): void {
     const ws = this.activeWangSet;
     if (!ws) return;
-    const wt = ws.wangtiles.find(w => w.tileid === tileId);
+    const wt = ws.wangtiles.find(w => w.tileid === tileId && (w.tileset ?? 0) === this._activeTilesetIndex);
     if (!wt) return;
     this.saveSnapshot();
     wt.probability = probability;
@@ -286,11 +420,11 @@ export class EditorState {
     if (!ws || entries.length === 0) return;
     this.saveSnapshot();
     for (const { tileId, wangid } of entries) {
-      const existing = ws.wangtiles.find(wt => wt.tileid === tileId);
+      const existing = ws.wangtiles.find(wt => wt.tileid === tileId && (wt.tileset ?? 0) === this._activeTilesetIndex);
       if (existing) {
         existing.wangid = [...wangid];
       } else {
-        ws.wangtiles.push({ tileid: tileId, wangid: [...wangid] });
+        ws.wangtiles.push({ tileid: tileId, wangid: [...wangid], tileset: this._activeTilesetIndex });
       }
     }
     this.emit('metadataChanged');
@@ -301,7 +435,7 @@ export class EditorState {
     const ws = this.activeWangSet;
     if (!ws || tileIds.length === 0) return;
     const targets = tileIds
-      .map(id => ws.wangtiles.find(wt => wt.tileid === id))
+      .map(id => ws.wangtiles.find(wt => wt.tileid === id && (wt.tileset ?? 0) === this._activeTilesetIndex))
       .filter((wt): wt is WangTileData => wt !== undefined);
     if (targets.length === 0) return;
     this.saveSnapshot();
@@ -316,7 +450,7 @@ export class EditorState {
     const ws = this.activeWangSet;
     if (!ws || tileIds.length === 0) return;
     const indices = tileIds
-      .map(id => ws.wangtiles.findIndex(wt => wt.tileid === id))
+      .map(id => ws.wangtiles.findIndex(wt => wt.tileid === id && (wt.tileset ?? 0) === this._activeTilesetIndex))
       .filter(idx => idx >= 0)
       .sort((a, b) => b - a);
     if (indices.length === 0) return;
@@ -366,17 +500,18 @@ export class EditorState {
     this.emit('metadataChanged');
   }
 
-  /** Add a new color to the active WangSet */
-  addColor(name: string, color: string): void {
+  /** Add a new color to the active WangSet (color auto-assigned from palette) */
+  addColor(name: string): void {
     const ws = this.activeWangSet;
     if (!ws) return;
     this.saveSnapshot();
-    ws.colors.push({ name, color, probability: 1.0, tile: -1 });
+    const colorId = ws.colors.length + 1;
+    ws.colors.push({ name, color: wangColorHex(colorId), probability: 1.0, tile: -1 });
     this.emit('metadataChanged');
   }
 
   /** Update properties of a color in the active WangSet */
-  updateColor(colorIndex: number, updates: Partial<{ name: string; color: string; probability: number; tile: number }>): void {
+  updateColor(colorIndex: number, updates: Partial<{ name: string; probability: number; tile: number; tileset: number | undefined }>): void {
     const ws = this.activeWangSet;
     if (!ws || !ws.colors[colorIndex]) return;
     this.saveSnapshot();
@@ -480,14 +615,14 @@ export class EditorState {
       for (let f = 1; f < anim.frames.length; f++) {
         const frameOffset = anim.frames[f].tileIdOffset - baseOffset;
         const targetTileId = wt.tileid + frameOffset;
-        if (targetTileId < 0 || targetTileId >= this._metadata.tileCount) continue;
+        if (targetTileId < 0 || targetTileId >= this.tileCount) continue;
 
-        const existing = ws.wangtiles.find(w => w.tileid === targetTileId);
+        const existing = ws.wangtiles.find(w => w.tileid === targetTileId && (w.tileset ?? 0) === (wt.tileset ?? 0));
         if (existing) {
           existing.wangid = [...wt.wangid];
           existing.probability = wt.probability;
         } else {
-          ws.wangtiles.push({ tileid: targetTileId, wangid: [...wt.wangid], probability: wt.probability });
+          ws.wangtiles.push({ tileid: targetTileId, wangid: [...wt.wangid], probability: wt.probability, tileset: wt.tileset });
         }
       }
     }
@@ -496,9 +631,10 @@ export class EditorState {
   }
 
   /** Replace the entire metadata (e.g., after loading from file) */
-  setMetadata(metadata: TilesetMetadata): void {
+  setMetadata(metadata: ProjectMetadata): void {
     this._metadata = metadata;
     this._activeWangSetIndex = 0;
+    this._activeTilesetIndex = 0;
     this._selectedTileId = -1;
     this.emit('metadataChanged');
     this.emit('activeWangSetChanged');

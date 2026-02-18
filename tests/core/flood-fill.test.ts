@@ -20,7 +20,7 @@ function createGrassDirtWangSet(): WangSet {
     const tr = (n & 4) ? 2 : 1;
     const br = (n & 2) ? 2 : 1;
     const bl = (n & 1) ? 2 : 1;
-    ws.addTileMapping(n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
+    ws.addTileMapping(0, n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
   }
 
   ws.setVariants(generateAllVariants(ws, DEFAULT_TRANSFORMATIONS));
@@ -42,14 +42,14 @@ function createThreeColorWangSet(): WangSet {
     const tr = (n & 4) ? 2 : 1;
     const br = (n & 2) ? 2 : 1;
     const bl = (n & 1) ? 2 : 1;
-    ws.addTileMapping(n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
+    ws.addTileMapping(0, n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
   }
   for (let n = 0; n < 16; n++) {
     const tl = (n & 8) ? 3 : 1;
     const tr = (n & 4) ? 3 : 1;
     const br = (n & 2) ? 3 : 1;
     const bl = (n & 1) ? 3 : 1;
-    ws.addTileMapping(16 + n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
+    ws.addTileMapping(0, 16 + n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
   }
 
   ws.setVariants(generateAllVariants(ws, DEFAULT_TRANSFORMATIONS));

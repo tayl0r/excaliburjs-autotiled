@@ -1,7 +1,7 @@
-import type { TilesetMetadata } from '../core/metadata-schema.js';
+import type { ProjectMetadata } from '../core/metadata-schema.js';
 
 /**
- * Snapshot-based undo/redo manager for tileset metadata.
+ * Snapshot-based undo/redo manager for project metadata.
  * Before each mutation, a deep clone (JSON snapshot) of the entire metadata
  * object is pushed onto the undo stack. Undo restores the snapshot and pushes
  * the current state to the redo stack. Any new mutation clears the redo stack.
@@ -12,7 +12,7 @@ export class UndoManager {
   private maxSize = 50;
 
   /** Save a snapshot before a mutation */
-  pushSnapshot(metadata: TilesetMetadata): void {
+  pushSnapshot(metadata: ProjectMetadata): void {
     this.undoStack.push(JSON.stringify(metadata));
     if (this.undoStack.length > this.maxSize) {
       this.undoStack.shift();
@@ -21,7 +21,7 @@ export class UndoManager {
   }
 
   /** Undo: returns the previous metadata state, or null if nothing to undo */
-  undo(currentMetadata: TilesetMetadata): TilesetMetadata | null {
+  undo(currentMetadata: ProjectMetadata): ProjectMetadata | null {
     const snapshot = this.undoStack.pop();
     if (!snapshot) return null;
     this.redoStack.push(JSON.stringify(currentMetadata));
@@ -29,7 +29,7 @@ export class UndoManager {
   }
 
   /** Redo: returns the next metadata state, or null if nothing to redo */
-  redo(currentMetadata: TilesetMetadata): TilesetMetadata | null {
+  redo(currentMetadata: ProjectMetadata): ProjectMetadata | null {
     const snapshot = this.redoStack.pop();
     if (!snapshot) return null;
     this.undoStack.push(JSON.stringify(currentMetadata));

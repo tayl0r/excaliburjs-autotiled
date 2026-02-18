@@ -1,6 +1,7 @@
 import { EditorState, TileFilter } from '../editor-state.js';
 import { colRowFromTileId, tileIdFromColRow } from '../../utils/tile-math.js';
 import { templateSlotWangId } from '../template-utils.js';
+import { wangColorHex } from '../../core/wang-color.js';
 
 /**
  * Spritesheet viewer panel rendered on an HTML canvas.
@@ -12,14 +13,16 @@ export class TilesetPanel {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private state: EditorState;
-  private image: HTMLImageElement;
+  private images: HTMLImageElement[];
   private hoveredTileId: number = -1;
   private tooltip: HTMLDivElement;
   private filterButtons: HTMLButtonElement[] = [];
+  private tilesetTabs: HTMLButtonElement[] = [];
+  private tilesetTabBar: HTMLDivElement;
 
-  constructor(state: EditorState, image: HTMLImageElement) {
+  constructor(state: EditorState, images: HTMLImageElement[]) {
     this.state = state;
-    this.image = image;
+    this.images = images;
 
     this.element = document.createElement('div');
     this.element.style.cssText = `
@@ -28,6 +31,21 @@ export class TilesetPanel {
       position: relative;
       cursor: crosshair;
     `;
+
+    // Sticky header that stays fixed at top while canvas scrolls
+    const stickyHeader = document.createElement('div');
+    stickyHeader.style.cssText = `
+      position: sticky; top: 0; z-index: 10;
+    `;
+
+    // Tileset tab bar (one tab per tileset)
+    this.tilesetTabBar = document.createElement('div');
+    this.tilesetTabBar.style.cssText = `
+      display: flex; gap: 0; padding: 0 8px;
+      background: #0e1628; border-bottom: 1px solid #333;
+    `;
+    this.buildTilesetTabs();
+    stickyHeader.appendChild(this.tilesetTabBar);
 
     // Filter bar
     const filterBar = document.createElement('div');
@@ -50,7 +68,8 @@ export class TilesetPanel {
       filterBar.appendChild(btn);
       this.filterButtons.push(btn);
     }
-    this.element.appendChild(filterBar);
+    stickyHeader.appendChild(filterBar);
+    this.element.appendChild(stickyHeader);
 
     this.canvas = document.createElement('canvas');
     this.canvas.style.cssText = 'image-rendering: pixelated;';
@@ -83,6 +102,42 @@ export class TilesetPanel {
     this.state.on('activeColorChanged', () => this.render());
     this.state.on('templateSlotChanged', () => this.render());
     this.state.on('templateModeChanged', () => this.render());
+    this.state.on('activeTilesetChanged', () => {
+      this.updateTilesetTabStyles();
+      this.render();
+    });
+  }
+
+  private buildTilesetTabs(): void {
+    this.tilesetTabs = [];
+    const tilesets = this.state.metadata.tilesets;
+    for (let i = 0; i < tilesets.length; i++) {
+      const ts = tilesets[i];
+      const btn = document.createElement('button');
+      btn.textContent = ts.tilesetImage.replace(/\.\w+$/, '');
+      btn.dataset.tilesetIndex = String(i);
+      btn.addEventListener('click', () => {
+        this.state.setActiveTileset(i);
+      });
+      this.tilesetTabBar.appendChild(btn);
+      this.tilesetTabs.push(btn);
+    }
+    this.updateTilesetTabStyles();
+  }
+
+  private updateTilesetTabStyles(): void {
+    const activeIdx = this.state.activeTilesetIndex;
+    for (const btn of this.tilesetTabs) {
+      const idx = Number(btn.dataset.tilesetIndex);
+      const isActive = idx === activeIdx;
+      btn.style.cssText = `
+        padding: 5px 14px; border: none; cursor: pointer;
+        font-size: 11px; font-family: inherit;
+        background: ${isActive ? '#1e1e3a' : 'transparent'};
+        color: ${isActive ? '#e0e0e0' : '#666'};
+        border-bottom: 2px solid ${isActive ? '#6666cc' : 'transparent'};
+      `;
+    }
   }
 
   private setupEvents(): void {
@@ -128,7 +183,7 @@ export class TilesetPanel {
         this.render();
       }
       if (tileId >= 0) {
-        const [col, row] = colRowFromTileId(tileId, this.state.metadata.columns);
+        const [col, row] = colRowFromTileId(tileId, this.state.columns);
         this.tooltip.textContent = `Tile ${tileId} (${col}, ${row})`;
         this.tooltip.style.display = 'block';
         this.tooltip.style.left = `${e.clientX + 12}px`;
@@ -157,8 +212,8 @@ export class TilesetPanel {
   private tileIdAtMouse(e: MouseEvent): number {
     const rect = this.canvas.getBoundingClientRect();
     const zoom = this.state.zoom;
-    const tw = this.state.metadata.tileWidth * zoom;
-    const th = this.state.metadata.tileHeight * zoom;
+    const tw = this.state.tileWidth * zoom;
+    const th = this.state.tileHeight * zoom;
 
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -166,15 +221,15 @@ export class TilesetPanel {
     const col = Math.floor(x / tw);
     const row = Math.floor(y / th);
 
-    if (col < 0 || col >= this.state.metadata.columns) return -1;
-    const tileId = tileIdFromColRow(col, row, this.state.metadata.columns);
-    if (tileId >= this.state.metadata.tileCount) return -1;
+    if (col < 0 || col >= this.state.columns) return -1;
+    const tileId = tileIdFromColRow(col, row, this.state.columns);
+    if (tileId >= this.state.tileCount) return -1;
 
     return tileId;
   }
 
   render(): void {
-    const { tileWidth, tileHeight, columns, tileCount } = this.state.metadata;
+    const { tileWidth, tileHeight, columns, tileCount } = this.state;
     const zoom = this.state.zoom;
     const rows = Math.ceil(tileCount / columns);
 
@@ -187,7 +242,7 @@ export class TilesetPanel {
     this.ctx.clearRect(0, 0, cw, ch);
 
     // Draw spritesheet
-    this.ctx.drawImage(this.image, 0, 0, cw, ch);
+    this.ctx.drawImage(this.images[this.state.activeTilesetIndex], 0, 0, cw, ch);
 
     // Draw grid lines
     this.ctx.strokeStyle = 'rgba(255,255,255,0.1)';
@@ -213,7 +268,8 @@ export class TilesetPanel {
     // Draw filter dimming overlay
     if (this.state.tileFilter !== 'all') {
       const ws = this.state.activeWangSet;
-      const taggedTileIds = new Set(ws?.wangtiles.map(wt => wt.tileid) ?? []);
+      const activeTsi = this.state.activeTilesetIndex;
+      const taggedTileIds = new Set(ws?.wangtiles.filter(wt => (wt.tileset ?? 0) === activeTsi).map(wt => wt.tileid) ?? []);
       const tw = tileWidth * zoom;
       const th = tileHeight * zoom;
 
@@ -272,14 +328,16 @@ export class TilesetPanel {
     const colorId = this.state.activeColorId;
     if (!ws || colorId <= 0) return;
 
-    const { tileWidth, tileHeight, columns } = this.state.metadata;
+    const { tileWidth, tileHeight, columns } = this.state;
     const tw = tileWidth * zoom;
     const th = tileHeight * zoom;
 
     this.ctx.strokeStyle = 'rgba(100, 180, 255, 0.7)';
     this.ctx.lineWidth = 2;
 
+    const activeTsi = this.state.activeTilesetIndex;
     for (const wt of ws.wangtiles) {
+      if ((wt.tileset ?? 0) !== activeTsi) continue;
       if (!wt.wangid.includes(colorId)) continue;
       const [col, row] = colRowFromTileId(wt.tileid, columns);
       this.ctx.strokeRect(
@@ -295,11 +353,13 @@ export class TilesetPanel {
     const ws = this.state.activeWangSet;
     if (!ws) return;
 
-    const { tileWidth, tileHeight, columns } = this.state.metadata;
+    const { tileWidth, tileHeight, columns } = this.state;
     const tw = tileWidth * zoom;
     const th = tileHeight * zoom;
 
+    const activeTsi = this.state.activeTilesetIndex;
     for (const wt of ws.wangtiles) {
+      if ((wt.tileset ?? 0) !== activeTsi) continue;
       const [col, row] = colRowFromTileId(wt.tileid, columns);
       const x = col * tw;
       const y = row * th;
@@ -316,14 +376,13 @@ export class TilesetPanel {
         const colorId = wt.wangid[wangIdx];
         if (colorId === 0) continue;
 
-        const wangColor = ws.colors[colorId - 1];
-        if (!wangColor) continue;
+        if (colorId > ws.colors.length) continue;
 
         const cornerX = x + cx * tw;
         const cornerY = y + cy * th;
         const size = Math.max(4, tw * 0.25);
 
-        this.ctx.fillStyle = wangColor.color + 'aa';
+        this.ctx.fillStyle = wangColorHex(colorId) + 'aa';
         this.ctx.beginPath();
         if (cx === 0 && cy === 0) {
           this.ctx.moveTo(cornerX, cornerY);

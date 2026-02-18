@@ -14,10 +14,10 @@ export class WangSet {
   name: string;
   type: WangSetType;
   colors: WangColor[];
-  /** tileId -> WangId mapping (base tiles only, no transforms) */
-  private tileMapping: Map<number, WangId> = new Map();
-  /** tileId -> probability weight (default 1.0) */
-  private tileProbabilities: Map<number, number> = new Map();
+  /** "tilesetIndex:tileId" -> WangId mapping (base tiles only, no transforms) */
+  private tileMapping: Map<string, WangId> = new Map();
+  /** "tilesetIndex:tileId" -> probability weight (default 1.0) */
+  private tileProbabilities: Map<string, number> = new Map();
   /** Pre-computed variants (base + transforms). Call recomputeVariants() after changing tiles. */
   private variants: WangVariant[] = [];
   /** Color distance matrix [colorA][colorB]. -1 = no path. */
@@ -36,28 +36,41 @@ export class WangSet {
     this.imageTileId = imageTileId;
   }
 
+  private static tileKey(tilesetIndex: number, tileId: number): string {
+    return `${tilesetIndex}:${tileId}`;
+  }
+
   /** Get WangId for a tile. Returns undefined if tile isn't in this set. */
-  wangIdOf(tileId: number): WangId | undefined {
-    return this.tileMapping.get(tileId);
+  wangIdOf(tilesetIndex: number, tileId: number): WangId | undefined {
+    return this.tileMapping.get(WangSet.tileKey(tilesetIndex, tileId));
   }
 
   /** Add or update a tile -> WangId mapping */
-  addTileMapping(tileId: number, wangId: WangId, probability?: number): void {
-    this.tileMapping.set(tileId, wangId);
+  addTileMapping(tilesetIndex: number, tileId: number, wangId: WangId, probability?: number): void {
+    const key = WangSet.tileKey(tilesetIndex, tileId);
+    this.tileMapping.set(key, wangId);
     if (probability !== undefined) {
-      this.tileProbabilities.set(tileId, probability);
+      this.tileProbabilities.set(key, probability);
     }
   }
 
   /** Remove a tile mapping */
-  removeTileMapping(tileId: number): void {
-    this.tileMapping.delete(tileId);
-    this.tileProbabilities.delete(tileId);
+  removeTileMapping(tilesetIndex: number, tileId: number): void {
+    const key = WangSet.tileKey(tilesetIndex, tileId);
+    this.tileMapping.delete(key);
+    this.tileProbabilities.delete(key);
   }
 
-  /** Get all base tile mappings */
-  getTileMappings(): Map<number, WangId> {
-    return new Map(this.tileMapping);
+  /** Get all base tile mappings as an array of {tilesetIndex, tileId, wangId} */
+  getTileMappings(): Array<{ tilesetIndex: number; tileId: number; wangId: WangId }> {
+    const result: Array<{ tilesetIndex: number; tileId: number; wangId: WangId }> = [];
+    for (const [key, wangId] of this.tileMapping) {
+      const sepIdx = key.indexOf(':');
+      const tilesetIndex = parseInt(key.substring(0, sepIdx), 10);
+      const tileId = parseInt(key.substring(sepIdx + 1), 10);
+      result.push({ tilesetIndex, tileId, wangId });
+    }
+    return result;
   }
 
   /** Get the number of base tile mappings */
@@ -132,8 +145,8 @@ export class WangSet {
   }
 
   /** Get the probability weight for a tile (default 1.0) */
-  tileProbability(tileId: number): number {
-    return this.tileProbabilities.get(tileId) ?? 1.0;
+  tileProbability(tilesetIndex: number, tileId: number): number {
+    return this.tileProbabilities.get(WangSet.tileKey(tilesetIndex, tileId)) ?? 1.0;
   }
 
   /** Get a color by its 1-based ID */

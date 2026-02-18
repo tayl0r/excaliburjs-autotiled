@@ -18,6 +18,8 @@ export class RegionAssignPanel {
     this.state.on('selectedTileChanged', () => this.render());
     this.state.on('metadataChanged', () => this.render());
     this.state.on('activeWangSetChanged', () => this.render());
+    this.state.on('clipboardChanged', () => this.render());
+    this.state.on('templateModeChanged', () => this.render());
 
     this.render();
   }
@@ -33,7 +35,7 @@ export class RegionAssignPanel {
     this.element.style.display = 'block';
 
     // Calculate selection bounds
-    const columns = this.state.metadata.columns;
+    const columns = this.state.columns;
     let minCol = Infinity, maxCol = -1, minRow = Infinity, maxRow = -1;
     for (const id of selectedIds) {
       const [c, r] = colRowFromTileId(id, columns);
@@ -66,12 +68,11 @@ export class RegionAssignPanel {
       return;
     }
 
-    // Color A/B selects — default to the currently active color
-    const activeColor = this.state.activeColorId;
-    const colorARow = this.createColorSelect('Color A:', activeColor >= 1 ? activeColor : 1, ws);
+    // Color A/B selects — persisted via state.templateColorA/B
+    const colorARow = this.createColorSelect('Color A:', this.state.templateColorA, ws);
     this.element.appendChild(colorARow);
 
-    const colorBRow = this.createColorSelect('Color B:', activeColor >= 1 ? activeColor : 2, ws);
+    const colorBRow = this.createColorSelect('Color B:', this.state.templateColorB, ws);
     this.element.appendChild(colorBRow);
 
     // Pattern select — all patterns shown, non-matching ones disabled
@@ -119,12 +120,43 @@ export class RegionAssignPanel {
       // Origin = top-left of selection
       const originTileId = minRow * columns + minCol;
       const assignments = applyLayoutPattern(
-        pattern, originTileId, columns, this.state.metadata.tileCount, colorA, colorB
+        pattern, originTileId, columns, this.state.tileCount, colorA, colorB
       );
 
       this.state.setWangIdMulti(assignments.map(([tileId, wangid]) => ({ tileId, wangid })));
     });
     this.element.appendChild(applyBtn);
+
+    // Copy/Paste buttons
+    const clip = this.state.wangClipboard;
+    const canPaste = clip != null && clip.width === regionW && clip.height === regionH;
+
+    const copyPasteRow = document.createElement('div');
+    copyPasteRow.style.cssText = 'display: flex; gap: 6px; margin-top: 6px;';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = 'Copy';
+    copyBtn.style.cssText = 'background: #333; color: #ccc; border: 1px solid #555; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; flex: 1;';
+    copyBtn.addEventListener('click', () => {
+      this.state.copyWangRegion();
+    });
+    copyPasteRow.appendChild(copyBtn);
+
+    const pasteBtn = document.createElement('button');
+    pasteBtn.textContent = clip ? `Paste (${clip.width}\u00D7${clip.height})` : 'Paste';
+    pasteBtn.disabled = !canPaste;
+    pasteBtn.style.cssText = `background: #333; color: ${canPaste ? '#ccc' : '#666'}; border: 1px solid #555; padding: 6px 12px; border-radius: 3px; cursor: ${canPaste ? 'pointer' : 'not-allowed'}; font-size: 12px; flex: 1;`;
+    pasteBtn.addEventListener('click', () => {
+      if (!canPaste) return;
+      const colorASelect = this.element.querySelector('[data-role="colorA"]') as HTMLSelectElement;
+      const colorBSelect = this.element.querySelector('[data-role="colorB"]') as HTMLSelectElement;
+      const colorA = parseInt(colorASelect?.value ?? '1', 10);
+      const colorB = parseInt(colorBSelect?.value ?? '2', 10);
+      this.state.pasteWangRegion(colorA, colorB);
+    });
+    copyPasteRow.appendChild(pasteBtn);
+
+    this.element.appendChild(copyPasteRow);
   }
 
   private createColorSelect(label: string, defaultColorId: number, ws: WangSetData): HTMLDivElement {
@@ -149,6 +181,11 @@ export class RegionAssignPanel {
       select.appendChild(opt);
     }
     select.value = String(Math.min(defaultColorId, ws.colors.length));
+    select.addEventListener('change', () => {
+      const val = parseInt(select.value, 10);
+      if (role === 'colorA') this.state.setTemplateColorA(val);
+      else this.state.setTemplateColorB(val);
+    });
     row.appendChild(select);
 
     return row;

@@ -25,7 +25,7 @@ function createGrassDirtWangSet(): WangSet {
     const bl = (n & 1) ? 2 : 1;
     // WangId: [Top, TopRight, Right, BottomRight, Bottom, BottomLeft, Left, TopLeft]
     // Corner type: edges=0, corners: TL=idx7, TR=idx1, BR=idx3, BL=idx5
-    ws.addTileMapping(n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
+    ws.addTileMapping(0, n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
   }
 
   // Generate variants (no transforms)
@@ -151,7 +151,7 @@ describe('findBestMatch', () => {
     const grass: WangColor = { id: 1, name: 'Grass', color: '#00ff00', imageTileId: 0, probability: 1.0 };
     const dirt: WangColor = { id: 2, name: 'Dirt', color: '#8b4513', imageTileId: 1, probability: 1.0 };
     const ws = new WangSet('Ground', 'corner', [grass, dirt]);
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 1]));
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 1]));
     ws.setVariants(generateAllVariants(ws, DEFAULT_TRANSFORMATIONS));
     const { distances: dist, nextHop: hop } = computeColorDistances(ws);
     ws.setDistanceMatrix(dist);
@@ -267,7 +267,7 @@ function createThreeColorWangSet(): WangSet {
     const tr = (n & 4) ? 2 : 1;
     const br = (n & 2) ? 2 : 1;
     const bl = (n & 1) ? 2 : 1;
-    ws.addTileMapping(n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
+    ws.addTileMapping(0, n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
   }
 
   // 16 Grass+Sand tiles (tileIds 16-31)
@@ -276,7 +276,7 @@ function createThreeColorWangSet(): WangSet {
     const tr = (n & 4) ? 3 : 1;
     const br = (n & 2) ? 3 : 1;
     const bl = (n & 1) ? 3 : 1;
-    ws.addTileMapping(16 + n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
+    ws.addTileMapping(0, 16 + n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
   }
 
   const variants = generateAllVariants(ws, DEFAULT_TRANSFORMATIONS);
@@ -320,11 +320,11 @@ describe('Cell flip flags preserved through map storage', () => {
 
     // Only provide tiles where TL differs from TR but BR=BL
     // Tile 4: TL=Grass, TR=Dirt, BR=Grass, BL=Grass  (only TR is dirt)
-    ws.addTileMapping(4, WangId.fromArray([0, 2, 0, 1, 0, 1, 0, 1]));
+    ws.addTileMapping(0, 4, WangId.fromArray([0, 2, 0, 1, 0, 1, 0, 1]));
     // Tile 0: all grass
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 1]));
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 1]));
     // Tile 15: all dirt
-    ws.addTileMapping(15, WangId.fromArray([0, 2, 0, 2, 0, 2, 0, 2]));
+    ws.addTileMapping(0, 15, WangId.fromArray([0, 2, 0, 2, 0, 2, 0, 2]));
 
     // No tile 8 (TL=Dirt, TR=Grass) — it must come from flipH of tile 4
     const transforms = { allowRotate: false, allowFlipH: true, allowFlipV: false, preferUntransformed: true };
@@ -446,7 +446,7 @@ describe('applyTerrainPaint with intermediates', () => {
       for (let x = 0; x < 5; x++) {
         const tileId = map.tileIdAt(x, y);
         if (tileId < 0) continue;
-        const wangId = ws.wangIdOf(tileId);
+        const wangId = ws.wangIdOf(0, tileId);
         if (!wangId) continue;
         const colors = new Set<number>();
         for (let i = 0; i < 8; i++) {
@@ -490,7 +490,7 @@ describe('applyTerrainPaint with intermediates', () => {
       const tr = (n & 4) ? 2 : 1;
       const br = (n & 2) ? 2 : 1;
       const bl = (n & 1) ? 2 : 1;
-      ws.addTileMapping(tileId++, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
+      ws.addTileMapping(0, tileId++, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
     }
     // B-C tiles
     for (let n = 0; n < 16; n++) {
@@ -498,7 +498,7 @@ describe('applyTerrainPaint with intermediates', () => {
       const tr = (n & 4) ? 3 : 2;
       const br = (n & 2) ? 3 : 2;
       const bl = (n & 1) ? 3 : 2;
-      ws.addTileMapping(tileId++, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
+      ws.addTileMapping(0, tileId++, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
     }
     // C-D tiles
     for (let n = 0; n < 16; n++) {
@@ -506,7 +506,7 @@ describe('applyTerrainPaint with intermediates', () => {
       const tr = (n & 4) ? 4 : 3;
       const br = (n & 2) ? 4 : 3;
       const bl = (n & 1) ? 4 : 3;
-      ws.addTileMapping(tileId++, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
+      ws.addTileMapping(0, tileId++, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
     }
 
     ws.setVariants(generateAllVariants(ws, DEFAULT_TRANSFORMATIONS));

@@ -26,8 +26,8 @@ export function wangIdFromSurroundings(
       continue;
     }
 
-    const neighborTileId = map.cellAt(nx, ny).tileId;
-    if (neighborTileId < 0) {
+    const neighborCell = map.cellAt(nx, ny);
+    if (neighborCell.tileId < 0) {
       // No tile placed, use painted color as a hint
       const neighborColor = map.colorAt(nx, ny);
       if (neighborColor > 0) {
@@ -38,7 +38,7 @@ export function wangIdFromSurroundings(
       continue;
     }
 
-    const neighborWangId = wangSet.wangIdOf(neighborTileId);
+    const neighborWangId = wangSet.wangIdOf(neighborCell.tilesetIndex, neighborCell.tileId);
     if (!neighborWangId) {
       colors[index] = 0; // Unknown tile, wildcard
       continue;
@@ -95,7 +95,7 @@ export function findBestMatch(
     }
 
     if (totalPenalty === lowestPenalty) {
-      const probability = wangSet.wangIdProbability(wangId) * wangSet.tileProbability(cell.tileId);
+      const probability = wangSet.wangIdProbability(wangId) * wangSet.tileProbability(cell.tilesetIndex, cell.tileId);
       candidates.add(cell, probability);
     }
   }

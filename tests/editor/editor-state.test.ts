@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { EditorState } from '../../src/editor/editor-state.js';
-import { TilesetMetadata } from '../../src/core/metadata-schema.js';
+import { EditorState, WangRegionClipboard } from '../../src/editor/editor-state.js';
+import { ProjectMetadata } from '../../src/core/metadata-schema.js';
 
-function makeMetadata(): TilesetMetadata {
+function makeMetadata(): ProjectMetadata {
   return {
-    tilesetImage: 'test.png',
-    tileWidth: 16, tileHeight: 16,
-    columns: 4, tileCount: 16,
+    version: 2,
+    tilesets: [{
+      tilesetImage: 'test.png',
+      tileWidth: 16, tileHeight: 16,
+      columns: 4, tileCount: 16,
+    }],
     wangsets: [],
   };
 }
@@ -77,30 +80,28 @@ describe('EditorState WangColor CRUD', () => {
 
   it('addColor appends a new color to the active WangSet', () => {
     const state = stateWithWangSet();
-    state.addColor('Grass', '#00ff00');
+    state.addColor('Grass');
     const colors = state.activeWangSet!.colors;
     expect(colors).toHaveLength(1);
     expect(colors[0].name).toBe('Grass');
-    expect(colors[0].color).toBe('#00ff00');
     expect(colors[0].probability).toBe(1.0);
     expect(colors[0].tile).toBe(-1);
   });
 
   it('updateColor changes properties', () => {
     const state = stateWithWangSet();
-    state.addColor('Grass', '#00ff00');
-    state.updateColor(0, { name: 'DarkGrass', color: '#006600' });
+    state.addColor('Grass');
+    state.updateColor(0, { name: 'DarkGrass' });
     const c = state.activeWangSet!.colors[0];
     expect(c.name).toBe('DarkGrass');
-    expect(c.color).toBe('#006600');
     expect(c.probability).toBe(1.0); // unchanged
   });
 
   it('removeColor removes and shifts wangid references', () => {
     const state = stateWithWangSet();
-    state.addColor('Grass', '#00ff00');  // id 1
-    state.addColor('Dirt', '#884400');   // id 2
-    state.addColor('Sand', '#ffee00');   // id 3
+    state.addColor('Grass');  // id 1
+    state.addColor('Dirt');   // id 2
+    state.addColor('Sand');   // id 3
 
     // Tag a tile: corners = [0, 2, 0, 3, 0, 1, 0, 2]
     state.setWangId(0, [0, 2, 0, 3, 0, 1, 0, 2]);
@@ -118,7 +119,7 @@ describe('EditorState WangColor CRUD', () => {
 
   it('removeColor with no wangtiles does not crash', () => {
     const state = stateWithWangSet();
-    state.addColor('Grass', '#00ff00');
+    state.addColor('Grass');
     state.removeColor(0);
     expect(state.activeWangSet!.colors).toHaveLength(0);
   });
@@ -127,7 +128,7 @@ describe('EditorState WangColor CRUD', () => {
     const state = stateWithWangSet();
     let count = 0;
     state.on('metadataChanged', () => count++);
-    state.addColor('A', '#000');   // +1
+    state.addColor('A');   // +1
     state.updateColor(0, { name: 'B' }); // +1
     state.removeColor(0);          // +1
     expect(count).toBe(3);
@@ -135,14 +136,14 @@ describe('EditorState WangColor CRUD', () => {
 
   it('updateColor changes probability', () => {
     const state = stateWithWangSet();
-    state.addColor('Grass', '#00ff00');
+    state.addColor('Grass');
     state.updateColor(0, { probability: 0.5 });
     expect(state.activeWangSet!.colors[0].probability).toBe(0.5);
   });
 
   it('updateColor sets representative tile', () => {
     const state = stateWithWangSet();
-    state.addColor('Grass', '#00ff00');
+    state.addColor('Grass');
     expect(state.activeWangSet!.colors[0].tile).toBe(-1);
     state.updateColor(0, { tile: 42 });
     expect(state.activeWangSet!.colors[0].tile).toBe(42);
@@ -150,7 +151,7 @@ describe('EditorState WangColor CRUD', () => {
 
   it('updateColor clears representative tile back to -1', () => {
     const state = stateWithWangSet();
-    state.addColor('Grass', '#00ff00');
+    state.addColor('Grass');
     state.updateColor(0, { tile: 42 });
     state.updateColor(0, { tile: -1 });
     expect(state.activeWangSet!.colors[0].tile).toBe(-1);
@@ -161,7 +162,7 @@ describe('EditorState tile probability', () => {
   function stateWithTaggedTile(): EditorState {
     const state = new EditorState(makeMetadata());
     state.addWangSet('Test', 'corner');
-    state.addColor('Grass', '#00ff00');
+    state.addColor('Grass');
     state.setWangId(0, [0, 1, 0, 1, 0, 1, 0, 1]);
     return state;
   }
@@ -203,7 +204,7 @@ describe('EditorState setWangIdMulti', () => {
   function stateWithWangSet(): EditorState {
     const state = new EditorState(makeMetadata());
     state.addWangSet('Test', 'corner');
-    state.addColor('Grass', '#00ff00');
+    state.addColor('Grass');
     return state;
   }
 
@@ -255,7 +256,7 @@ describe('EditorState setTileProbabilityMulti', () => {
   function stateWithTaggedTiles(): EditorState {
     const state = new EditorState(makeMetadata());
     state.addWangSet('Test', 'corner');
-    state.addColor('Grass', '#00ff00');
+    state.addColor('Grass');
     state.setWangId(0, [0, 1, 0, 1, 0, 1, 0, 1]);
     state.setWangId(1, [0, 1, 0, 1, 0, 1, 0, 1]);
     state.setWangId(2, [0, 1, 0, 1, 0, 1, 0, 1]);
@@ -329,5 +330,124 @@ describe('EditorState template mode', () => {
     state.setActiveTemplateSlot(5);
     state.setTemplateMode(false);
     expect(state.activeTemplateSlot).toBe(-1);
+  });
+});
+
+describe('EditorState copyWangRegion / pasteWangRegion', () => {
+  /** 4-column, 16-tile tileset with a wangset + 2 colors */
+  function stateWith2x2Tagged(): EditorState {
+    const state = new EditorState(makeMetadata());
+    state.addWangSet('Test', 'corner');
+    state.addColor('Grass');  // color 1
+    state.addColor('Dirt');   // color 2
+    // Tag a 2x2 block (tiles 0,1,4,5 in a 4-col grid)
+    state.setWangId(0, [0, 1, 0, 1, 0, 2, 0, 2]);  // row0 col0
+    state.setWangId(1, [0, 2, 0, 2, 0, 1, 0, 1]);  // row0 col1
+    state.setWangId(4, [0, 1, 0, 2, 0, 1, 0, 2]);  // row1 col0
+    // tile 5 intentionally left untagged
+    // Select the 2x2 region
+    state.selectTile(0);
+    state.selectTileRange(0, 5);
+    return state;
+  }
+
+  it('copies 2x2 region with correct dimensions and entry count', () => {
+    const state = stateWith2x2Tagged();
+    state.copyWangRegion();
+
+    const clip = state.wangClipboard!;
+    expect(clip).not.toBeNull();
+    expect(clip.width).toBe(2);
+    expect(clip.height).toBe(2);
+    // tile 5 has no wangid, so only 3 entries
+    expect(clip.entries.size).toBe(3);
+    // TL corner (index 7) of tile 0 is 2, so sourceColorA=2
+    expect(clip.sourceColorA).toBe(2);
+    expect(clip.sourceColorB).toBe(1);
+  });
+
+  it('emits clipboardChanged event', () => {
+    const state = stateWith2x2Tagged();
+    let count = 0;
+    state.on('clipboardChanged', () => count++);
+    state.copyWangRegion();
+    expect(count).toBe(1);
+  });
+
+  it('paste remaps colors correctly', () => {
+    const state = stateWith2x2Tagged();
+    state.addColor('Sand');   // color 3
+    state.addColor('Stone');  // color 4
+    state.copyWangRegion();
+
+    // Select a different 2x2 region (tiles 2,3,6,7)
+    state.selectTile(2);
+    state.selectTileRange(2, 7);
+
+    // sourceColorA=2, sourceColorB=1 (detected from TL of tile 0)
+    // Paste with colorA=3, colorB=4: remap 2→3, 1→4
+    const ok = state.pasteWangRegion(3, 4);
+    expect(ok).toBe(true);
+
+    // tile 0 original: [0,1,0,1,0,2,0,2] → remap 2→3,1→4 → [0,4,0,4,0,3,0,3]
+    const wt2 = state.getWangTile(2);
+    expect(wt2!.wangid).toEqual([0, 4, 0, 4, 0, 3, 0, 3]);
+
+    // tile 1 original: [0,2,0,2,0,1,0,1] → remap 2→3,1→4 → [0,3,0,3,0,4,0,4]
+    const wt3 = state.getWangTile(3);
+    expect(wt3!.wangid).toEqual([0, 3, 0, 3, 0, 4, 0, 4]);
+  });
+
+  it('paste returns false on dimension mismatch', () => {
+    const state = stateWith2x2Tagged();
+    state.copyWangRegion();
+
+    // Select a 3x1 region (tiles 0,1,2)
+    state.selectTile(0);
+    state.selectTileRange(0, 2);
+
+    const ok = state.pasteWangRegion(1, 2);
+    expect(ok).toBe(false);
+  });
+
+  it('paste returns false when clipboard is empty', () => {
+    const state = stateWith2x2Tagged();
+    // No copy performed
+    const ok = state.pasteWangRegion(1, 2);
+    expect(ok).toBe(false);
+  });
+
+  it('paste is undoable (single undo reverts all pasted tiles)', () => {
+    const state = stateWith2x2Tagged();
+    state.copyWangRegion();
+
+    // Select tiles 2,3,6,7
+    state.selectTile(2);
+    state.selectTileRange(2, 7);
+    state.pasteWangRegion(1, 2);
+
+    // Verify tiles were pasted
+    expect(state.getWangTile(2)).toBeDefined();
+    expect(state.getWangTile(3)).toBeDefined();
+    expect(state.getWangTile(6)).toBeDefined();
+
+    // Single undo should revert all
+    state.undo();
+    expect(state.getWangTile(2)).toBeUndefined();
+    expect(state.getWangTile(3)).toBeUndefined();
+    expect(state.getWangTile(6)).toBeUndefined();
+  });
+
+  it('tiles without wangids in source are skipped on paste', () => {
+    const state = stateWith2x2Tagged();
+    state.copyWangRegion();
+
+    // Select tiles 2,3,6,7
+    state.selectTile(2);
+    state.selectTileRange(2, 7);
+    state.pasteWangRegion(1, 2);
+
+    // Tile at relative (1,1) had no wangid in source (tile 5), so tile 7 should be untagged
+    expect(state.getWangTile(7)).toBeUndefined();
   });
 });

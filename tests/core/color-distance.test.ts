@@ -11,7 +11,7 @@ function makeColor(id: number, name: string): WangColor {
 describe('computeColorDistances', () => {
   it('returns 0 for self-distance', () => {
     const ws = new WangSet('test', 'corner', [makeColor(1, 'A'), makeColor(2, 'B')]);
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1])); // has both A and B
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1])); // has both A and B
     const { distances: dist } = computeColorDistances(ws);
     expect(dist[1][1]).toBe(0);
     expect(dist[2][2]).toBe(0);
@@ -19,7 +19,7 @@ describe('computeColorDistances', () => {
 
   it('returns 1 for direct transitions', () => {
     const ws = new WangSet('test', 'corner', [makeColor(1, 'A'), makeColor(2, 'B')]);
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1]));
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1]));
     const { distances: dist } = computeColorDistances(ws);
     expect(dist[1][2]).toBe(1);
     expect(dist[2][1]).toBe(1);
@@ -32,7 +32,7 @@ describe('computeColorDistances', () => {
       makeColor(3, 'C'),
     ]);
     // A-B transition exists but no B-C or A-C
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1]));
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1]));
     const { distances: dist } = computeColorDistances(ws);
     expect(dist[1][3]).toBe(-1);
     expect(dist[3][1]).toBe(-1);
@@ -45,9 +45,9 @@ describe('computeColorDistances', () => {
       makeColor(3, 'C'),
     ]);
     // A-B transition
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1]));
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1]));
     // B-C transition
-    ws.addTileMapping(1, WangId.fromArray([0, 2, 0, 3, 0, 2, 0, 2]));
+    ws.addTileMapping(0, 1, WangId.fromArray([0, 2, 0, 3, 0, 2, 0, 2]));
     const { distances: dist } = computeColorDistances(ws);
     // A->C should be 2 (A->B->C)
     expect(dist[1][3]).toBe(2);
@@ -58,7 +58,7 @@ describe('computeColorDistances', () => {
 describe('next-hop matrix', () => {
   it('returns direct target for distance-1 pairs', () => {
     const ws = new WangSet('test', 'corner', [makeColor(1, 'A'), makeColor(2, 'B')]);
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1]));
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1]));
     const { nextHop } = computeColorDistances(ws);
     expect(nextHop[1][2]).toBe(2); // A->B: go directly to B
     expect(nextHop[2][1]).toBe(1); // B->A: go directly to A
@@ -66,7 +66,7 @@ describe('next-hop matrix', () => {
 
   it('returns self for same color', () => {
     const ws = new WangSet('test', 'corner', [makeColor(1, 'A'), makeColor(2, 'B')]);
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1]));
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1]));
     const { nextHop } = computeColorDistances(ws);
     expect(nextHop[1][1]).toBe(1);
     expect(nextHop[2][2]).toBe(2);
@@ -79,9 +79,9 @@ describe('next-hop matrix', () => {
       makeColor(3, 'C'),
     ]);
     // A-B transition
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1]));
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1]));
     // B-C transition
-    ws.addTileMapping(1, WangId.fromArray([0, 2, 0, 3, 0, 2, 0, 2]));
+    ws.addTileMapping(0, 1, WangId.fromArray([0, 2, 0, 3, 0, 2, 0, 2]));
     const { nextHop } = computeColorDistances(ws);
     // A->C should go through B first
     expect(nextHop[1][3]).toBe(2);
@@ -96,7 +96,7 @@ describe('next-hop matrix', () => {
       makeColor(3, 'C'),
     ]);
     // Only A-B transition, no path to C
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1]));
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 2, 0, 1, 0, 1]));
     const { nextHop } = computeColorDistances(ws);
     expect(nextHop[1][3]).toBe(-1);
     expect(nextHop[3][1]).toBe(-1);

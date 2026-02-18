@@ -62,7 +62,7 @@
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Project management (create/open, register tilesets) | Not done | Single hardcoded tileset only (`terrain.autotile.json`) |
+| Project management (create/open, register tilesets) | Partial | ProjectMetadata format with multiple tilesets; no create/open UI |
 | Tileset image loader (scrollable/zoomable viewer) | Done | `src/editor/panels/tileset-panel.ts` — Ctrl+wheel zoom |
 | Tile selection and inspection | Done | `src/editor/panels/inspector-panel.ts` |
 | Multi-select tiles (shift-click range, ctrl-click) | Done | Both range and toggle multi-select implemented |
@@ -80,7 +80,7 @@
 | Animation frame support | Done | `src/editor/panels/animation-panel.ts` — frame sync, offset editing, auto-copy tags |
 | Layout pattern definitions | Partial | 2 patterns defined (Standard 4x4 Binary, Fantasy 1x16); RPG Maker VX and custom pattern creation not implemented |
 | Save/load metadata JSON files | Partial | Auto-save to server endpoint works (5s debounce); no manual save, load dialog, or standalone JSON export |
-| Multi-tileset workflow (tabbed interface) | Not done | Single tileset only |
+| Multi-tileset workflow (tabbed interface) | Partial | ProjectMetadata supports multiple tilesets; editor operates on active tileset; tab bar UI not yet implemented |
 | Undo/redo for all tagging operations | Done | `src/editor/undo-manager.ts` — full snapshot-based undo stack |
 | Keyboard shortcuts | Partial | See detail below |
 
@@ -105,7 +105,7 @@
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Per-tileset metadata file format | Done | `src/core/metadata-schema.ts` — TypeScript interfaces match the spec |
+| Per-tileset metadata file format | Done | `src/core/metadata-schema.ts` — TilesetDef + ProjectMetadata (version 2) |
 | Top-level fields (image, dimensions, columns, tileCount) | Done | |
 | Transformations object | Done | allowRotate, allowFlipH, allowFlipV, preferUntransformed |
 | WangSet with name, type, colors, wangtiles | Done | |
@@ -113,7 +113,7 @@
 | WangTile with tileid and 8-element wangid | Done | |
 | Animation sequences (name, frames, duration, pattern) | Done | |
 | Validation rules (Section 5) | Partial | Type-constraint validation on load; no real-time duplicate-tileid warning in editor |
-| Project file format (Section 3) | Not done | No project file support |
+| Project file format (Section 3) | Done | `ProjectMetadata` with `version: 2`, `tilesets[]`, migration from legacy format |
 
 ---
 
@@ -122,14 +122,14 @@
 | Item | Status | Notes |
 |------|--------|-------|
 | Ground Terrain WangSet (Grass/Dirt/Sand/Rock) | Done | Configured in `terrain.autotile.json` with tile probabilities |
-| Water WangSet (3-frame animated, ping-pong) | Not done | Animation panel exists but no water tileset is tagged |
+| Water WangSet (3-frame animated, ping-pong) | Not done | water.png loaded in project metadata but no tiles tagged yet |
 | Forest Canopy WangSet | Not done | No `outside.png` tileset loaded |
 | Cliff/Mountain handling | Not done | |
 | Desert Terrain WangSet | Not done | No `desert.png` tileset loaded |
 | Dungeon Floor WangSet | Not done | No `dungeon.png` tileset loaded |
 | Castle Floor WangSet | Not done | No `castle.png` tileset loaded |
 
-Only the ground terrain tileset has been authored. The remaining asset authoring depends on multi-tileset support.
+Only the ground terrain tileset has been authored. water.png is loaded in the project metadata but awaits tile tagging in the editor. The remaining asset authoring depends on the tileset tab bar UI.
 
 ---
 
@@ -167,6 +167,37 @@ Only the ground terrain tileset has been authored. The remaining asset authoring
 | Task 4: Representative tile thumbnail + picker | Done | Canvas thumbnail, "Set Rep Tile" button, right-click to clear |
 | Task 5: Final verification | Done | All tests pass |
 
+### 2026-02-17: Copy/Paste WangId Regions
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Task 1: EditorState clipboard + copy/paste methods | Done | `WangRegionClipboard` interface, `copyWangRegion()`, `pasteWangRegion()` with color remapping |
+| Task 2: Tests for copy/paste | Done | 7 tests covering dimensions, events, remap, mismatch, empty clipboard, undo, skip untagged |
+| Task 3: Region Assign Panel — Copy/Paste buttons | Done | Copy/Paste row, clipboard dimension label, Color A/B synced to `state.templateColorA/B` |
+| Task 4: Update CHANGELOG | Done | This section |
+
+### 2026-02-17: Multi-Tileset Support (`multi-tileset-plan.md`)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Task 1: Schema — ProjectMetadata, TilesetDef | Done | `TilesetDef`, `ProjectMetadata` interfaces, `tileset` field on `WangTileData` |
+| Task 2: Migration — Legacy to ProjectMetadata | Done | `src/core/metadata-migration.ts` with idempotent migration |
+| Task 3: Cell — Add tilesetIndex | Done | `Cell.tilesetIndex`, updated `createCell()`, `cellSpriteKey()` |
+| Task 4: WangSet — Composite tile keys | Done | `Map<string, WangId>` with `"tilesetIndex:tileId"` keys |
+| Task 5: Variant Generator — Carry tilesetIndex | Done | tilesetIndex preserved through rotation/flip transforms |
+| Task 6: Matching — Use qualified lookups | Done | `wangIdOf(tilesetIndex, tileId)` throughout |
+| Task 7: Metadata Loader — Accept ProjectMetadata | Done | Accepts both formats, passes `wt.tileset ?? 0` |
+| Task 8: Fix all tests | Done | All 174 tests updated and passing |
+| Task 9: EditorState — Switch to ProjectMetadata | Done | Active tileset concept, convenience getters, scoped operations |
+| Task 10: TileEditor — Accept ProjectMetadata | Done | Saves as `project.autotile.json` |
+| Task 11: TilesetPanel — Tileset tab bar | Done | Tab bar above filter row, switches active tileset image and grid dimensions |
+| Task 12: Other Panels — Use state getters | Done | All panels use `state.columns/tileWidth/tileHeight/tileCount` |
+| Task 13: SpriteResolver — Multi-spritesheet | Done | `TilesetSheet[]` array, resolves via `cell.tilesetIndex` |
+| Task 14: TilesetManager — ProjectMetadata | Done | Uses `primaryTileset` getter for tileset[0] dimensions |
+| Task 15: main.ts — Load project + migrate | Done | Loads `project.autotile.json` with fallback to legacy |
+| Task 16: Create project.autotile.json | Done | Terrain + water.png tilesets, water has no wangtiles |
+| Task 17: Update CHANGELOG | Done | This section |
+
 ---
 
 ## Summary
@@ -188,9 +219,11 @@ Only the ground terrain tileset has been authored. The remaining asset authoring
 - Color overlay rendering
 - Transformation configuration UI
 - Animation panel with frame sync
-- Region auto-detect (2 layout patterns)
-- All three implementation plans (2026-02-16 x2, 2026-02-17)
-- Ground terrain asset authoring (terrain.autotile.json)
+- Region auto-detect (2 layout patterns) with copy/paste WangId regions
+- All implementation plans (2026-02-16 x2, 2026-02-17 x3)
+- Ground terrain asset authoring (terrain.autotile.json → project.autotile.json)
+- Multi-tileset data model (ProjectMetadata, TilesetDef, Cell.tilesetIndex, composite WangSet keys)
+- Legacy metadata migration (TilesetMetadata → ProjectMetadata)
 
 ### Partially Complete
 
@@ -199,10 +232,10 @@ Only the ground terrain tileset has been authored. The remaining asset authoring
 - **Layout patterns** — 2 of 3+ planned patterns defined (missing RPG Maker VX, custom creation)
 - **Save/load** — auto-save works, no manual save/load/export UI
 - **Validation** — completeness checking works, no real-time duplicate WangId warning
+- **Multi-tileset editor** — data model, editor state, and tileset tab bar all working; wangtile tagging scoped to active tileset
+- **Multi-spritesheet runtime** — SpriteResolver and TilesetManager support multiple spritesheets; all tileset images loaded at startup
 
 ### Not Started
 
-- **Project management** — no multi-tileset project workflow
-- **Multi-tileset editor** — single tileset only, no tabbed interface
 - **Transformation preview** — no UI to view generated variants
 - **Asset authoring** for Water, Forest, Cliff, Desert, Dungeon, Castle tilesets

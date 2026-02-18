@@ -2,14 +2,17 @@ import * as ex from 'excalibur';
 import { Cell, cellSpriteKey } from '../core/cell.js';
 import { colRowFromTileId } from '../utils/tile-math.js';
 
+export interface TilesetSheet {
+  sheet: ex.SpriteSheet;
+  columns: number;
+}
+
 export class SpriteResolver {
-  private spriteSheet: ex.SpriteSheet;
-  private columns: number;
+  private spriteSheets: TilesetSheet[];
   private cache: Map<string, ex.Sprite> = new Map();
 
-  constructor(spriteSheet: ex.SpriteSheet, columns: number) {
-    this.spriteSheet = spriteSheet;
-    this.columns = columns;
+  constructor(spriteSheets: TilesetSheet[]) {
+    this.spriteSheets = spriteSheets;
   }
 
   /** Resolve a Cell to an Excalibur Sprite, with caching */
@@ -18,8 +21,11 @@ export class SpriteResolver {
     const cached = this.cache.get(key);
     if (cached) return cached;
 
-    const [col, row] = colRowFromTileId(cell.tileId, this.columns);
-    const baseSprite = this.spriteSheet.getSprite(col, row);
+    const ts = this.spriteSheets[cell.tilesetIndex];
+    if (!ts) return undefined;
+
+    const [col, row] = colRowFromTileId(cell.tileId, ts.columns);
+    const baseSprite = ts.sheet.getSprite(col, row);
     if (!baseSprite) return undefined;
 
     const sprite = baseSprite.clone();
@@ -50,10 +56,12 @@ export class SpriteResolver {
     return sprite;
   }
 
-  /** Resolve a raw tile ID (no transforms) to a Sprite */
-  resolveById(tileId: number): ex.Sprite | undefined {
-    const [col, row] = colRowFromTileId(tileId, this.columns);
-    return this.spriteSheet.getSprite(col, row);
+  /** Resolve a raw tile ID (no transforms) to a Sprite from a specific tileset */
+  resolveById(tileId: number, tilesetIndex = 0): ex.Sprite | undefined {
+    const ts = this.spriteSheets[tilesetIndex];
+    if (!ts) return undefined;
+    const [col, row] = colRowFromTileId(tileId, ts.columns);
+    return ts.sheet.getSprite(col, row);
   }
 
   /** Clear the sprite cache */

@@ -28,7 +28,7 @@ export function computeColorDistances(wangSet: WangSet): ColorDistanceResult {
 
   // Find direct transitions from existing tiles
   const mappings = wangSet.getTileMappings();
-  for (const [, wangId] of mappings) {
+  for (const { wangId } of mappings) {
     const colorsInTile = new Set<number>();
     for (let idx = 0; idx < 8; idx++) {
       const c = wangId.indexColor(idx);

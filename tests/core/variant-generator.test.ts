@@ -12,8 +12,8 @@ function makeColor(id: number, name: string): WangColor {
 describe('generateAllVariants', () => {
   it('generates base variants only when transforms disabled', () => {
     const ws = new WangSet('test', 'corner', [makeColor(1, 'A'), makeColor(2, 'B')]);
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 1]));
-    ws.addTileMapping(1, WangId.fromArray([0, 2, 0, 2, 0, 2, 0, 2]));
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 1]));
+    ws.addTileMapping(0, 1, WangId.fromArray([0, 2, 0, 2, 0, 2, 0, 2]));
 
     const variants = generateAllVariants(ws, DEFAULT_TRANSFORMATIONS);
     expect(variants).toHaveLength(2);
@@ -22,7 +22,7 @@ describe('generateAllVariants', () => {
   it('generates rotation variants when allowRotate', () => {
     const ws = new WangSet('test', 'corner', [makeColor(1, 'A'), makeColor(2, 'B')]);
     // Asymmetric tile: only TL corner is different
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 2]));
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 2]));
 
     const config: TransformationConfig = {
       ...DEFAULT_TRANSFORMATIONS,
@@ -36,7 +36,7 @@ describe('generateAllVariants', () => {
   it('deduplicates symmetric tiles under rotation', () => {
     const ws = new WangSet('test', 'corner', [makeColor(1, 'A')]);
     // All-same tile: rotations are identical
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 1]));
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 1]));
 
     const config: TransformationConfig = {
       ...DEFAULT_TRANSFORMATIONS,
@@ -49,7 +49,7 @@ describe('generateAllVariants', () => {
   it('generates flipH variants', () => {
     const ws = new WangSet('test', 'corner', [makeColor(1, 'A'), makeColor(2, 'B')]);
     // Tile with TL=B, rest=A (asymmetric under H flip)
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 2]));
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 2]));
 
     const config: TransformationConfig = {
       ...DEFAULT_TRANSFORMATIONS,
@@ -66,7 +66,7 @@ describe('generateAllVariants', () => {
   it('generates combined rotate + flipH variants', () => {
     const ws = new WangSet('test', 'corner', [makeColor(1, 'A'), makeColor(2, 'B')]);
     // Only one corner different
-    ws.addTileMapping(0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 2]));
+    ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 2]));
 
     const config: TransformationConfig = {
       ...DEFAULT_TRANSFORMATIONS,

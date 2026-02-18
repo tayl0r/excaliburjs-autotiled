@@ -1,6 +1,7 @@
 import { EditorState } from '../editor-state.js';
 import { TEMPLATE_SLOTS, templateSlotWangId } from '../template-utils.js';
 import { colRowFromTileId } from '../../utils/tile-math.js';
+import { wangColorHex } from '../../core/wang-color.js';
 import type { WangSetData } from '../../core/metadata-schema.js';
 
 /**
@@ -11,7 +12,7 @@ import type { WangSetData } from '../../core/metadata-schema.js';
 export class TemplatePanel {
   readonly element: HTMLDivElement;
   private state: EditorState;
-  private image: HTMLImageElement;
+  private images: HTMLImageElement[];
 
   /** Local mapping: slotIndex -> tileId */
   private slotAssignments = new Map<number, number>();
@@ -20,9 +21,9 @@ export class TemplatePanel {
   private colorBSelect!: HTMLSelectElement;
   private gridContainer!: HTMLDivElement;
 
-  constructor(state: EditorState, image: HTMLImageElement) {
+  constructor(state: EditorState, images: HTMLImageElement[]) {
     this.state = state;
-    this.image = image;
+    this.images = images;
 
     this.element = document.createElement('div');
     this.buildUI();
@@ -227,8 +228,7 @@ export class TemplatePanel {
     for (const corner of corners) {
       const letter = slot[corner.key]; // 'A' or 'B'
       const colorId = letter === 'A' ? this.state.templateColorA : this.state.templateColorB;
-      const colorData = colorId > 0 && colorId <= colors.length ? colors[colorId - 1] : undefined;
-      const displayColor = colorData ? colorData.color : '#555';
+      const displayColor = colorId > 0 ? wangColorHex(colorId) : '#555';
 
       const indicator = document.createElement('div');
       indicator.style.cssText = `
@@ -250,7 +250,7 @@ export class TemplatePanel {
    * Draw a tile image preview in the center of a cell using a canvas.
    */
   private drawTilePreview(cell: HTMLDivElement, tileId: number): void {
-    const { tileWidth, tileHeight, columns, tileCount } = this.state.metadata;
+    const { tileWidth, tileHeight, columns, tileCount } = this.state;
     if (tileId < 0 || tileId >= tileCount) return;
 
     const canvas = document.createElement('canvas');
@@ -260,7 +260,7 @@ export class TemplatePanel {
     ctx.imageSmoothingEnabled = false;
     const [col, row] = colRowFromTileId(tileId, columns);
     ctx.drawImage(
-      this.image,
+      this.images[this.state.activeTilesetIndex],
       col * tileWidth, row * tileHeight, tileWidth, tileHeight,
       0, 0, tileWidth, tileHeight
     );
