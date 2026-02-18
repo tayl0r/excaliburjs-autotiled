@@ -1,6 +1,7 @@
 import { WangId } from './wang-id.js';
 import type { WangColor } from './wang-color.js';
 import type { Cell } from './cell.js';
+import { cellSpriteKey } from './cell.js';
 
 export type WangSetType = 'corner' | 'edge' | 'mixed';
 
@@ -20,6 +21,8 @@ export class WangSet {
   private tileProbabilities: Map<string, number> = new Map();
   /** Pre-computed variants (base + transforms). Call recomputeVariants() after changing tiles. */
   private variants: WangVariant[] = [];
+  /** Reverse lookup: cellSpriteKey(cell) → variant WangId */
+  private cellWangIds: Map<string, WangId> = new Map();
   /** Color distance matrix [colorA][colorB]. -1 = no path. */
   private distanceMatrix: number[][] = [];
   /** Next-hop matrix [from][to] = first intermediate color on shortest path */
@@ -82,6 +85,15 @@ export class WangSet {
   /** Set the variants (called by variant-generator) */
   setVariants(variants: WangVariant[]): void {
     this.variants = variants;
+    this.cellWangIds = new Map();
+    for (const { wangId, cell } of variants) {
+      this.cellWangIds.set(cellSpriteKey(cell), wangId);
+    }
+  }
+
+  /** Get the WangId for a placed cell (including flip flags), via the variant lookup. */
+  wangIdOfCell(cell: Cell): WangId | undefined {
+    return this.cellWangIds.get(cellSpriteKey(cell));
   }
 
   /** Get color distance between two colors. -1 = no path. */

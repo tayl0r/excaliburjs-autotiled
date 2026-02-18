@@ -124,6 +124,16 @@ export function recomputeTiles(
     if (cellColor === 0) continue;
 
     const desired = desiredWangIdFromColors(map, ax, ay, wangSet.type);
+
+    // Skip replacement if existing tile already satisfies the desired WangId
+    const existing = map.cellAt(ax, ay);
+    if (existing.tileId >= 0) {
+      const existingWangId = wangSet.wangIdOfCell(existing);
+      if (existingWangId && existingWangId.matches(desired, wangSet.type)) {
+        continue;
+      }
+    }
+
     const cell = findBestMatch(wangSet, desired, wangSet.type);
 
     if (cell) {

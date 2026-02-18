@@ -276,6 +276,21 @@ Verification: `tsc --noEmit` clean, 186 tests passing.
 
 ---
 
+## 2026-02-18: Skip Tile Replacement When Already Matching
+
+Optimization to prevent unnecessary tile churn during autotiling. When recomputing tiles (brush paint or flood fill), existing tiles whose WangId already satisfies the desired configuration are now preserved instead of being randomly re-resolved.
+
+| Change | Files |
+|--------|-------|
+| Reverse cell→WangId lookup (`cellWangIds` map + `wangIdOfCell()` method) | `src/core/wang-set.ts` |
+| Skip replacement when existing tile matches desired WangId | `src/core/terrain-painter.ts` |
+| Test: repainting same color preserves existing tiles | `tests/core/matching.test.ts` |
+| Updated comment for same-color fill behavior | `tests/core/flood-fill.test.ts` |
+
+Verification: `tsc --noEmit` clean, 187 tests passing.
+
+---
+
 ## Summary
 
 ### Fully Complete

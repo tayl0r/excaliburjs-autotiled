@@ -301,6 +301,42 @@ describe('Cell flip flags preserved through map storage', () => {
   });
 });
 
+describe('applyTerrainPaint preserves existing tiles', () => {
+  it('repainting same color preserves existing tile (no re-randomization)', () => {
+    const ws = createGrassDirtWangSet();
+    const map = new SimpleAutotileMap(5, 5, 1); // All grass
+
+    // Initialize all tiles
+    for (let y = 0; y < 5; y++) {
+      for (let x = 0; x < 5; x++) {
+        applyTerrainPaint(map, ws, x, y, 1);
+      }
+    }
+
+    // Paint dirt at center
+    applyTerrainPaint(map, ws, 2, 2, 2);
+
+    // Record all tile IDs after first paint
+    const tilesBefore: number[][] = [];
+    for (let y = 0; y < 5; y++) {
+      tilesBefore[y] = [];
+      for (let x = 0; x < 5; x++) {
+        tilesBefore[y][x] = map.tileIdAt(x, y);
+      }
+    }
+
+    // Paint dirt at center again (same color, same position)
+    applyTerrainPaint(map, ws, 2, 2, 2);
+
+    // All tiles should be preserved — no re-randomization
+    for (let y = 0; y < 5; y++) {
+      for (let x = 0; x < 5; x++) {
+        expect(map.tileIdAt(x, y)).toBe(tilesBefore[y][x]);
+      }
+    }
+  });
+});
+
 describe('applyTerrainPaint with intermediates', () => {
   it('auto-inserts grass between dirt and sand', () => {
     const ws = createThreeColorWangSet();

@@ -21,7 +21,7 @@ describe('floodFillTerrain', () => {
     initMap(map, ws, 1);
 
     const affected = floodFillTerrain(map, ws, 2, 2, 1);
-    // Same-color fill still runs the autotiler to re-randomize tiles
+    // Same-color fill runs the autotiler but preserves existing tiles whose WangId already matches
     expect(affected.length).toBeGreaterThan(0);
     // All cells should still be color 1
     for (let y = 0; y < 5; y++) {
