@@ -24,7 +24,6 @@ export class TileEditor {
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private saveIndicator: HTMLDivElement;
   private filename: string;
-  private _onHide?: () => void;
 
   constructor(metadata: ProjectMetadata, images: HTMLImageElement[]) {
     this.state = new EditorState(metadata);
@@ -111,8 +110,6 @@ export class TileEditor {
 
     // Undo/Redo keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-      if (!this.overlay.isActive) return;
-
       const key = e.key.toLowerCase();
       if ((e.ctrlKey || e.metaKey) && key === 'z' && !e.shiftKey) {
         e.preventDefault();
@@ -125,35 +122,9 @@ export class TileEditor {
         this.state.redo();
       }
     });
-  }
 
-  get isActive(): boolean {
-    return this.overlay.isActive;
-  }
-
-  toggle(): void {
-    const wasActive = this.overlay.isActive;
-    this.overlay.toggle();
-    if (this.overlay.isActive) {
-      this.tilesetPanel.render();
-    } else if (wasActive) {
-      this._onHide?.();
-    }
-  }
-
-  show(): void {
-    this.overlay.show();
+    // Render immediately since editor is always visible
     this.tilesetPanel.render();
-  }
-
-  hide(): void {
-    const wasActive = this.overlay.isActive;
-    this.overlay.hide();
-    if (wasActive) this._onHide?.();
-  }
-
-  onHide(callback: () => void): void {
-    this._onHide = callback;
   }
 
   setActiveColor(colorId: number): void {
