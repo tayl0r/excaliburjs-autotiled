@@ -8,7 +8,6 @@ export class OverlayManager {
   private leftSidebar!: HTMLDivElement;
   private centerPanel!: HTMLDivElement;
   private rightPanel!: HTMLDivElement;
-  private _active = false;
 
   constructor() {
     this.overlay = document.getElementById('editor-overlay') as HTMLDivElement;
@@ -22,10 +21,9 @@ export class OverlayManager {
 
   private setupLayout(): void {
     this.overlay.style.cssText = `
-      display: none;
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      z-index: 100;
+      display: block;
+      width: 100%;
+      height: 100vh;
       background: #1a1a2e;
       color: #e0e0e0;
       font-family: 'Segoe UI', system-ui, sans-serif;
@@ -60,19 +58,10 @@ export class OverlayManager {
     title.style.cssText = 'font-weight: 600; font-size: 14px;';
     this.topBar.appendChild(title);
 
-    // Spacer to push close button to the right
+    // Spacer
     const spacer = document.createElement('div');
     spacer.style.flex = '1';
     this.topBar.appendChild(spacer);
-
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = 'Close (Esc)';
-    closeBtn.style.cssText = `
-      background: #333; color: #ccc; border: 1px solid #555;
-      padding: 4px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;
-    `;
-    closeBtn.addEventListener('click', () => this.hide());
-    this.topBar.appendChild(closeBtn);
 
     // Left sidebar (WangSet panel)
     this.leftSidebar = document.createElement('div');
@@ -107,26 +96,7 @@ export class OverlayManager {
     this.overlay.appendChild(grid);
   }
 
-  get isActive(): boolean {
-    return this._active;
-  }
-
-  show(): void {
-    this._active = true;
-    this.overlay.style.display = 'block';
-  }
-
-  hide(): void {
-    this._active = false;
-    this.overlay.style.display = 'none';
-  }
-
-  toggle(): void {
-    if (this._active) this.hide();
-    else this.show();
-  }
-
-  /** Mount an element into the top bar (inserted before the spacer/close button) */
+  /** Mount an element into the top bar (inserted before the spacer) */
   mountTopBar(element: HTMLElement): void {
     const spacer = this.topBar.querySelector('[style*="flex: 1"]') ?? this.topBar.lastChild;
     this.topBar.insertBefore(element, spacer);

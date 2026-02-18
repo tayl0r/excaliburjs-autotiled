@@ -235,6 +235,25 @@ Verification: `tsc --noEmit` clean, 186 tests passing.
 
 ---
 
+## 2026-02-18: Multi-Page App Split
+
+Split the single-page app into separate pages for the tileset editor and map painter.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Landing page at `/` | Done | `index.html` — links to both tools |
+| Tileset editor at `/tools/tileset-editor/` | Done | `tools/tileset-editor/index.html` + `src/tileset-editor-main.ts` — standalone full-page editor, always visible |
+| Map painter at `/tools/map-painter/` | Done | `tools/map-painter/index.html` + `src/map-painter-main.ts` — Excalibur canvas with Brush/Fill tools only |
+| OverlayManager standalone mode | Done | Removed toggle/hide/show, always `display: block`, fills viewport naturally instead of absolute overlay |
+| TileEditor standalone mode | Done | Removed `onHide`, `toggle`, `show`, `hide`, `isActive`; renders immediately in constructor |
+| GameScene cleanup | Done | Removed `reloadMetadata()`, removed "Tile Data" toolbar button |
+| InputHandler cleanup | Done | Removed `tiledata` from `ToolMode`, removed `inspectAt` and `setOnTileInspect` |
+| Vite multi-page config | Done | `build.rollupOptions.input` with 3 HTML entry points, `build.target: 'esnext'` for top-level await |
+| Delete `src/main.ts` | Done | Replaced by `src/tileset-editor-main.ts` and `src/map-painter-main.ts` |
+| Verification | Done | `tsc --noEmit` clean, `vite build` clean, 186 tests passing |
+
+---
+
 ## Summary
 
 ### Fully Complete

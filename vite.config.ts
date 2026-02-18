@@ -65,6 +65,16 @@ function metadataSavePlugin(): Plugin {
 
 export default defineConfig({
   plugins: [metadataSavePlugin()],
+  build: {
+    target: 'esnext',
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        'tileset-editor': path.resolve(__dirname, 'tools/tileset-editor/index.html'),
+        'map-painter': path.resolve(__dirname, 'tools/map-painter/index.html'),
+      },
+    },
+  },
   resolve: {
     alias: {
       '@core': path.resolve(__dirname, 'src/core'),

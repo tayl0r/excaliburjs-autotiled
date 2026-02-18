@@ -1,6 +1,5 @@
 import * as ex from 'excalibur';
 import { WangSet } from '../core/wang-set.js';
-import { ProjectMetadata } from '../core/metadata-schema.js';
 import { TilesetManager } from './tileset-manager.js';
 import { SpriteResolver } from './sprite-resolver.js';
 import { AutotileTilemap } from './autotile-tilemap.js';
@@ -142,27 +141,6 @@ export class GameScene extends ex.Scene {
     }
   }
 
-  /** Reload WangSet data from updated metadata and re-resolve all tiles */
-  reloadMetadata(metadata: ProjectMetadata): void {
-    this.tilesetManager.reload(metadata);
-    const wangSet = this.tilesetManager.primaryWangSet;
-    if (!wangSet) return;
-    this.autotileTilemap.updateWangSet(wangSet);
-    this.autotileTilemap.setAnimationsFromWangSets(metadata.wangsets);
-
-    const totalTiles = metadata.wangsets.reduce((s, ws) => s + ws.wangtiles.length, 0);
-    const totalColors = metadata.wangsets.reduce((s, ws) => s + ws.colors.length, 0);
-    console.log(
-      `[metadata] Reloaded project.autotile.json:`,
-      `${metadata.wangsets.length} WangSet(s),`,
-      `${totalColors} colors,`,
-      `${totalTiles} tagged tiles`
-    );
-
-    this.hud?.remove();
-    this.createHUD(wangSet);
-  }
-
   onPreUpdate(_engine: ex.Engine, delta: number): void {
     this.autotileTilemap?.updateAnimations(delta);
   }
@@ -189,7 +167,6 @@ export class GameScene extends ex.Scene {
     const tools: Array<{ mode: ToolMode; label: string; shortcut: string }> = [
       { mode: 'brush', label: 'Brush', shortcut: 'B' },
       { mode: 'fill', label: 'Fill', shortcut: 'G' },
-      { mode: 'tiledata', label: 'Tile Data', shortcut: 'T' },
     ];
 
     for (const tool of tools) {
@@ -227,16 +204,9 @@ export class GameScene extends ex.Scene {
       btn.appendChild(label);
       btn.appendChild(kbd);
 
-      if (tool.mode === 'tiledata') {
-        // Tile Data toggles the editor overlay via synthetic keypress
-        btn.addEventListener('click', () => {
-          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'T' }));
-        });
-      } else {
-        btn.addEventListener('click', () => {
-          this.inputHandler.setToolMode(tool.mode);
-        });
-      }
+      btn.addEventListener('click', () => {
+        this.inputHandler.setToolMode(tool.mode);
+      });
 
       this.toolbar.appendChild(btn);
       this.toolButtons.set(tool.mode, btn);
