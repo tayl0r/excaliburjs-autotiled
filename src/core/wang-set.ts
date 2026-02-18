@@ -63,14 +63,10 @@ export class WangSet {
 
   /** Get all base tile mappings as an array of {tilesetIndex, tileId, wangId} */
   getTileMappings(): Array<{ tilesetIndex: number; tileId: number; wangId: WangId }> {
-    const result: Array<{ tilesetIndex: number; tileId: number; wangId: WangId }> = [];
-    for (const [key, wangId] of this.tileMapping) {
-      const sepIdx = key.indexOf(':');
-      const tilesetIndex = parseInt(key.substring(0, sepIdx), 10);
-      const tileId = parseInt(key.substring(sepIdx + 1), 10);
-      result.push({ tilesetIndex, tileId, wangId });
-    }
-    return result;
+    return [...this.tileMapping].map(([key, wangId]) => {
+      const [tilesetIndex, tileId] = key.split(':').map(Number);
+      return { tilesetIndex, tileId, wangId };
+    });
   }
 
   /** Get the number of base tile mappings */

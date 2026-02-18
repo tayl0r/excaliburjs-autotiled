@@ -1,4 +1,6 @@
 import * as ex from 'excalibur';
+import { WangSet } from '../core/wang-set.js';
+import { ProjectMetadata } from '../core/metadata-schema.js';
 import { TilesetManager } from './tileset-manager.js';
 import { SpriteResolver } from './sprite-resolver.js';
 import { AutotileTilemap } from './autotile-tilemap.js';
@@ -30,11 +32,8 @@ export class GameScene extends ex.Scene {
     }
 
     const ts = this.tilesetManager.primaryTileset;
-    const spriteResolver = new SpriteResolver(
-      this.tilesetManager.spriteSheets
-    );
+    const spriteResolver = new SpriteResolver(this.tilesetManager.spriteSheets);
 
-    // Create autotile tilemap with the primary WangSet
     this.autotileTilemap = new AutotileTilemap(
       MAP_COLS,
       MAP_ROWS,
@@ -42,29 +41,22 @@ export class GameScene extends ex.Scene {
       ts.tileHeight,
       wangSet,
       spriteResolver,
-      1 // default to Grass
+      1,
     );
 
     this.add(this.autotileTilemap.tileMap);
     this.autotileTilemap.initializeAll(1);
-
-    // Set up animations from per-tile animation data
     this.autotileTilemap.setAnimationsFromWangSets(this.tilesetManager.metadata.wangsets);
 
-    // Set up camera
-    const tileW = ts.tileWidth;
-    const tileH = ts.tileHeight;
     this.camera.pos = ex.vec(
-      (MAP_COLS * tileW) / 2,
-      (MAP_ROWS * tileH) / 2
+      (MAP_COLS * ts.tileWidth) / 2,
+      (MAP_ROWS * ts.tileHeight) / 2,
     );
     this.camera.zoom = 3;
 
-    // Set up input
     this.inputHandler = new InputHandler(engine, this.autotileTilemap);
     this.inputHandler.initialize();
 
-    // Keyboard shortcuts: B=brush, G=fill
     engine.input.keyboard.on('press', (evt) => {
       if (evt.key === ex.Keys.B) {
         this.inputHandler.setToolMode('brush');
@@ -73,18 +65,12 @@ export class GameScene extends ex.Scene {
       }
     });
 
-    // Top toolbar
     this.createToolbar();
-
-    this.inputHandler.setOnToolModeChange((mode) => {
-      this.updateToolbarSelection(mode);
-    });
-
-    // Create HUD from WangSet colors
+    this.inputHandler.setOnToolModeChange((mode) => this.updateToolbarSelection(mode));
     this.createHUD(wangSet);
   }
 
-  private createHUD(wangSet: import('../core/wang-set.js').WangSet): void {
+  private createHUD(wangSet: WangSet): void {
     this.hud = document.createElement('div');
     this.hud.id = 'game-hud';
     this.hud.style.cssText = `
@@ -114,7 +100,6 @@ export class GameScene extends ex.Scene {
         cursor: pointer;
       `;
 
-      // Tile thumbnail — use the color's tileset index
       const tsi = color.tilesetIndex;
       const tilesetImage = this.tilesetManager.getImage(tsi);
       const ts = this.tilesetManager.metadata.tilesets[tsi] ?? this.tilesetManager.primaryTileset;
@@ -150,16 +135,15 @@ export class GameScene extends ex.Scene {
   }
 
   private updateHUDSelection(activeColor: number): void {
-    const buttons = this.hud.querySelectorAll('button');
-    buttons.forEach((btn) => {
-      const id = Number(btn.dataset.colorId);
-      btn.style.outline = id === activeColor ? '3px solid yellow' : 'none';
+    for (const btn of this.hud.querySelectorAll('button')) {
+      const isActive = Number(btn.dataset.colorId) === activeColor;
+      btn.style.outline = isActive ? '3px solid yellow' : 'none';
       btn.style.outlineOffset = '2px';
-    });
+    }
   }
 
   /** Reload WangSet data from updated metadata and re-resolve all tiles */
-  reloadMetadata(metadata: import('../core/metadata-schema.js').ProjectMetadata): void {
+  reloadMetadata(metadata: ProjectMetadata): void {
     this.tilesetManager.reload(metadata);
     const wangSet = this.tilesetManager.primaryWangSet;
     if (!wangSet) return;
@@ -175,7 +159,6 @@ export class GameScene extends ex.Scene {
       `${totalTiles} tagged tiles`
     );
 
-    // Rebuild HUD with potentially updated colors
     this.hud?.remove();
     this.createHUD(wangSet);
   }

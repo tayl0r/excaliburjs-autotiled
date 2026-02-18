@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { loadMetadata, validateProjectMetadata } from '../../src/core/metadata-loader.js';
-import { ProjectMetadata } from '../../src/core/metadata-schema.js';
+import type { ProjectMetadata } from '../../src/core/metadata-schema.js';
 
 const validMetadata: ProjectMetadata = {
   version: 2,

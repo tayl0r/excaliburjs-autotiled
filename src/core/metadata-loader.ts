@@ -9,13 +9,7 @@ export function loadMetadata(json: ProjectMetadata): {
   transformations: typeof DEFAULT_TRANSFORMATIONS;
 } {
   const transformations = json.transformations ?? { ...DEFAULT_TRANSFORMATIONS };
-  const wangSets: WangSet[] = [];
-
-  for (const wsData of json.wangsets) {
-    const ws = loadWangSet(wsData);
-    wangSets.push(ws);
-  }
-
+  const wangSets = json.wangsets.map(loadWangSet);
   return { wangSets, transformations };
 }
 
@@ -29,7 +23,7 @@ function loadWangSet(data: WangSetData): WangSet {
     probability: c.probability ?? 1.0,
   }));
 
-  const ws = new WangSet(data.name, data.type as WangSetType, colors, data.tile);
+  const ws = new WangSet(data.name, data.type, colors, data.tile);
 
   for (const wt of data.wangtiles) {
     if (wt.wangid.length !== 8) {

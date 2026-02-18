@@ -57,23 +57,14 @@ export function floodFillTerrain(
   }
 
   // 3. Find boundary cells (filled cells adjacent to non-filled cells)
-  // These are the seeds for intermediate insertion
   const filledKeys = new Set(filled.map(([x, y]) => `${x},${y}`));
-  const boundary: Array<[number, number]> = [];
-  for (const [fx, fy] of filled) {
-    let isBoundary = false;
-    for (const [dx, dy] of FOUR_DIRECTIONS) {
+  const boundary = filled.filter(([fx, fy]) =>
+    FOUR_DIRECTIONS.some(([dx, dy]) => {
       const nx = fx + dx;
       const ny = fy + dy;
-      if (!map.inBounds(nx, ny) || !filledKeys.has(`${nx},${ny}`)) {
-        isBoundary = true;
-        break;
-      }
-    }
-    if (isBoundary) {
-      boundary.push([fx, fy]);
-    }
-  }
+      return !map.inBounds(nx, ny) || !filledKeys.has(`${nx},${ny}`);
+    })
+  );
 
   // 4. Insert intermediates from boundary cells outward
   const seedPositions = boundary.length > 0 ? boundary : filled;

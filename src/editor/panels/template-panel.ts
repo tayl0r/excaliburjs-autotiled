@@ -120,11 +120,10 @@ export class TemplatePanel {
     const prevB = this.state.templateColorB;
 
     for (const select of [this.colorASelect, this.colorBSelect]) {
-      while (select.firstChild) select.removeChild(select.firstChild);
-
+      select.replaceChildren();
       for (let i = 0; i < colors.length; i++) {
         const opt = document.createElement('option');
-        opt.value = String(i + 1); // 1-based color ID
+        opt.value = String(i + 1);
         opt.textContent = colors[i].name;
         select.appendChild(opt);
       }
@@ -166,9 +165,7 @@ export class TemplatePanel {
    * Render the 4x4 grid of template slot cells.
    */
   private renderGrid(): void {
-    while (this.gridContainer.firstChild) {
-      this.gridContainer.removeChild(this.gridContainer.firstChild);
-    }
+    this.gridContainer.replaceChildren();
 
     const ws = this.state.activeWangSet;
 

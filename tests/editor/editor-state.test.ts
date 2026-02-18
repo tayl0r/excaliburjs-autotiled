@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { EditorState, WangRegionClipboard } from '../../src/editor/editor-state.js';
-import { ProjectMetadata, TileAnimation } from '../../src/core/metadata-schema.js';
+import type { ProjectMetadata, TileAnimation } from '../../src/core/metadata-schema.js';
 
 function makeMetadata(): ProjectMetadata {
   return {

@@ -1,4 +1,4 @@
-import { ProjectMetadata, TilesetDef, WangSetData, WangTileData, TransformationConfig, DEFAULT_TRANSFORMATIONS, TileAnimation, AnimationFrameData } from '../core/metadata-schema.js';
+import { type ProjectMetadata, type TilesetDef, type WangSetData, type WangTileData, type TransformationConfig, DEFAULT_TRANSFORMATIONS, type TileAnimation, type AnimationFrameData } from '../core/metadata-schema.js';
 import { wangColorHex } from '../core/wang-color.js';
 import { UndoManager } from './undo-manager.js';
 import { colRowFromTileId, tileIdFromColRow } from '../utils/tile-math.js';
@@ -634,7 +634,9 @@ export class EditorState {
     const ws = this.activeWangSet;
     if (!ws) return;
     const { animation, offset } = this._animationClipboard;
-    const tileIds = this._selectedTileIds.size > 0 ? [...this._selectedTileIds] : (this._selectedTileId >= 0 ? [this._selectedTileId] : []);
+    const tileIds = this._selectedTileIds.size > 0
+      ? [...this._selectedTileIds]
+      : this._selectedTileId >= 0 ? [this._selectedTileId] : [];
     if (tileIds.length === 0) return;
 
     const targets = tileIds

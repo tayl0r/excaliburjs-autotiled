@@ -25,7 +25,7 @@ export class RegionAssignPanel {
   }
 
   render(): void {
-    while (this.element.firstChild) this.element.removeChild(this.element.firstChild);
+    this.element.replaceChildren();
 
     const selectedIds = this.state.selectedTileIds;
     if (selectedIds.size <= 1) {

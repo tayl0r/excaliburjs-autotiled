@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { WangId } from '../../src/core/wang-id.js';
 import { WangSet } from '../../src/core/wang-set.js';
-import { WangColor } from '../../src/core/wang-color.js';
+import type { WangColor } from '../../src/core/wang-color.js';
 import { SimpleAutotileMap } from '../../src/core/autotile-map.js';
 import { wangIdFromSurroundings, findBestMatch } from '../../src/core/matching.js';
 import { computeColorDistances } from '../../src/core/color-distance.js';
@@ -9,36 +9,7 @@ import { generateAllVariants } from '../../src/core/variant-generator.js';
 import { applyTerrainPaint } from '../../src/core/terrain-painter.js';
 import { DEFAULT_TRANSFORMATIONS } from '../../src/core/metadata-schema.js';
 import { createCell } from '../../src/core/cell.js';
-
-// Helper: create a 2-color corner WangSet with 16 tiles
-function createGrassDirtWangSet(): WangSet {
-  const grass: WangColor = { id: 1, name: 'Grass', color: '#00ff00', imageTileId: 0, probability: 1.0 };
-  const dirt: WangColor = { id: 2, name: 'Dirt', color: '#8b4513', imageTileId: 15, probability: 1.0 };
-  const ws = new WangSet('Ground', 'corner', [grass, dirt]);
-
-  // 16 tiles using standard binary layout
-  // N = TL(bit3) TR(bit2) BR(bit1) BL(bit0), where 0=Grass(1), 1=Dirt(2)
-  for (let n = 0; n < 16; n++) {
-    const tl = (n & 8) ? 2 : 1;
-    const tr = (n & 4) ? 2 : 1;
-    const br = (n & 2) ? 2 : 1;
-    const bl = (n & 1) ? 2 : 1;
-    // WangId: [Top, TopRight, Right, BottomRight, Bottom, BottomLeft, Left, TopLeft]
-    // Corner type: edges=0, corners: TL=idx7, TR=idx1, BR=idx3, BL=idx5
-    ws.addTileMapping(0, n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
-  }
-
-  // Generate variants (no transforms)
-  const variants = generateAllVariants(ws, DEFAULT_TRANSFORMATIONS);
-  ws.setVariants(variants);
-
-  // Compute distances
-  const { distances, nextHop } = computeColorDistances(ws);
-  ws.setDistanceMatrix(distances);
-  ws.setNextHopMatrix(nextHop);
-
-  return ws;
-}
+import { createGrassDirtWangSet, createThreeColorWangSet } from './test-helpers.js';
 
 describe('computeColorDistances', () => {
   it('self-distance is 0', () => {
@@ -252,42 +223,6 @@ describe('applyTerrainPaint', () => {
     expect(affected.length).toBe(4);
   });
 });
-
-// Helper: create a 3-color corner WangSet (Grass=1, Dirt=2, Sand=3)
-// where only Grass+Dirt and Grass+Sand tiles exist (no direct Dirt+Sand)
-function createThreeColorWangSet(): WangSet {
-  const grass: WangColor = { id: 1, name: 'Grass', color: '#00ff00', imageTileId: 0, probability: 1.0 };
-  const dirt: WangColor = { id: 2, name: 'Dirt', color: '#8b4513', imageTileId: 15, probability: 1.0 };
-  const sand: WangColor = { id: 3, name: 'Sand', color: '#f4e242', imageTileId: 31, probability: 1.0 };
-  const ws = new WangSet('Ground', 'corner', [grass, dirt, sand]);
-
-  // 16 Grass+Dirt tiles (tileIds 0-15)
-  for (let n = 0; n < 16; n++) {
-    const tl = (n & 8) ? 2 : 1;
-    const tr = (n & 4) ? 2 : 1;
-    const br = (n & 2) ? 2 : 1;
-    const bl = (n & 1) ? 2 : 1;
-    ws.addTileMapping(0, n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
-  }
-
-  // 16 Grass+Sand tiles (tileIds 16-31)
-  for (let n = 0; n < 16; n++) {
-    const tl = (n & 8) ? 3 : 1;
-    const tr = (n & 4) ? 3 : 1;
-    const br = (n & 2) ? 3 : 1;
-    const bl = (n & 1) ? 3 : 1;
-    ws.addTileMapping(0, 16 + n, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
-  }
-
-  const variants = generateAllVariants(ws, DEFAULT_TRANSFORMATIONS);
-  ws.setVariants(variants);
-
-  const { distances, nextHop } = computeColorDistances(ws);
-  ws.setDistanceMatrix(distances);
-  ws.setNextHopMatrix(nextHop);
-
-  return ws;
-}
 
 describe('findBestMatch with penalty scoring', () => {
   it('finds approximate match across color boundaries', () => {

@@ -1,4 +1,4 @@
-import { WangSetData } from '../core/metadata-schema.js';
+import type { WangSetData } from '../core/metadata-schema.js';
 
 export interface MissingCombination {
   /** Corner colors: [TL, TR, BR, BL] using 1-based color IDs */

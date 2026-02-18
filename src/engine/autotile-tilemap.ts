@@ -3,7 +3,7 @@ import { SimpleAutotileMap } from '../core/autotile-map.js';
 import { WangSet } from '../core/wang-set.js';
 import { applyTerrainPaint } from '../core/terrain-painter.js';
 import { floodFillTerrain } from '../core/flood-fill.js';
-import { WangSetData } from '../core/metadata-schema.js';
+import type { WangSetData } from '../core/metadata-schema.js';
 import { createCell } from '../core/cell.js';
 import { SpriteResolver } from './sprite-resolver.js';
 import { AnimationController } from './animation-controller.js';

@@ -1,12 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { WangId } from '../../src/core/wang-id.js';
 import { WangSet } from '../../src/core/wang-set.js';
-import { WangColor } from '../../src/core/wang-color.js';
 import { computeColorDistances } from '../../src/core/color-distance.js';
-
-function makeColor(id: number, name: string): WangColor {
-  return { id, name, color: '#000000', imageTileId: -1, probability: 1.0 };
-}
+import { makeColor } from './test-helpers.js';
 
 describe('computeColorDistances', () => {
   it('returns 0 for self-distance', () => {

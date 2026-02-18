@@ -32,10 +32,7 @@ export class OverlayManager {
       font-size: 13px;
     `;
 
-    // Clear existing children
-    while (this.overlay.firstChild) {
-      this.overlay.removeChild(this.overlay.firstChild);
-    }
+    this.overlay.replaceChildren();
 
     // CSS grid layout
     const grid = document.createElement('div');

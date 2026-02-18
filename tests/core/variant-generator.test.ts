@@ -1,13 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { WangId } from '../../src/core/wang-id.js';
 import { WangSet } from '../../src/core/wang-set.js';
-import { WangColor } from '../../src/core/wang-color.js';
 import { generateAllVariants } from '../../src/core/variant-generator.js';
-import { DEFAULT_TRANSFORMATIONS, TransformationConfig } from '../../src/core/metadata-schema.js';
-
-function makeColor(id: number, name: string): WangColor {
-  return { id, name, color: '#000000', imageTileId: -1, probability: 1.0 };
-}
+import { DEFAULT_TRANSFORMATIONS, type TransformationConfig } from '../../src/core/metadata-schema.js';
+import { makeColor } from './test-helpers.js';
 
 describe('generateAllVariants', () => {
   it('generates base variants only when transforms disabled', () => {

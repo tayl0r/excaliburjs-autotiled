@@ -1,4 +1,4 @@
-import { TileAnimation, AnimationFrameData } from '../core/metadata-schema.js';
+import type { TileAnimation, AnimationFrameData } from '../core/metadata-schema.js';
 
 interface AnimationState {
   animation: TileAnimation;

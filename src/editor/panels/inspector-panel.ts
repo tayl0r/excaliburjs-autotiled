@@ -1,17 +1,10 @@
 import { EditorState } from '../editor-state.js';
-import { TileAnimation } from '../../core/metadata-schema.js';
+import type { TileAnimation } from '../../core/metadata-schema.js';
 import { colRowFromTileId } from '../../utils/tile-math.js';
 import { computeAdjacencyPreview } from '../adjacency-preview.js';
 import { wangColorHex } from '../../core/wang-color.js';
 
 const EMPTY_WANGID = [0, 0, 0, 0, 0, 0, 0, 0];
-
-/** Remove all child nodes from a container element */
-function clearChildren(el: HTMLElement): void {
-  while (el.firstChild) {
-    el.removeChild(el.firstChild);
-  }
-}
 
 /**
  * Tile inspector panel with WangId zone editor and inline per-tile animation editor.
@@ -241,7 +234,7 @@ export class InspectorPanel {
 
   private renderAnimationSection(): void {
     this.cleanUpAnimPreview();
-    clearChildren(this.animationSection);
+    this.animationSection.replaceChildren();
 
     const tileId = this.state.selectedTileId;
     if (tileId < 0) return;
@@ -653,7 +646,7 @@ export class InspectorPanel {
   }
 
   private drawGrid(tileId: number): void {
-    clearChildren(this.gridContainer);
+    this.gridContainer.replaceChildren();
 
     const ws = this.state.activeWangSet;
     const wt = this.state.getWangTile(tileId);
@@ -684,9 +677,8 @@ export class InspectorPanel {
         cell.textContent = 'tile';
       } else {
         const isCorner = wangIdx % 2 === 1;
-        const isEdge = wangIdx % 2 === 0;
         const isActive = (type === 'corner' && isCorner)
-          || (type === 'edge' && isEdge)
+          || (type === 'edge' && !isCorner)
           || type === 'mixed';
 
         const colorId = wangid[wangIdx];
@@ -725,11 +717,11 @@ export class InspectorPanel {
   }
 
   private clearGrid(): void {
-    clearChildren(this.gridContainer);
+    this.gridContainer.replaceChildren();
   }
 
   private drawAdjacencyPreview(tileId: number): void {
-    clearChildren(this.adjacencyContainer);
+    this.adjacencyContainer.replaceChildren();
 
     const ws = this.state.activeWangSet;
     const wt = this.state.getWangTile(tileId);
@@ -798,13 +790,13 @@ export class InspectorPanel {
   }
 
   private clearAdjacencyPreview(): void {
-    clearChildren(this.adjacencyContainer);
+    this.adjacencyContainer.replaceChildren();
     this.adjacencyLabel.style.display = 'none';
     this.adjacencyContainer.style.display = 'none';
   }
 
   private renderProbability(tileId: number): void {
-    clearChildren(this.probabilityContainer);
+    this.probabilityContainer.replaceChildren();
     const wt = this.state.getWangTile(tileId);
     if (!wt) return;
 
@@ -886,8 +878,7 @@ export class InspectorPanel {
       const wangid = [...base];
       for (let i = 0; i < 8; i++) {
         const isCorner = i % 2 === 1;
-        const isEdge = i % 2 === 0;
-        if ((type === 'corner' && isCorner) || (type === 'edge' && isEdge) || type === 'mixed') {
+        if ((type === 'corner' && isCorner) || (type === 'edge' && !isCorner) || type === 'mixed') {
           wangid[i] = colorId;
         }
       }

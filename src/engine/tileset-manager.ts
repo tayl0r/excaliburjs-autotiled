@@ -28,7 +28,6 @@ export class TilesetManager {
   initialize(): void {
     this.metadata = this.metadataJson;
 
-    // Create one SpriteSheet per tileset
     this.spriteSheets = this.metadata.tilesets.map((ts, i) => {
       const rows = Math.ceil(ts.tileCount / ts.columns);
       const sheet = ex.SpriteSheet.fromImageSource({
@@ -43,32 +42,23 @@ export class TilesetManager {
       return { sheet, columns: ts.columns };
     });
 
-    // Load WangSets from metadata
-    const { wangSets, transformations } = loadMetadata(this.metadataJson);
-    this.wangSets = wangSets;
-
-    // Pre-compute variants and distance matrices
-    for (const ws of this.wangSets) {
-      const variants = generateAllVariants(ws, transformations);
-      ws.setVariants(variants);
-
-      const { distances, nextHop } = computeColorDistances(ws);
-      ws.setDistanceMatrix(distances);
-      ws.setNextHopMatrix(nextHop);
-    }
+    this.buildWangSets(this.metadataJson);
   }
 
   /** Reload WangSets from updated metadata */
   reload(metadata: ProjectMetadata): void {
     this.metadataJson = metadata;
     this.metadata = metadata;
+    this.buildWangSets(metadata);
+  }
 
+  /** Load WangSets from metadata and pre-compute variants and distance matrices */
+  private buildWangSets(metadata: ProjectMetadata): void {
     const { wangSets, transformations } = loadMetadata(metadata);
     this.wangSets = wangSets;
 
     for (const ws of this.wangSets) {
-      const variants = generateAllVariants(ws, transformations);
-      ws.setVariants(variants);
+      ws.setVariants(generateAllVariants(ws, transformations));
 
       const { distances, nextHop } = computeColorDistances(ws);
       ws.setDistanceMatrix(distances);

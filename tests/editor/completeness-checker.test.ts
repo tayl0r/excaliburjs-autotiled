@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { checkCompleteness } from '../../src/editor/completeness-checker.js';
-import { WangSetData } from '../../src/core/metadata-schema.js';
+import type { WangSetData } from '../../src/core/metadata-schema.js';
 
 function makeWangSet(colorCount: number, wangtiles: { tileid: number; wangid: number[] }[]): WangSetData {
   const colors = Array.from({ length: colorCount }, (_, i) => ({

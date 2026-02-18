@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { AnimationController } from '../../src/engine/animation-controller.js';
-import { TileAnimation } from '../../src/core/metadata-schema.js';
+import type { TileAnimation } from '../../src/core/metadata-schema.js';
 
 function makeLoopAnim(frameCount: number, frameDuration: number, baseTileId: number = 0): TileAnimation {
   const frames = Array.from({ length: frameCount }, (_, i) => ({

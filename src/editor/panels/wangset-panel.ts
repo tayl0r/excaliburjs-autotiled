@@ -44,10 +44,7 @@ export class WangSetPanel {
   }
 
   render(): void {
-    // Clear existing content
-    while (this.listContainer.firstChild) {
-      this.listContainer.removeChild(this.listContainer.firstChild);
-    }
+    this.listContainer.replaceChildren();
 
     const { wangsets } = this.state.metadata;
 

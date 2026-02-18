@@ -11,18 +11,11 @@ async function loadMetadata(): Promise<ProjectMetadata> {
 
 const projectMetadata = await loadMetadata();
 
-// Create ImageSource for each tileset defined in the project metadata
 const tilesetImages = projectMetadata.tilesets.map(
   ts => new ex.ImageSource(`/assets/TimeFantasy_TILES_6.24.17/TILESETS/${ts.tilesetImage}`)
 );
 
-// Create tileset manager with all tileset images
-const tilesetManager = new TilesetManager(
-  tilesetImages,
-  projectMetadata
-);
-
-// Create the game scene, passing the tileset manager
+const tilesetManager = new TilesetManager(tilesetImages, projectMetadata);
 const gameScene = new GameScene(tilesetManager);
 
 const game = new ex.Engine({
@@ -35,7 +28,6 @@ const game = new ex.Engine({
   antialiasing: false,
 });
 
-// Load all tileset images
 const loader = new ex.Loader(tilesetImages);
 loader.suppressPlayButton = true;
 
@@ -43,21 +35,13 @@ game.addScene('game', gameScene);
 game.start('game', { loader }).then(() => {
   console.log('[metadata] Loaded project metadata:', JSON.parse(JSON.stringify(projectMetadata)));
 
-  // Get HTMLImageElement for each loaded tileset
   const images = tilesetImages.map(src => src.image);
+  const editor = new TileEditor(projectMetadata, images);
 
-  // Initialize tile editor with all tileset images
-  const editor = new TileEditor(
-    projectMetadata,
-    images
-  );
-
-  // Reload game scene when editor closes
   editor.onHide(() => {
     gameScene.reloadMetadata(editor.getMetadata());
   });
 
-  // Toggle editor with 'T' key or Escape to close
   document.addEventListener('keydown', (e) => {
     if (e.key === 't' || e.key === 'T') {
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {

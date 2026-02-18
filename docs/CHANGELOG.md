@@ -1,7 +1,7 @@
 # Implementation Status — Plans vs. Codebase
 
 > Compares the original specification documents and implementation plans in `./docs/`
-> against what is actually implemented in `src/`. Last updated: 2026-02-17.
+> against what is actually implemented in `src/`. Last updated: 2026-02-18.
 
 ---
 
@@ -212,6 +212,26 @@ Only the ground terrain tileset has been authored. water.png is loaded in the pr
 | Post: Legacy cleanup | Done | Removed `TilesetMetadata`, `metadata-migration.ts`, `terrain.autotile.json`, legacy `validateMetadata`; all code now uses `ProjectMetadata` exclusively |
 | Post: Region Assign above Animation | Done | RegionAssignPanel mounted inside InspectorPanel above animation section |
 | Post: Multi-select animation uncheck | Done | Unchecking "Is animated?" with multiple tiles removes animation from all selected |
+
+---
+
+## 2026-02-18: Codebase Simplification & Refinement
+
+Systematic code review and cleanup across all source and test files. No behavioral changes.
+
+| Area | Change | Files |
+|------|--------|-------|
+| DOM cleanup | Replaced `while (firstChild) removeChild` and custom `clearChildren()` with native `replaceChildren()` | `overlay-manager.ts`, `inspector-panel.ts`, `region-assign-panel.ts`, `wangset-panel.ts`, `template-panel.ts` |
+| Type imports | Changed value imports of type-only symbols to `import type` | `editor-state.ts`, `autotile-tilemap.ts`, `animation-controller.ts`, `completeness-checker.ts`, `inspector-panel.ts`, 4 test files |
+| Deduplication | Extracted shared `buildWangSets()` from duplicated init logic | `tileset-manager.ts` |
+| Deduplication | Extracted shared test helpers (`makeColor`, `createGrassDirtWangSet`, `createThreeColorWangSet`) | New `tests/core/test-helpers.ts`; updated `color-distance.test.ts`, `variant-generator.test.ts`, `matching.test.ts`, `flood-fill.test.ts` |
+| Inline types | Replaced `import()` type references with proper top-level imports | `game-scene.ts` |
+| Simplification | Replaced for-loop with `Array.map` in `loadMetadata` | `metadata-loader.ts` |
+| Simplification | Replaced verbose boundary loop with `filter`+`some` | `flood-fill.ts` |
+| Simplification | Replaced manual string parsing with `split(':').map(Number)` | `wang-set.ts` |
+| Simplification | Removed unused variables, redundant comments, redundant local variables | `game-scene.ts`, `inspector-panel.ts`, `main.ts`, `template-panel.ts` |
+
+Verification: `tsc --noEmit` clean, 186 tests passing.
 
 ---
 
