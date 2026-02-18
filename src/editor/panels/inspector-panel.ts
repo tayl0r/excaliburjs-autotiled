@@ -724,6 +724,35 @@ export class InspectorPanel {
     this.probabilityContainer.appendChild(badge);
   }
 
+  /**
+   * Replace an element with an inline input. Handles Enter to commit,
+   * Escape to cancel, and blur to commit. Calls render() after either path.
+   */
+  private startInlineEdit(
+    target: HTMLElement,
+    input: HTMLInputElement,
+    onCommit: (input: HTMLInputElement) => void,
+  ): void {
+    let committed = false;
+    const commit = () => {
+      if (committed) return;
+      committed = true;
+      onCommit(input);
+      this.render();
+    };
+
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      else if (e.key === 'Escape') { committed = true; this.render(); }
+    });
+    input.addEventListener('blur', commit);
+
+    target.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
   private startTileProbabilityEdit(badge: HTMLSpanElement, tileId: number): void {
     const wt = this.state.getWangTile(tileId);
     if (!wt) return;
@@ -738,10 +767,7 @@ export class InspectorPanel {
       font-size: 11px; padding: 1px 4px; border-radius: 2px; outline: none;
     `;
 
-    let committed = false;
-    const commit = () => {
-      if (committed) return;
-      committed = true;
+    this.startInlineEdit(badge, input, () => {
       const val = parseFloat(input.value);
       if (!isNaN(val) && val >= 0) {
         if (this.state.selectedTileIds.size > 1) {
@@ -750,19 +776,7 @@ export class InspectorPanel {
           this.state.setTileProbability(tileId, val);
         }
       }
-      this.render();
-    };
-
-    input.addEventListener('keydown', (e) => {
-      e.stopPropagation();
-      if (e.key === 'Enter') { e.preventDefault(); commit(); }
-      else if (e.key === 'Escape') { committed = true; this.render(); }
     });
-    input.addEventListener('blur', commit);
-
-    badge.replaceWith(input);
-    input.focus();
-    input.select();
   }
 
   private paintAllZones(): void {

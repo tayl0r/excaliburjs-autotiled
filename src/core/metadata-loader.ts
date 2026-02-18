@@ -1,6 +1,6 @@
 import { ProjectMetadata, WangSetData, DEFAULT_TRANSFORMATIONS } from './metadata-schema.js';
 import { WangSet, WangSetType } from './wang-set.js';
-import { WangColor } from './wang-color.js';
+import type { WangColor } from './wang-color.js';
 import { WangId } from './wang-id.js';
 
 /** Load and parse metadata from a ProjectMetadata JSON object */

@@ -1,12 +1,17 @@
 import * as ex from 'excalibur';
-import { WangSet } from '../core/wang-set.js';
+import type { WangSet } from '../core/wang-set.js';
 import { TilesetManager } from './tileset-manager.js';
 import { SpriteResolver } from './sprite-resolver.js';
 import { AutotileTilemap } from './autotile-tilemap.js';
-import { InputHandler, ToolMode } from './input-handler.js';
+import { InputHandler, type ToolMode } from './input-handler.js';
 
 const MAP_COLS = 20;
 const MAP_ROWS = 20;
+
+const TOOLS: ReadonlyArray<{ mode: ToolMode; label: string; shortcut: string; key: ex.Keys }> = [
+  { mode: 'brush', label: 'Brush', shortcut: 'B', key: ex.Keys.B },
+  { mode: 'fill', label: 'Fill', shortcut: 'G', key: ex.Keys.G },
+];
 
 export class GameScene extends ex.Scene {
   private tilesetManager: TilesetManager;
@@ -57,11 +62,8 @@ export class GameScene extends ex.Scene {
     this.inputHandler.initialize();
 
     engine.input.keyboard.on('press', (evt) => {
-      if (evt.key === ex.Keys.B) {
-        this.inputHandler.setToolMode('brush');
-      } else if (evt.key === ex.Keys.G) {
-        this.inputHandler.setToolMode('fill');
-      }
+      const tool = TOOLS.find(t => t.key === evt.key);
+      if (tool) this.inputHandler.setToolMode(tool.mode);
     });
 
     this.createToolbar();
@@ -164,12 +166,7 @@ export class GameScene extends ex.Scene {
 
     this.toolButtons = new Map();
 
-    const tools: Array<{ mode: ToolMode; label: string; shortcut: string }> = [
-      { mode: 'brush', label: 'Brush', shortcut: 'B' },
-      { mode: 'fill', label: 'Fill', shortcut: 'G' },
-    ];
-
-    for (const tool of tools) {
+    for (const tool of TOOLS) {
       const btn = document.createElement('button');
       btn.dataset.tool = tool.mode;
       btn.style.cssText = `

@@ -1,7 +1,7 @@
 import { WangId, NEIGHBOR_OFFSETS, isActiveIndex } from './wang-id.js';
-import { WangSet } from './wang-set.js';
-import { Cell } from './cell.js';
-import { AutotileMap } from './autotile-map.js';
+import type { WangSet } from './wang-set.js';
+import type { Cell } from './cell.js';
+import type { AutotileMap } from './autotile-map.js';
 import { RandomPicker } from './random-picker.js';
 
 /**

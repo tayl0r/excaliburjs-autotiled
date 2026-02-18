@@ -119,8 +119,8 @@ describe('findBestMatch', () => {
 
   it('returns undefined when no match possible', () => {
     // Create WangSet with only all-grass tile
-    const grass: WangColor = { id: 1, name: 'Grass', color: '#00ff00', imageTileId: 0, probability: 1.0 };
-    const dirt: WangColor = { id: 2, name: 'Dirt', color: '#8b4513', imageTileId: 1, probability: 1.0 };
+    const grass: WangColor = { id: 1, name: 'Grass', color: '#00ff00', imageTileId: 0, tilesetIndex: 0, probability: 1.0 };
+    const dirt: WangColor = { id: 2, name: 'Dirt', color: '#8b4513', imageTileId: 1, tilesetIndex: 0, probability: 1.0 };
     const ws = new WangSet('Ground', 'corner', [grass, dirt]);
     ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 1]));
     ws.setVariants(generateAllVariants(ws, DEFAULT_TRANSFORMATIONS));
@@ -249,8 +249,8 @@ describe('Cell flip flags preserved through map storage', () => {
 
   it('preserves flip flags when terrain paint resolves a flipped variant', () => {
     // Create a WangSet with limited tiles + allowFlipH so flipping is required
-    const grass: WangColor = { id: 1, name: 'Grass', color: '#00ff00', imageTileId: 0, probability: 1.0 };
-    const dirt: WangColor = { id: 2, name: 'Dirt', color: '#8b4513', imageTileId: 15, probability: 1.0 };
+    const grass: WangColor = { id: 1, name: 'Grass', color: '#00ff00', imageTileId: 0, tilesetIndex: 0, probability: 1.0 };
+    const dirt: WangColor = { id: 2, name: 'Dirt', color: '#8b4513', imageTileId: 15, tilesetIndex: 0, probability: 1.0 };
     const ws = new WangSet('Ground', 'corner', [grass, dirt]);
 
     // Only provide tiles where TL differs from TR but BR=BL
@@ -412,10 +412,10 @@ describe('applyTerrainPaint with intermediates', () => {
 
   it('cascades intermediates for multi-hop distances', () => {
     // With A↔B, B↔C, C↔D: painting A next to D should insert B then C
-    const a: WangColor = { id: 1, name: 'A', color: '#ff0000', imageTileId: 0, probability: 1.0 };
-    const b: WangColor = { id: 2, name: 'B', color: '#00ff00', imageTileId: 0, probability: 1.0 };
-    const c: WangColor = { id: 3, name: 'C', color: '#0000ff', imageTileId: 0, probability: 1.0 };
-    const d: WangColor = { id: 4, name: 'D', color: '#ffff00', imageTileId: 0, probability: 1.0 };
+    const a: WangColor = { id: 1, name: 'A', color: '#ff0000', imageTileId: 0, tilesetIndex: 0, probability: 1.0 };
+    const b: WangColor = { id: 2, name: 'B', color: '#00ff00', imageTileId: 0, tilesetIndex: 0, probability: 1.0 };
+    const c: WangColor = { id: 3, name: 'C', color: '#0000ff', imageTileId: 0, tilesetIndex: 0, probability: 1.0 };
+    const d: WangColor = { id: 4, name: 'D', color: '#ffff00', imageTileId: 0, tilesetIndex: 0, probability: 1.0 };
     const ws = new WangSet('Test', 'corner', [a, b, c, d]);
 
     let tileId = 0;

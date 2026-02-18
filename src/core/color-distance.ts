@@ -1,4 +1,4 @@
-import { WangSet } from './wang-set.js';
+import type { WangSet } from './wang-set.js';
 
 export interface ColorDistanceResult {
   distances: number[][];

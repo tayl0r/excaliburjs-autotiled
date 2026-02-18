@@ -1,22 +1,21 @@
 import * as ex from 'excalibur';
-import { ProjectMetadata, TilesetDef } from '../core/metadata-schema.js';
-import { WangSet } from '../core/wang-set.js';
+import type { ProjectMetadata, TilesetDef } from '../core/metadata-schema.js';
+import type { WangSet } from '../core/wang-set.js';
 import { loadMetadata } from '../core/metadata-loader.js';
 import { generateAllVariants } from '../core/variant-generator.js';
 import { computeColorDistances } from '../core/color-distance.js';
-import { TilesetSheet } from './sprite-resolver.js';
+import type { TilesetSheet } from './sprite-resolver.js';
 
 export class TilesetManager {
   spriteSheets: TilesetSheet[] = [];
   wangSets: WangSet[] = [];
-  metadata!: ProjectMetadata;
+  metadata: ProjectMetadata;
 
   private imageSources: ex.ImageSource[];
-  private metadataJson: ProjectMetadata;
 
-  constructor(imageSources: ex.ImageSource[], metadataJson: ProjectMetadata) {
+  constructor(imageSources: ex.ImageSource[], metadata: ProjectMetadata) {
     this.imageSources = imageSources;
-    this.metadataJson = metadataJson;
+    this.metadata = metadata;
   }
 
   /** The primary tileset definition (tilesets[0]) */
@@ -24,10 +23,8 @@ export class TilesetManager {
     return this.metadata.tilesets[0];
   }
 
-  /** Initialize after resources are loaded */
+  /** Initialize sprite sheets after image resources are loaded */
   initialize(): void {
-    this.metadata = this.metadataJson;
-
     this.spriteSheets = this.metadata.tilesets.map((ts, i) => {
       const rows = Math.ceil(ts.tileCount / ts.columns);
       const sheet = ex.SpriteSheet.fromImageSource({
@@ -42,19 +39,18 @@ export class TilesetManager {
       return { sheet, columns: ts.columns };
     });
 
-    this.buildWangSets(this.metadataJson);
+    this.buildWangSets();
   }
 
   /** Reload WangSets from updated metadata */
   reload(metadata: ProjectMetadata): void {
-    this.metadataJson = metadata;
     this.metadata = metadata;
-    this.buildWangSets(metadata);
+    this.buildWangSets();
   }
 
   /** Load WangSets from metadata and pre-compute variants and distance matrices */
-  private buildWangSets(metadata: ProjectMetadata): void {
-    const { wangSets, transformations } = loadMetadata(metadata);
+  private buildWangSets(): void {
+    const { wangSets, transformations } = loadMetadata(this.metadata);
     this.wangSets = wangSets;
 
     for (const ws of this.wangSets) {
@@ -75,5 +71,4 @@ export class TilesetManager {
   get primaryWangSet(): WangSet | undefined {
     return this.wangSets[0];
   }
-
 }

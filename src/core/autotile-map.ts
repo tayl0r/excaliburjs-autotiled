@@ -1,4 +1,5 @@
-import { Cell, EMPTY_CELL } from './cell.js';
+import { EMPTY_CELL } from './cell.js';
+import type { Cell } from './cell.js';
 
 /** The painted terrain color per grid cell. This is what the user paints. */
 export interface AutotileMap {

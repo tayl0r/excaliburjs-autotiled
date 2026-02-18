@@ -1,6 +1,6 @@
 import { WangId } from './wang-id.js';
-import { WangColor } from './wang-color.js';
-import { Cell, createCell } from './cell.js';
+import type { WangColor } from './wang-color.js';
+import type { Cell } from './cell.js';
 
 export type WangSetType = 'corner' | 'edge' | 'mixed';
 

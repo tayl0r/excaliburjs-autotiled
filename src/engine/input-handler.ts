@@ -12,7 +12,6 @@ export class InputHandler {
   private onColorChange?: (color: number) => void;
   private onToolModeChange?: (mode: ToolMode) => void;
 
-
   constructor(engine: ex.Engine, tilemap: AutotileTilemap) {
     this.engine = engine;
     this.tilemap = tilemap;
@@ -80,5 +79,4 @@ export class InputHandler {
     const [col, row] = tilePos;
     this.tilemap.fillTerrain(col, row, this.activeColor);
   }
-
 }

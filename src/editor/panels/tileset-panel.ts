@@ -233,10 +233,12 @@ export class TilesetPanel {
   render(): void {
     const { tileWidth, tileHeight, columns, tileCount } = this.state;
     const zoom = this.state.zoom;
+    const tw = tileWidth * zoom;
+    const th = tileHeight * zoom;
     const rows = Math.ceil(tileCount / columns);
 
-    const cw = columns * tileWidth * zoom;
-    const ch = rows * tileHeight * zoom;
+    const cw = columns * tw;
+    const ch = rows * th;
     this.canvas.width = cw;
     this.canvas.height = ch;
 
@@ -250,14 +252,14 @@ export class TilesetPanel {
     this.ctx.strokeStyle = 'rgba(255,255,255,0.1)';
     this.ctx.lineWidth = 1;
     for (let c = 0; c <= columns; c++) {
-      const x = c * tileWidth * zoom;
+      const x = c * tw;
       this.ctx.beginPath();
       this.ctx.moveTo(x + 0.5, 0);
       this.ctx.lineTo(x + 0.5, ch);
       this.ctx.stroke();
     }
     for (let r = 0; r <= rows; r++) {
-      const y = r * tileHeight * zoom;
+      const y = r * th;
       this.ctx.beginPath();
       this.ctx.moveTo(0, y + 0.5);
       this.ctx.lineTo(cw, y + 0.5);
@@ -265,15 +267,13 @@ export class TilesetPanel {
     }
 
     // Draw WangId overlays for tagged tiles
-    this.drawWangOverlays(zoom);
+    this.drawWangOverlays(tw, th);
 
     // Draw filter dimming overlay
     if (this.state.tileFilter !== 'all') {
       const ws = this.state.activeWangSet;
       const activeTsi = this.state.activeTilesetIndex;
       const taggedTileIds = new Set(ws?.wangtiles.filter(wt => (wt.tileset ?? 0) === activeTsi).map(wt => wt.tileid) ?? []);
-      const tw = tileWidth * zoom;
-      const th = tileHeight * zoom;
 
       for (let id = 0; id < tileCount; id++) {
         const isTagged = taggedTileIds.has(id);
@@ -296,22 +296,17 @@ export class TilesetPanel {
     }
 
     // Draw light blue outline on tiles matching active WangSet + color
-    this.drawActiveColorOutlines(zoom);
+    this.drawActiveColorOutlines(tw, th);
 
     // Draw badge on animated tiles
-    this.drawAnimatedTileBadges(zoom);
+    this.drawAnimatedTileBadges(tw, th);
 
     // Draw hover highlight
     if (this.hoveredTileId >= 0) {
       const [hc, hr] = colRowFromTileId(this.hoveredTileId, columns);
       this.ctx.strokeStyle = 'rgba(255,255,255,0.6)';
       this.ctx.lineWidth = 2;
-      this.ctx.strokeRect(
-        hc * tileWidth * zoom + 1,
-        hr * tileHeight * zoom + 1,
-        tileWidth * zoom - 2,
-        tileHeight * zoom - 2
-      );
+      this.ctx.strokeRect(hc * tw + 1, hr * th + 1, tw - 2, th - 2);
     }
 
     // Draw selection highlights (multi-select)
@@ -319,23 +314,16 @@ export class TilesetPanel {
       const [sc, sr] = colRowFromTileId(selId, columns);
       this.ctx.strokeStyle = '#ffdd00';
       this.ctx.lineWidth = 2;
-      this.ctx.strokeRect(
-        sc * tileWidth * zoom + 1,
-        sr * tileHeight * zoom + 1,
-        tileWidth * zoom - 2,
-        tileHeight * zoom - 2
-      );
+      this.ctx.strokeRect(sc * tw + 1, sr * th + 1, tw - 2, th - 2);
     }
   }
 
-  private drawActiveColorOutlines(zoom: number): void {
+  private drawActiveColorOutlines(tw: number, th: number): void {
     const ws = this.state.activeWangSet;
     const colorId = this.state.activeColorId;
     if (!ws || colorId <= 0) return;
 
-    const { tileWidth, tileHeight, columns } = this.state;
-    const tw = tileWidth * zoom;
-    const th = tileHeight * zoom;
+    const { columns } = this.state;
 
     this.ctx.strokeStyle = 'rgba(100, 180, 255, 0.7)';
     this.ctx.lineWidth = 2;
@@ -345,22 +333,15 @@ export class TilesetPanel {
       if ((wt.tileset ?? 0) !== activeTsi) continue;
       if (!wt.wangid.includes(colorId)) continue;
       const [col, row] = colRowFromTileId(wt.tileid, columns);
-      this.ctx.strokeRect(
-        col * tw + 1,
-        row * th + 1,
-        tw - 2,
-        th - 2,
-      );
+      this.ctx.strokeRect(col * tw + 1, row * th + 1, tw - 2, th - 2);
     }
   }
 
-  private drawWangOverlays(zoom: number): void {
+  private drawWangOverlays(tw: number, th: number): void {
     const ws = this.state.activeWangSet;
     if (!ws) return;
 
-    const { tileWidth, tileHeight, columns } = this.state;
-    const tw = tileWidth * zoom;
-    const th = tileHeight * zoom;
+    const { columns } = this.state;
 
     const activeTsi = this.state.activeTilesetIndex;
     for (const wt of ws.wangtiles) {
@@ -412,13 +393,11 @@ export class TilesetPanel {
     }
   }
 
-  private drawAnimatedTileBadges(zoom: number): void {
+  private drawAnimatedTileBadges(tw: number, th: number): void {
     const ws = this.state.activeWangSet;
     if (!ws) return;
 
-    const { tileWidth, tileHeight, columns } = this.state;
-    const tw = tileWidth * zoom;
-    const th = tileHeight * zoom;
+    const { columns } = this.state;
     const activeTsi = this.state.activeTilesetIndex;
 
     for (const wt of ws.wangtiles) {

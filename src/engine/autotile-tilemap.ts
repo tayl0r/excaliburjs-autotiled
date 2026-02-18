@@ -1,6 +1,6 @@
 import * as ex from 'excalibur';
 import { SimpleAutotileMap } from '../core/autotile-map.js';
-import { WangSet } from '../core/wang-set.js';
+import type { WangSet } from '../core/wang-set.js';
 import { applyTerrainPaint } from '../core/terrain-painter.js';
 import { floodFillTerrain } from '../core/flood-fill.js';
 import type { WangSetData } from '../core/metadata-schema.js';
@@ -68,34 +68,22 @@ export class AutotileTilemap {
 
   /** Initialize all tiles with a color */
   initializeAll(colorId: number): void {
-    for (let y = 0; y < this.autoMap.height; y++) {
-      for (let x = 0; x < this.autoMap.width; x++) {
-        applyTerrainPaint(this.autoMap, this.wangSet, x, y, colorId);
-      }
-    }
-    for (let y = 0; y < this.autoMap.height; y++) {
-      for (let x = 0; x < this.autoMap.width; x++) {
-        this.refreshTile(x, y);
-      }
-    }
+    this.forEachCell((x, y) => {
+      applyTerrainPaint(this.autoMap, this.wangSet, x, y, colorId);
+    });
+    this.refreshAllTiles();
   }
 
   /** Swap the WangSet and re-resolve all tiles from their painted colors */
   updateWangSet(wangSet: WangSet): void {
     this.wangSet = wangSet;
-    for (let y = 0; y < this.autoMap.height; y++) {
-      for (let x = 0; x < this.autoMap.width; x++) {
-        const color = this.autoMap.colorAt(x, y);
-        if (color > 0) {
-          applyTerrainPaint(this.autoMap, this.wangSet, x, y, color);
-        }
+    this.forEachCell((x, y) => {
+      const color = this.autoMap.colorAt(x, y);
+      if (color > 0) {
+        applyTerrainPaint(this.autoMap, this.wangSet, x, y, color);
       }
-    }
-    for (let y = 0; y < this.autoMap.height; y++) {
-      for (let x = 0; x < this.autoMap.width; x++) {
-        this.refreshTile(x, y);
-      }
-    }
+    });
+    this.refreshAllTiles();
   }
 
   /** Fill terrain at (x, y) with flood fill and refresh affected tiles */
@@ -129,35 +117,46 @@ export class AutotileTilemap {
 
     const changedSet = new Set(changed);
 
-    // For each cell, check if it belongs to a changed animation
+    this.forEachCell((x, y) => {
+      const cell = this.autoMap.cellAt(x, y);
+      if (cell.tileId < 0) return;
+
+      const animKey = this.animController!.getAnimationKey(cell.tilesetIndex, cell.tileId);
+      if (!animKey || !changedSet.has(animKey)) return;
+
+      const frame = this.animController!.getCurrentFrame(animKey);
+      if (!frame || frame.tileId < 0) return;
+
+      const tile = this.tileMap.getTile(x, y);
+      if (!tile) return;
+
+      tile.clearGraphics();
+      const animatedCell = createCell(
+        frame.tileId,
+        cell.flipH,
+        cell.flipV,
+        cell.flipD,
+        frame.tileset
+      );
+      const sprite = this.spriteResolver.resolve(animatedCell);
+      if (sprite) {
+        tile.addGraphic(sprite);
+      }
+    });
+  }
+
+  /** Run a callback for every cell in the map */
+  private forEachCell(fn: (x: number, y: number) => void): void {
     for (let y = 0; y < this.autoMap.height; y++) {
       for (let x = 0; x < this.autoMap.width; x++) {
-        const cell = this.autoMap.cellAt(x, y);
-        if (cell.tileId < 0) continue;
-
-        const animKey = this.animController.getAnimationKey(cell.tilesetIndex, cell.tileId);
-        if (!animKey || !changedSet.has(animKey)) continue;
-
-        const frame = this.animController.getCurrentFrame(animKey);
-        if (!frame || frame.tileId < 0) continue;
-
-        const tile = this.tileMap.getTile(x, y);
-        if (!tile) continue;
-
-        tile.clearGraphics();
-        const animatedCell = createCell(
-          frame.tileId,
-          cell.flipH,
-          cell.flipV,
-          cell.flipD,
-          frame.tileset
-        );
-        const sprite = this.spriteResolver.resolve(animatedCell);
-        if (sprite) {
-          tile.addGraphic(sprite);
-        }
+        fn(x, y);
       }
     }
+  }
+
+  /** Refresh the visual for every tile from the autoMap */
+  private refreshAllTiles(): void {
+    this.forEachCell((x, y) => this.refreshTile(x, y));
   }
 
   /** Convert world position to tile coordinates */

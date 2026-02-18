@@ -254,6 +254,28 @@ Split the single-page app into separate pages for the tileset editor and map pai
 
 ---
 
+## 2026-02-18: Codebase Simplification & Refinement (Round 2)
+
+Continued systematic code review covering all remaining source files. No behavioral changes.
+
+| Area | Change | Files |
+|------|--------|-------|
+| Type imports | Changed `import { ProjectMetadata }` to `import type` | `tile-editor.ts` |
+| Deduplication | Extracted `startInlineEdit()` helper consolidating 3 identical commit/escape/blur inline-edit patterns | `wangset-panel.ts` |
+| Deduplication | Extracted `createTextInput()` for shared text input styling | `wangset-panel.ts` |
+| Deduplication | Extracted `startInlineEdit()` for inline probability editing | `inspector-panel.ts` |
+| Deduplication | Added `computeTileBounds()` utility to replace 3 identical min/max col/row loops | `tile-math.ts`, `editor-state.ts`, `region-assign-panel.ts` |
+| Engine cleanup | Extracted `TOOLS` constant, simplified keyboard handler with `find()` | `game-scene.ts` |
+| Engine cleanup | Removed redundant `metadataJson` field, `buildWangSets()` uses `this.metadata` directly | `tileset-manager.ts` |
+| Rendering cleanup | Computed `tw`/`th` once, passed to helpers instead of redundant recalculation | `tileset-panel.ts` |
+| State cleanup | Extracted `restoreSnapshot()` to deduplicate undo/redo logic | `editor-state.ts` |
+| Batch operations | Changed `clearAll()` to use `removeWangTileMulti()` | `template-panel.ts` |
+| Engine helpers | Extracted `forEachCell()` and `refreshAllTiles()` to deduplicate 3 nested loops | `autotile-tilemap.ts` |
+
+Verification: `tsc --noEmit` clean, 186 tests passing.
+
+---
+
 ## Summary
 
 ### Fully Complete

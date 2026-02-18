@@ -1,7 +1,8 @@
-import { WangSet, WangVariant } from './wang-set.js';
+import type { WangSet, WangVariant } from './wang-set.js';
 import { WangId } from './wang-id.js';
-import { createCell, Cell } from './cell.js';
-import { TransformationConfig } from './metadata-schema.js';
+import { createCell } from './cell.js';
+import type { Cell } from './cell.js';
+import type { TransformationConfig } from './metadata-schema.js';
 
 /**
  * Generate all tile variants (base + transformed) for a WangSet.

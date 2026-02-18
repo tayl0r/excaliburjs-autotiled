@@ -205,95 +205,75 @@ export class WangSetPanel {
   }
 
   /**
-   * Replace a WangSet name span with an inline text input for renaming.
+   * Replace an element with an inline input. Handles Enter to commit,
+   * Escape to cancel, and blur to commit. Calls render() after either path.
    */
-  private startInlineRenameWangSet(span: HTMLSpanElement, wsIndex: number): void {
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = this.state.metadata.wangsets[wsIndex].name;
-    input.style.cssText = `
-      flex: 1; background: #1e1e3a; color: #e0e0e0; border: 1px solid #6666cc;
-      font-size: 12px; padding: 1px 4px; border-radius: 2px; outline: none;
-    `;
-
+  private startInlineEdit(
+    target: HTMLElement,
+    input: HTMLInputElement,
+    onCommit: (input: HTMLInputElement) => void,
+  ): void {
     let committed = false;
     const commit = () => {
       if (committed) return;
       committed = true;
+      onCommit(input);
+      this.render();
+    };
+
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commit();
+      } else if (e.key === 'Escape') {
+        committed = true;
+        this.render();
+      }
+    });
+    input.addEventListener('blur', commit);
+
+    target.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  private createTextInput(value: string): HTMLInputElement {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = value;
+    input.style.cssText = `
+      flex: 1; background: #1e1e3a; color: #e0e0e0; border: 1px solid #6666cc;
+      font-size: 12px; padding: 1px 4px; border-radius: 2px; outline: none;
+    `;
+    return input;
+  }
+
+  private startInlineRenameWangSet(span: HTMLSpanElement, wsIndex: number): void {
+    const input = this.createTextInput(this.state.metadata.wangsets[wsIndex].name);
+    this.startInlineEdit(span, input, () => {
       const newName = input.value.trim();
       if (newName && newName !== this.state.metadata.wangsets[wsIndex]?.name) {
         this.state.renameWangSet(wsIndex, newName);
       }
-      this.render();
-    };
-
-    input.addEventListener('keydown', (e) => {
-      e.stopPropagation();
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        commit();
-      } else if (e.key === 'Escape') {
-        committed = true;
-        this.render();
-      }
     });
-    input.addEventListener('blur', commit);
-
-    span.replaceWith(input);
-    input.focus();
-    input.select();
   }
 
-  /**
-   * Replace a color name label with an inline text input for renaming.
-   */
   private startInlineRenameColor(span: HTMLSpanElement, colorIndex: number): void {
     const ws = this.state.activeWangSet;
     if (!ws) return;
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = ws.colors[colorIndex].name;
-    input.style.cssText = `
-      flex: 1; background: #1e1e3a; color: #e0e0e0; border: 1px solid #6666cc;
-      font-size: 12px; padding: 1px 4px; border-radius: 2px; outline: none;
-    `;
-
-    let committed = false;
-    const commit = () => {
-      if (committed) return;
-      committed = true;
+    const input = this.createTextInput(ws.colors[colorIndex].name);
+    this.startInlineEdit(span, input, () => {
       const newName = input.value.trim();
       if (newName && newName !== ws.colors[colorIndex]?.name) {
         this.state.updateColor(colorIndex, { name: newName });
       }
-      this.render();
-    };
-
-    input.addEventListener('keydown', (e) => {
-      e.stopPropagation();
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        commit();
-      } else if (e.key === 'Escape') {
-        committed = true;
-        this.render();
-      }
     });
-    input.addEventListener('blur', commit);
-
-    span.replaceWith(input);
-    input.focus();
-    input.select();
   }
 
-  /**
-   * Replace a probability badge with an inline number input.
-   */
   private startInlineProbabilityEdit(badge: HTMLSpanElement, colorIndex: number): void {
     const ws = this.state.activeWangSet;
     if (!ws) return;
-
     const input = document.createElement('input');
     input.type = 'number';
     input.min = '0';
@@ -304,33 +284,12 @@ export class WangSetPanel {
       width: 48px; background: #1e1e3a; color: #e0e0e0; border: 1px solid #6666cc;
       font-size: 11px; padding: 1px 4px; border-radius: 2px; outline: none;
     `;
-
-    let committed = false;
-    const commit = () => {
-      if (committed) return;
-      committed = true;
+    this.startInlineEdit(badge, input, () => {
       const val = parseFloat(input.value);
       if (!isNaN(val) && val >= 0 && val <= 1) {
         this.state.updateColor(colorIndex, { probability: val });
       }
-      this.render();
-    };
-
-    input.addEventListener('keydown', (e) => {
-      e.stopPropagation();
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        commit();
-      } else if (e.key === 'Escape') {
-        committed = true;
-        this.render();
-      }
     });
-    input.addEventListener('blur', commit);
-
-    badge.replaceWith(input);
-    input.focus();
-    input.select();
   }
 
   /**
@@ -386,7 +345,7 @@ export class WangSetPanel {
         thumb.addEventListener('contextmenu', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          this.state.updateColor(colorIndex!, { tile: -1, tileset: undefined });
+          this.state.updateColor(colorIndex, { tile: -1, tileset: undefined });
         });
       } else {
         thumb.title = 'No representative tile set';
@@ -434,7 +393,7 @@ export class WangSetPanel {
       probBadge.title = 'Click to edit probability';
       probBadge.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.startInlineProbabilityEdit(probBadge, colorIndex!);
+        this.startInlineProbabilityEdit(probBadge, colorIndex);
       });
       row.appendChild(probBadge);
     }
@@ -617,5 +576,4 @@ export class WangSetPanel {
     const color = ws.colors[colorId - 1];
     return color ? color.name : `Color ${colorId}`;
   }
-
 }

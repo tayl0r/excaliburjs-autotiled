@@ -1,5 +1,5 @@
-import { AutotileMap } from './autotile-map.js';
-import { WangSet } from './wang-set.js';
+import type { AutotileMap } from './autotile-map.js';
+import type { WangSet } from './wang-set.js';
 import { insertIntermediates, recomputeTiles } from './terrain-painter.js';
 
 /** 4-directional offsets for flood fill connectivity */

@@ -1,6 +1,6 @@
 import { EditorState } from '../editor-state.js';
 import { ALL_PATTERNS, applyLayoutPattern } from '../layout-patterns.js';
-import { colRowFromTileId } from '../../utils/tile-math.js';
+import { computeTileBounds } from '../../utils/tile-math.js';
 import type { WangSetData } from '../../core/metadata-schema.js';
 
 /**
@@ -36,14 +36,7 @@ export class RegionAssignPanel {
 
     // Calculate selection bounds
     const columns = this.state.columns;
-    let minCol = Infinity, maxCol = -1, minRow = Infinity, maxRow = -1;
-    for (const id of selectedIds) {
-      const [c, r] = colRowFromTileId(id, columns);
-      minCol = Math.min(minCol, c);
-      maxCol = Math.max(maxCol, c);
-      minRow = Math.min(minRow, r);
-      maxRow = Math.max(maxRow, r);
-    }
+    const { minCol, maxCol, minRow, maxRow } = computeTileBounds(selectedIds, columns);
     const regionW = maxCol - minCol + 1;
     const regionH = maxRow - minRow + 1;
 

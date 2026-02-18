@@ -1,7 +1,8 @@
-import { type ProjectMetadata, type TilesetDef, type WangSetData, type WangTileData, type TransformationConfig, DEFAULT_TRANSFORMATIONS, type TileAnimation, type AnimationFrameData } from '../core/metadata-schema.js';
+import type { ProjectMetadata, TilesetDef, WangSetData, WangTileData, TransformationConfig, TileAnimation, AnimationFrameData } from '../core/metadata-schema.js';
+import { DEFAULT_TRANSFORMATIONS } from '../core/metadata-schema.js';
 import { wangColorHex } from '../core/wang-color.js';
 import { UndoManager } from './undo-manager.js';
-import { colRowFromTileId, tileIdFromColRow } from '../utils/tile-math.js';
+import { colRowFromTileId, tileIdFromColRow, computeTileBounds } from '../utils/tile-math.js';
 
 export type TileFilter = 'all' | 'tagged' | 'untagged';
 
@@ -259,14 +260,7 @@ export class EditorState {
     if (selectedIds.size === 0) return;
 
     const columns = this.columns;
-    let minCol = Infinity, maxCol = -1, minRow = Infinity, maxRow = -1;
-    for (const id of selectedIds) {
-      const [c, r] = colRowFromTileId(id, columns);
-      minCol = Math.min(minCol, c);
-      maxCol = Math.max(maxCol, c);
-      minRow = Math.min(minRow, r);
-      maxRow = Math.max(maxRow, r);
-    }
+    const { minCol, maxCol, minRow, maxRow } = computeTileBounds(selectedIds, columns);
 
     const entries = new Map<string, number[]>();
     for (const id of selectedIds) {
@@ -306,14 +300,7 @@ export class EditorState {
     if (selectedIds.size === 0) return false;
 
     const columns = this.columns;
-    let minCol = Infinity, maxCol = -1, minRow = Infinity, maxRow = -1;
-    for (const id of selectedIds) {
-      const [c, r] = colRowFromTileId(id, columns);
-      minCol = Math.min(minCol, c);
-      maxCol = Math.max(maxCol, c);
-      minRow = Math.min(minRow, r);
-      maxRow = Math.max(maxRow, r);
-    }
+    const { minCol, maxCol, minRow, maxRow } = computeTileBounds(selectedIds, columns);
     const regionW = maxCol - minCol + 1;
     const regionH = maxRow - minRow + 1;
 
@@ -349,28 +336,21 @@ export class EditorState {
   }
 
   undo(): void {
-    const prev = this.undoManager.undo(this._metadata);
-    if (prev) {
-      this._metadata = prev;
-      // Clamp active WangSet index
-      if (this._activeWangSetIndex >= this._metadata.wangsets.length) {
-        this._activeWangSetIndex = Math.max(0, this._metadata.wangsets.length - 1);
-      }
-      this.emit('metadataChanged');
-      this.emit('activeWangSetChanged');
-    }
+    this.restoreSnapshot(this.undoManager.undo(this._metadata));
   }
 
   redo(): void {
-    const next = this.undoManager.redo(this._metadata);
-    if (next) {
-      this._metadata = next;
-      if (this._activeWangSetIndex >= this._metadata.wangsets.length) {
-        this._activeWangSetIndex = Math.max(0, this._metadata.wangsets.length - 1);
-      }
-      this.emit('metadataChanged');
-      this.emit('activeWangSetChanged');
+    this.restoreSnapshot(this.undoManager.redo(this._metadata));
+  }
+
+  private restoreSnapshot(snapshot: ProjectMetadata | null): void {
+    if (!snapshot) return;
+    this._metadata = snapshot;
+    if (this._activeWangSetIndex >= this._metadata.wangsets.length) {
+      this._activeWangSetIndex = Math.max(0, this._metadata.wangsets.length - 1);
     }
+    this.emit('metadataChanged');
+    this.emit('activeWangSetChanged');
   }
 
   // --- Metadata mutation ---

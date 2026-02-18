@@ -1,4 +1,4 @@
-import { ProjectMetadata } from '../core/metadata-schema.js';
+import type { ProjectMetadata } from '../core/metadata-schema.js';
 import { OverlayManager } from './overlay-manager.js';
 import { EditorState } from './editor-state.js';
 import { TilesetPanel } from './panels/tileset-panel.js';

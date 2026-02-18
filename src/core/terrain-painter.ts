@@ -1,13 +1,7 @@
-import { AutotileMap } from './autotile-map.js';
-import { WangSet } from './wang-set.js';
-import { WangId } from './wang-id.js';
+import type { AutotileMap } from './autotile-map.js';
+import type { WangSet } from './wang-set.js';
+import { WangId, NEIGHBOR_OFFSETS } from './wang-id.js';
 import { findBestMatch } from './matching.js';
-
-/** All 8-direction neighbor offsets for BFS intermediate insertion */
-const ALL_DIRECTIONS: [number, number][] = [
-  [0, -1], [1, -1], [1, 0], [1, 1],
-  [0, 1], [-1, 1], [-1, 0], [-1, -1],
-];
 
 /**
  * Paint a terrain color at (x, y) and update all affected tiles.
@@ -60,7 +54,7 @@ export function insertIntermediates(
     const [cx, cy] = queue.shift()!;
     const myColor = map.colorAt(cx, cy);
 
-    for (const [dx, dy] of ALL_DIRECTIONS) {
+    for (const [dx, dy] of NEIGHBOR_OFFSETS) {
       const nx = cx + dx;
       const ny = cy + dy;
       if (!map.inBounds(nx, ny)) continue;
@@ -178,13 +172,6 @@ function desiredWangIdFromColors(
     }
   } else {
     // Edge/mixed: use painted colors of direct neighbors
-    // Edge indices: 0(T), 2(R), 4(B), 6(L)
-    // Corner indices: 1(TR), 3(BR), 5(BL), 7(TL)
-    const NEIGHBOR_OFFSETS: [number, number][] = [
-      [0, -1], [1, -1], [1, 0], [1, 1],
-      [0, 1], [-1, 1], [-1, 0], [-1, -1],
-    ];
-
     for (let i = 0; i < 8; i++) {
       const isCorner = i % 2 === 1;
       if (type === 'edge' && isCorner) continue;

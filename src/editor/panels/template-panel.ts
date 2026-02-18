@@ -270,8 +270,8 @@ export class TemplatePanel {
    */
   private clearAll(): void {
     const tileIds = [...this.slotAssignments.values()];
-    for (const tileId of tileIds) {
-      this.state.removeWangTile(tileId);
+    if (tileIds.length > 0) {
+      this.state.removeWangTileMulti(tileIds);
     }
   }
 
@@ -282,5 +282,4 @@ export class TemplatePanel {
       flex: 1; cursor: pointer;
     `;
   }
-
 }
