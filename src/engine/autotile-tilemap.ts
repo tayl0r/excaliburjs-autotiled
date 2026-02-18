@@ -109,19 +109,15 @@ export class AutotileTilemap {
 
   /** Set up animations from wangset wangtiles with animation data */
   setAnimationsFromWangSets(wangsets: WangSetData[]): void {
-    this.animController = new AnimationController();
-    let count = 0;
+    const controller = new AnimationController();
     for (const ws of wangsets) {
       for (const wt of ws.wangtiles) {
         if (wt.animation) {
-          this.animController.addTileAnimation(wt.tileid, wt.tileset ?? 0, wt.animation);
-          count++;
+          controller.addTileAnimation(wt.tileid, wt.tileset ?? 0, wt.animation);
         }
       }
     }
-    if (count === 0) {
-      this.animController = undefined;
-    }
+    this.animController = controller.isEmpty ? undefined : controller;
   }
 
   /** Advance animation state and re-render affected cells */
@@ -139,7 +135,7 @@ export class AutotileTilemap {
         const cell = this.autoMap.cellAt(x, y);
         if (cell.tileId < 0) continue;
 
-        const animKey = this.animController.getAnimationForTile(cell.tilesetIndex, cell.tileId);
+        const animKey = this.animController.getAnimationKey(cell.tilesetIndex, cell.tileId);
         if (!animKey || !changedSet.has(animKey)) continue;
 
         const frame = this.animController.getCurrentFrame(animKey);

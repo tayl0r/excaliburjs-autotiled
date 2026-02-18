@@ -133,11 +133,11 @@ describe('AnimationController', () => {
     expect(changed).not.toContain('0:100');
   });
 
-  it('getAnimationForTile returns key for registered tile', () => {
+  it('getAnimationKey returns key for registered tile and undefined for unregistered', () => {
     const ctrl = new AnimationController();
     ctrl.addTileAnimation(42, 1, makeLoopAnim(2, 100, 42));
 
-    expect(ctrl.getAnimationForTile(1, 42)).toBe('1:42');
-    expect(ctrl.getAnimationForTile(0, 42)).toBeUndefined();
+    expect(ctrl.getAnimationKey(1, 42)).toBe('1:42');
+    expect(ctrl.getAnimationKey(0, 42)).toBeUndefined();
   });
 });

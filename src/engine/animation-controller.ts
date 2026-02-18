@@ -9,8 +9,6 @@ interface AnimationState {
 
 export class AnimationController {
   private animations: Map<string, AnimationState> = new Map();
-  /** Maps "tileset:tileId" to animation key for source tile lookups */
-  private sourceTileMap: Map<string, string> = new Map();
 
   /** Register a per-tile animation, keyed by "tilesetIndex:tileId" */
   addTileAnimation(tileId: number, tilesetIndex: number, animation: TileAnimation): void {
@@ -23,9 +21,6 @@ export class AnimationController {
       currentFrame: 0,
       direction: 1,
     });
-
-    // Register in source tile map for lookups
-    this.sourceTileMap.set(key, key);
   }
 
   /**
@@ -79,8 +74,14 @@ export class AnimationController {
     return state.animation.frames[state.currentFrame] ?? null;
   }
 
-  /** Look up which animation key (if any) is registered for the given tile */
-  getAnimationForTile(tilesetIndex: number, tileId: number): string | undefined {
-    return this.sourceTileMap.get(`${tilesetIndex}:${tileId}`);
+  /** Whether any animations are registered */
+  get isEmpty(): boolean {
+    return this.animations.size === 0;
+  }
+
+  /** Look up the animation key for the given tile, if one is registered */
+  getAnimationKey(tilesetIndex: number, tileId: number): string | undefined {
+    const key = `${tilesetIndex}:${tileId}`;
+    return this.animations.has(key) ? key : undefined;
   }
 }

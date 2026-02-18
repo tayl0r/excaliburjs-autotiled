@@ -375,11 +375,26 @@ export class EditorState {
 
   // --- Metadata mutation ---
 
+  /** Find a WangTile entry matching tileId in the active WangSet and tileset */
+  private findWangTile(ws: WangSetData, tileId: number): WangTileData | undefined {
+    return ws.wangtiles.find(wt => wt.tileid === tileId && (wt.tileset ?? 0) === this._activeTilesetIndex);
+  }
+
+  /** Upsert a WangId for a tile in the given WangSet (does not save snapshot) */
+  private upsertWangTile(ws: WangSetData, tileId: number, wangid: number[]): void {
+    const existing = this.findWangTile(ws, tileId);
+    if (existing) {
+      existing.wangid = [...wangid];
+    } else {
+      ws.wangtiles.push({ tileid: tileId, wangid: [...wangid], tileset: this._activeTilesetIndex });
+    }
+  }
+
   /** Get the WangTile data for a tile ID in the active WangSet (filtered by active tileset) */
   getWangTile(tileId: number): WangTileData | undefined {
     const ws = this.activeWangSet;
     if (!ws) return undefined;
-    return ws.wangtiles.find(wt => wt.tileid === tileId && (wt.tileset ?? 0) === this._activeTilesetIndex);
+    return this.findWangTile(ws, tileId);
   }
 
   /** Set or update the WangId for a tile in the active WangSet */
@@ -387,13 +402,7 @@ export class EditorState {
     const ws = this.activeWangSet;
     if (!ws) return;
     this.saveSnapshot();
-
-    const existing = ws.wangtiles.find(wt => wt.tileid === tileId && (wt.tileset ?? 0) === this._activeTilesetIndex);
-    if (existing) {
-      existing.wangid = [...wangid];
-    } else {
-      ws.wangtiles.push({ tileid: tileId, wangid: [...wangid], tileset: this._activeTilesetIndex });
-    }
+    this.upsertWangTile(ws, tileId, wangid);
     this.emit('metadataChanged');
   }
 
@@ -414,7 +423,7 @@ export class EditorState {
   setTileProbability(tileId: number, probability: number): void {
     const ws = this.activeWangSet;
     if (!ws) return;
-    const wt = ws.wangtiles.find(w => w.tileid === tileId && (w.tileset ?? 0) === this._activeTilesetIndex);
+    const wt = this.findWangTile(ws, tileId);
     if (!wt) return;
     this.saveSnapshot();
     wt.probability = probability;
@@ -427,12 +436,7 @@ export class EditorState {
     if (!ws || entries.length === 0) return;
     this.saveSnapshot();
     for (const { tileId, wangid } of entries) {
-      const existing = ws.wangtiles.find(wt => wt.tileid === tileId && (wt.tileset ?? 0) === this._activeTilesetIndex);
-      if (existing) {
-        existing.wangid = [...wangid];
-      } else {
-        ws.wangtiles.push({ tileid: tileId, wangid: [...wangid], tileset: this._activeTilesetIndex });
-      }
+      this.upsertWangTile(ws, tileId, wangid);
     }
     this.emit('metadataChanged');
   }
@@ -442,7 +446,7 @@ export class EditorState {
     const ws = this.activeWangSet;
     if (!ws || tileIds.length === 0) return;
     const targets = tileIds
-      .map(id => ws.wangtiles.find(wt => wt.tileid === id && (wt.tileset ?? 0) === this._activeTilesetIndex))
+      .map(id => this.findWangTile(ws, id))
       .filter((wt): wt is WangTileData => wt !== undefined);
     if (targets.length === 0) return;
     this.saveSnapshot();
@@ -557,18 +561,44 @@ export class EditorState {
 
   // --- Per-Tile Animation ---
 
-  /** Set or clear animation on a WangTile (undoable) */
-  setTileAnimation(tileId: number, animation: TileAnimation | undefined): void {
-    const ws = this.activeWangSet;
-    if (!ws) return;
-    const wt = ws.wangtiles.find(w => w.tileid === tileId && (w.tileset ?? 0) === this._activeTilesetIndex);
-    if (!wt) return;
-    this.saveSnapshot();
+  /** Infer the tile offset between consecutive animation frames (0 if not determinable) */
+  private inferAnimationOffset(anim: TileAnimation): number {
+    if (anim.frames.length >= 2 && anim.frames[0].tileId >= 0 && anim.frames[1].tileId >= 0) {
+      return anim.frames[1].tileId - anim.frames[0].tileId;
+    }
+    return 0;
+  }
+
+  /** Build animation frames for a target tile using an offset pattern from a source animation */
+  private buildAnimationForTile(source: TileAnimation, targetTileId: number, tilesetIndex: number, offset: number): TileAnimation {
+    const frames: AnimationFrameData[] = source.frames.map((_, i) => ({
+      tileId: targetTileId + i * offset,
+      tileset: tilesetIndex,
+    }));
+    return {
+      frameDuration: source.frameDuration,
+      pattern: source.pattern,
+      frames,
+    };
+  }
+
+  /** Apply or clear animation on a WangTile (does not save snapshot) */
+  private applyAnimation(wt: WangTileData, animation: TileAnimation | undefined): void {
     if (animation === undefined) {
       delete wt.animation;
     } else {
       wt.animation = animation;
     }
+  }
+
+  /** Set or clear animation on a WangTile (undoable) */
+  setTileAnimation(tileId: number, animation: TileAnimation | undefined): void {
+    const ws = this.activeWangSet;
+    if (!ws) return;
+    const wt = this.findWangTile(ws, tileId);
+    if (!wt) return;
+    this.saveSnapshot();
+    this.applyAnimation(wt, animation);
     this.emit('metadataChanged');
   }
 
@@ -577,16 +607,12 @@ export class EditorState {
     const ws = this.activeWangSet;
     if (!ws || tileIds.length === 0) return;
     const targets = tileIds
-      .map(id => ws.wangtiles.find(w => w.tileid === id && (w.tileset ?? 0) === this._activeTilesetIndex))
+      .map(id => this.findWangTile(ws, id))
       .filter((wt): wt is WangTileData => wt !== undefined);
     if (targets.length === 0) return;
     this.saveSnapshot();
     for (const wt of targets) {
-      if (animation === undefined) {
-        delete wt.animation;
-      } else {
-        wt.animation = JSON.parse(JSON.stringify(animation));
-      }
+      this.applyAnimation(wt, animation ? JSON.parse(JSON.stringify(animation)) : undefined);
     }
     this.emit('metadataChanged');
   }
@@ -595,15 +621,9 @@ export class EditorState {
   copyTileAnimation(): void {
     const wt = this.getWangTile(this._selectedTileId);
     if (!wt?.animation) return;
-    const anim = wt.animation;
-    // Infer offset from frames: difference between frame[1].tileId and frame[0].tileId
-    let offset = 0;
-    if (anim.frames.length >= 2 && anim.frames[0].tileId >= 0 && anim.frames[1].tileId >= 0) {
-      offset = anim.frames[1].tileId - anim.frames[0].tileId;
-    }
     this._animationClipboard = {
-      animation: JSON.parse(JSON.stringify(anim)),
-      offset,
+      animation: JSON.parse(JSON.stringify(wt.animation)),
+      offset: this.inferAnimationOffset(wt.animation),
     };
     this.emit('clipboardChanged');
   }
@@ -618,21 +638,13 @@ export class EditorState {
     if (tileIds.length === 0) return;
 
     const targets = tileIds
-      .map(id => ws.wangtiles.find(w => w.tileid === id && (w.tileset ?? 0) === this._activeTilesetIndex))
+      .map(id => this.findWangTile(ws, id))
       .filter((wt): wt is WangTileData => wt !== undefined);
     if (targets.length === 0) return;
 
     this.saveSnapshot();
     for (const wt of targets) {
-      const frames: AnimationFrameData[] = animation.frames.map((_, i) => ({
-        tileId: wt.tileid + i * offset,
-        tileset: wt.tileset ?? this._activeTilesetIndex,
-      }));
-      wt.animation = {
-        frameDuration: animation.frameDuration,
-        pattern: animation.pattern,
-        frames,
-      };
+      wt.animation = this.buildAnimationForTile(animation, wt.tileid, wt.tileset ?? this._activeTilesetIndex, offset);
     }
     this.emit('metadataChanged');
   }
@@ -645,13 +657,8 @@ export class EditorState {
     if (!sourceWt?.animation) return;
 
     const anim = sourceWt.animation;
-    // Infer offset from source animation
-    let offset = 0;
-    if (anim.frames.length >= 2 && anim.frames[0].tileId >= 0 && anim.frames[1].tileId >= 0) {
-      offset = anim.frames[1].tileId - anim.frames[0].tileId;
-    }
+    const offset = this.inferAnimationOffset(anim);
 
-    // Find all wangtiles in active tileset that contain the colorId
     const targets = ws.wangtiles.filter(wt =>
       (wt.tileset ?? 0) === this._activeTilesetIndex && wt.wangid.includes(colorId)
     );
@@ -659,15 +666,7 @@ export class EditorState {
 
     this.saveSnapshot();
     for (const wt of targets) {
-      const frames: AnimationFrameData[] = anim.frames.map((_, i) => ({
-        tileId: wt.tileid + i * offset,
-        tileset: wt.tileset ?? this._activeTilesetIndex,
-      }));
-      wt.animation = {
-        frameDuration: anim.frameDuration,
-        pattern: anim.pattern,
-        frames,
-      };
+      wt.animation = this.buildAnimationForTile(anim, wt.tileid, wt.tileset ?? this._activeTilesetIndex, offset);
     }
     this.emit('metadataChanged');
   }

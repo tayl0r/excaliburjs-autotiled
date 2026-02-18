@@ -4,6 +4,15 @@ import { colRowFromTileId } from '../../utils/tile-math.js';
 import { computeAdjacencyPreview } from '../adjacency-preview.js';
 import { wangColorHex } from '../../core/wang-color.js';
 
+const EMPTY_WANGID = [0, 0, 0, 0, 0, 0, 0, 0];
+
+/** Remove all child nodes from a container element */
+function clearChildren(el: HTMLElement): void {
+  while (el.firstChild) {
+    el.removeChild(el.firstChild);
+  }
+}
+
 /**
  * Tile inspector panel with WangId zone editor and inline per-tile animation editor.
  */
@@ -232,9 +241,7 @@ export class InspectorPanel {
 
   private renderAnimationSection(): void {
     this.cleanUpAnimPreview();
-    while (this.animationSection.firstChild) {
-      this.animationSection.removeChild(this.animationSection.firstChild);
-    }
+    clearChildren(this.animationSection);
 
     const tileId = this.state.selectedTileId;
     if (tileId < 0) return;
@@ -242,7 +249,7 @@ export class InspectorPanel {
     const wt = this.state.getWangTile(tileId);
     if (!wt) return;
 
-    const hasAnimation = !!wt.animation;
+    const anim = wt.animation;
 
     // Section label
     const sectionLabel = document.createElement('div');
@@ -256,7 +263,7 @@ export class InspectorPanel {
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
-    checkbox.checked = hasAnimation;
+    checkbox.checked = !!anim;
     checkbox.style.cssText = 'cursor: pointer;';
     checkbox.addEventListener('change', () => {
       const selectedIds = [...this.state.selectedTileIds];
@@ -289,9 +296,7 @@ export class InspectorPanel {
 
     this.animationSection.appendChild(checkRow);
 
-    if (!hasAnimation || !wt.animation) return;
-
-    const anim = wt.animation;
+    if (!anim) return;
 
     // Controls row: Duration, Frame count, Pattern
     const controlsRow = document.createElement('div');
@@ -648,13 +653,11 @@ export class InspectorPanel {
   }
 
   private drawGrid(tileId: number): void {
-    while (this.gridContainer.firstChild) {
-      this.gridContainer.removeChild(this.gridContainer.firstChild);
-    }
+    clearChildren(this.gridContainer);
 
     const ws = this.state.activeWangSet;
     const wt = this.state.getWangTile(tileId);
-    const wangid = wt ? wt.wangid : [0, 0, 0, 0, 0, 0, 0, 0];
+    const wangid = wt ? wt.wangid : EMPTY_WANGID;
     const type = ws?.type ?? 'corner';
 
     const gridMap: (number | null)[] = [
@@ -722,15 +725,11 @@ export class InspectorPanel {
   }
 
   private clearGrid(): void {
-    while (this.gridContainer.firstChild) {
-      this.gridContainer.removeChild(this.gridContainer.firstChild);
-    }
+    clearChildren(this.gridContainer);
   }
 
   private drawAdjacencyPreview(tileId: number): void {
-    while (this.adjacencyContainer.firstChild) {
-      this.adjacencyContainer.removeChild(this.adjacencyContainer.firstChild);
-    }
+    clearChildren(this.adjacencyContainer);
 
     const ws = this.state.activeWangSet;
     const wt = this.state.getWangTile(tileId);
@@ -799,17 +798,13 @@ export class InspectorPanel {
   }
 
   private clearAdjacencyPreview(): void {
-    while (this.adjacencyContainer.firstChild) {
-      this.adjacencyContainer.removeChild(this.adjacencyContainer.firstChild);
-    }
+    clearChildren(this.adjacencyContainer);
     this.adjacencyLabel.style.display = 'none';
     this.adjacencyContainer.style.display = 'none';
   }
 
   private renderProbability(tileId: number): void {
-    while (this.probabilityContainer.firstChild) {
-      this.probabilityContainer.removeChild(this.probabilityContainer.firstChild);
-    }
+    clearChildren(this.probabilityContainer);
     const wt = this.state.getWangTile(tileId);
     if (!wt) return;
 
@@ -903,18 +898,18 @@ export class InspectorPanel {
       const entries: Array<{ tileId: number; wangid: number[] }> = [];
       for (const selId of this.state.selectedTileIds) {
         const selWt = this.state.getWangTile(selId);
-        entries.push({ tileId: selId, wangid: fillWangid(selWt ? selWt.wangid : [0, 0, 0, 0, 0, 0, 0, 0]) });
+        entries.push({ tileId: selId, wangid: fillWangid(selWt ? selWt.wangid : EMPTY_WANGID) });
       }
       this.state.setWangIdMulti(entries);
     } else {
       const wt = this.state.getWangTile(tileId);
-      this.state.setWangId(tileId, fillWangid(wt ? wt.wangid : [0, 0, 0, 0, 0, 0, 0, 0]));
+      this.state.setWangId(tileId, fillWangid(wt ? wt.wangid : EMPTY_WANGID));
     }
   }
 
   private paintZone(tileId: number, wangIdx: number): void {
     const wt = this.state.getWangTile(tileId);
-    const wangid = wt ? [...wt.wangid] : [0, 0, 0, 0, 0, 0, 0, 0];
+    const wangid = wt ? [...wt.wangid] : [...EMPTY_WANGID];
 
     const colorId = this.state.activeColorId;
     const newColor = wangid[wangIdx] === colorId ? 0 : colorId;
@@ -924,7 +919,7 @@ export class InspectorPanel {
       const entries: Array<{ tileId: number; wangid: number[] }> = [];
       for (const selId of this.state.selectedTileIds) {
         const selWt = this.state.getWangTile(selId);
-        const selWangid = selWt ? [...selWt.wangid] : [0, 0, 0, 0, 0, 0, 0, 0];
+        const selWangid = selWt ? [...selWt.wangid] : [...EMPTY_WANGID];
         selWangid[wangIdx] = newColor;
         entries.push({ tileId: selId, wangid: selWangid });
       }
