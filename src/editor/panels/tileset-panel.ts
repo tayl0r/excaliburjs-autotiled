@@ -298,6 +298,9 @@ export class TilesetPanel {
     // Draw light blue outline on tiles matching active WangSet + color
     this.drawActiveColorOutlines(zoom);
 
+    // Draw badge on animated tiles
+    this.drawAnimatedTileBadges(zoom);
+
     // Draw hover highlight
     if (this.hoveredTileId >= 0) {
       const [hc, hr] = colRowFromTileId(this.hoveredTileId, columns);
@@ -406,6 +409,33 @@ export class TilesetPanel {
         this.ctx.closePath();
         this.ctx.fill();
       }
+    }
+  }
+
+  private drawAnimatedTileBadges(zoom: number): void {
+    const ws = this.state.activeWangSet;
+    if (!ws) return;
+
+    const { tileWidth, tileHeight, columns } = this.state;
+    const tw = tileWidth * zoom;
+    const th = tileHeight * zoom;
+    const activeTsi = this.state.activeTilesetIndex;
+
+    for (const wt of ws.wangtiles) {
+      if ((wt.tileset ?? 0) !== activeTsi) continue;
+      if (!wt.animation) continue;
+
+      const [col, row] = colRowFromTileId(wt.tileid, columns);
+      const x = col * tw + tw - 14;
+      const y = row * th + 2;
+
+      // Small "A" badge in top-right corner
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      this.ctx.fillRect(x, y, 12, 12);
+      this.ctx.fillStyle = '#0f0';
+      this.ctx.font = 'bold 9px monospace';
+      this.ctx.textBaseline = 'top';
+      this.ctx.fillText('A', x + 2, y + 2);
     }
   }
 

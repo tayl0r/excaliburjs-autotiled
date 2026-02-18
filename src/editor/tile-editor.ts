@@ -5,7 +5,6 @@ import { TilesetPanel } from './panels/tileset-panel.js';
 import { WangSetPanel } from './panels/wangset-panel.js';
 import { InspectorPanel } from './panels/inspector-panel.js';
 import { TemplatePanel } from './panels/template-panel.js';
-import { AnimationPanel } from './panels/animation-panel.js';
 import { RegionAssignPanel } from './panels/region-assign-panel.js';
 
 /**
@@ -19,7 +18,6 @@ export class TileEditor {
   private wangSetPanel: WangSetPanel;
   private inspectorPanel: InspectorPanel;
   private templatePanel: TemplatePanel;
-  private animationPanel: AnimationPanel;
   private regionAssignPanel: RegionAssignPanel;
   private inspectorTab!: HTMLButtonElement;
   private templateTab!: HTMLButtonElement;
@@ -38,11 +36,9 @@ export class TileEditor {
     this.inspectorPanel = new InspectorPanel(this.state, images);
     this.templatePanel = new TemplatePanel(this.state, images);
 
-    this.animationPanel = new AnimationPanel(this.state);
     this.regionAssignPanel = new RegionAssignPanel(this.state);
 
     this.overlay.mountLeft(this.wangSetPanel.element);
-    this.overlay.mountLeft(this.animationPanel.element);
     this.overlay.mountCenter(this.tilesetPanel.element);
 
     // Undo/Redo buttons in top bar
@@ -81,9 +77,12 @@ export class TileEditor {
     // Panel containers
     this.inspectorPanel.element.style.display = 'block';
     this.templatePanel.element.style.display = 'none';
+
+    // Mount region assign panel inside inspector, above animation section
+    this.inspectorPanel.mountBeforeAnimation(this.regionAssignPanel.element);
+
     rightWrapper.appendChild(this.inspectorPanel.element);
     rightWrapper.appendChild(this.templatePanel.element);
-    rightWrapper.appendChild(this.regionAssignPanel.element);
 
     this.overlay.mountRight(rightWrapper);
 

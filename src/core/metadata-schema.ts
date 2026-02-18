@@ -1,17 +1,5 @@
 /** TypeScript interfaces matching the JSON schema from AUTOTILE_JSON_SCHEMA.md */
 
-/** Legacy single-tileset format (version 1 / unversioned) */
-export interface TilesetMetadata {
-  tilesetImage: string;
-  tileWidth: number;
-  tileHeight: number;
-  columns: number;
-  tileCount: number;
-  transformations?: TransformationConfig;
-  wangsets: WangSetData[];
-  animations?: AnimationData[];
-}
-
 /** A tileset definition within a project */
 export interface TilesetDef {
   tilesetImage: string;
@@ -27,7 +15,6 @@ export interface ProjectMetadata {
   tilesets: TilesetDef[];
   transformations?: TransformationConfig;
   wangsets: WangSetData[];
-  animations?: AnimationData[];
 }
 
 export interface TransformationConfig {
@@ -58,19 +45,18 @@ export interface WangTileData {
   wangid: number[];
   probability?: number;  // Relative weight for tile selection (default 1.0)
   tileset?: number;      // Index into ProjectMetadata.tilesets[] (default 0)
+  animation?: TileAnimation;
 }
 
-export interface AnimationData {
-  name: string;
-  frameCount: number;
-  frameDuration: number;
+export interface TileAnimation {
+  frameDuration: number;          // ms per frame
   pattern: 'loop' | 'ping-pong';
-  frames: AnimationFrameData[];
+  frames: AnimationFrameData[];   // frame[0] = this tile, frame[1..n] = subsequent frames
 }
 
 export interface AnimationFrameData {
-  tileIdOffset: number;
-  description?: string;
+  tileId: number;      // -1 = unassigned
+  tileset: number;
 }
 
 export const DEFAULT_TRANSFORMATIONS: TransformationConfig = {

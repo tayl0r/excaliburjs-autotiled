@@ -198,6 +198,21 @@ Only the ground terrain tileset has been authored. water.png is loaded in the pr
 | Task 16: Create project.autotile.json | Done | Terrain + water.png tilesets, water has no wangtiles |
 | Task 17: Update CHANGELOG | Done | This section |
 
+### 2026-02-17: Per-Tile Animation Redesign
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Task 1: Data Model — TileAnimation on WangTileData | Done | `TileAnimation` interface with `frameDuration`, `pattern`, `frames[]`; added `animation?` to `WangTileData`; removed `AnimationData` and project-level `animations[]` from schema |
+| Task 2: EditorState — Per-Tile Animation Methods | Done | Removed standalone animation state/methods (`activeAnimationIndex`, pick mode, CRUD); added `setTileAnimation`, `setTileAnimationMulti`, `copyTileAnimation`, `pasteTileAnimation`, `applyAnimationToColorTiles` with clipboard + offset |
+| Task 3: Inspector Panel — Inline Animation Editor | Done | "Is animated?" checkbox, duration/frames/pattern controls, frame slot thumbnails, "Populate from offset" button, Copy/Paste/Apply to color buttons, live preview canvas |
+| Task 4: Remove AnimationPanel + Cleanup | Done | Deleted `animation-panel.ts`; removed from `tile-editor.ts`; replaced animation highlights with "A" badge on animated tiles in tileset panel |
+| Task 5: Runtime — AnimationController from WangTiles | Done | `addTileAnimation(tileId, tilesetIndex, animation)` keyed by `"tileset:tileId"`; `setAnimationsFromWangSets()` iterates wangtiles; removed `AnimationData` import |
+| Task 6: Migration | Removed | Migration code removed — old animation formats no longer supported |
+| Task 7: Update CHANGELOG + Verify | Done | `tsc --noEmit` clean; 186 tests pass |
+| Post: Legacy cleanup | Done | Removed `TilesetMetadata`, `metadata-migration.ts`, `terrain.autotile.json`, legacy `validateMetadata`; all code now uses `ProjectMetadata` exclusively |
+| Post: Region Assign above Animation | Done | RegionAssignPanel mounted inside InspectorPanel above animation section |
+| Post: Multi-select animation uncheck | Done | Unchecking "Is animated?" with multiple tiles removes animation from all selected |
+
 ---
 
 ## Summary
@@ -211,19 +226,19 @@ Only the ground terrain tileset has been authored. water.png is loaded in the pr
 - Editor state management with pub/sub events
 - Undo/redo system
 - Tileset viewer with zoom and multi-select
-- Inspector panel with 8-zone WangId editor
+- Inspector panel with 8-zone WangId editor + inline per-tile animation editor
 - Template panel with 4x4 grid and auto-fill
 - WangSet and WangColor CRUD (state + UI)
 - Completeness validation with status display
 - Adjacency preview (3x3 grid)
 - Color overlay rendering
 - Transformation configuration UI
-- Animation panel with frame sync
+- Per-tile animation system (inline inspector editor, copy/paste with offset, apply to color, animated tile badges)
 - Region auto-detect (2 layout patterns) with copy/paste WangId regions
-- All implementation plans (2026-02-16 x2, 2026-02-17 x3)
+- All implementation plans (2026-02-16 x2, 2026-02-17 x4)
 - Ground terrain asset authoring (terrain.autotile.json → project.autotile.json)
 - Multi-tileset data model (ProjectMetadata, TilesetDef, Cell.tilesetIndex, composite WangSet keys)
-- Legacy metadata migration (TilesetMetadata → ProjectMetadata)
+- Legacy code removed — all code uses ProjectMetadata v2 exclusively (no migration needed)
 
 ### Partially Complete
 

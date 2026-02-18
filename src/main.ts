@@ -2,19 +2,11 @@ import * as ex from 'excalibur';
 import { TilesetManager } from './engine/tileset-manager.js';
 import { GameScene } from './engine/game-scene.js';
 import { TileEditor } from './editor/tile-editor.js';
-import { migrateToProjectMetadata } from './core/metadata-migration.js';
+import { ProjectMetadata } from './core/metadata-schema.js';
 
-// Fetch metadata at runtime so we always get the latest saved version
-// Try project.autotile.json first, fall back to legacy terrain.autotile.json
-async function loadMetadata() {
-  const projectResp = await fetch('/assets/metadata/project.autotile.json');
-  if (projectResp.ok) {
-    const raw = await projectResp.json();
-    return migrateToProjectMetadata(raw);
-  }
-  const legacyResp = await fetch('/assets/metadata/terrain.autotile.json');
-  const raw = await legacyResp.json();
-  return migrateToProjectMetadata(raw);
+async function loadMetadata(): Promise<ProjectMetadata> {
+  const resp = await fetch('/assets/metadata/project.autotile.json');
+  return resp.json();
 }
 
 const projectMetadata = await loadMetadata();

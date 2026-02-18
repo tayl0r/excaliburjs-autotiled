@@ -1,14 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { UndoManager } from '../../src/editor/undo-manager.js';
-import type { TilesetMetadata } from '../../src/core/metadata-schema.js';
+import type { ProjectMetadata } from '../../src/core/metadata-schema.js';
 
-function makeMetadata(name = 'test'): TilesetMetadata {
+function makeMetadata(name = 'test'): ProjectMetadata {
   return {
-    tilesetImage: 'test.png',
-    tileWidth: 16,
-    tileHeight: 16,
-    columns: 16,
-    tileCount: 256,
+    version: 2,
+    tilesets: [{ tilesetImage: 'test.png', tileWidth: 16, tileHeight: 16, columns: 16, tileCount: 256 }],
     wangsets: [{ name, type: 'corner', tile: -1, colors: [], wangtiles: [] }],
   };
 }

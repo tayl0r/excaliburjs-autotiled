@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { EditorState, WangRegionClipboard } from '../../src/editor/editor-state.js';
-import { ProjectMetadata } from '../../src/core/metadata-schema.js';
+import { ProjectMetadata, TileAnimation } from '../../src/core/metadata-schema.js';
 
 function makeMetadata(): ProjectMetadata {
   return {
@@ -449,5 +449,180 @@ describe('EditorState copyWangRegion / pasteWangRegion', () => {
 
     // Tile at relative (1,1) had no wangid in source (tile 5), so tile 7 should be untagged
     expect(state.getWangTile(7)).toBeUndefined();
+  });
+});
+
+describe('EditorState per-tile animation', () => {
+  function stateWithTaggedTiles(): EditorState {
+    const state = new EditorState(makeMetadata());
+    state.addWangSet('Test', 'corner');
+    state.addColor('Grass');
+    state.setWangId(0, [0, 1, 0, 1, 0, 1, 0, 1]);
+    state.setWangId(1, [0, 1, 0, 1, 0, 1, 0, 1]);
+    state.setWangId(2, [0, 1, 0, 1, 0, 1, 0, 1]);
+    return state;
+  }
+
+  it('setTileAnimation sets animation on a wangtile', () => {
+    const state = stateWithTaggedTiles();
+    const anim: TileAnimation = {
+      frameDuration: 200,
+      pattern: 'loop',
+      frames: [
+        { tileId: 0, tileset: 0 },
+        { tileId: 3, tileset: 0 },
+        { tileId: 6, tileset: 0 },
+      ],
+    };
+    state.setTileAnimation(0, anim);
+    expect(state.getWangTile(0)!.animation).toBeDefined();
+    expect(state.getWangTile(0)!.animation!.frameDuration).toBe(200);
+    expect(state.getWangTile(0)!.animation!.frames).toHaveLength(3);
+  });
+
+  it('setTileAnimation(undefined) clears animation', () => {
+    const state = stateWithTaggedTiles();
+    state.setTileAnimation(0, {
+      frameDuration: 200,
+      pattern: 'loop',
+      frames: [{ tileId: 0, tileset: 0 }],
+    });
+    expect(state.getWangTile(0)!.animation).toBeDefined();
+    state.setTileAnimation(0, undefined);
+    expect(state.getWangTile(0)!.animation).toBeUndefined();
+  });
+
+  it('setTileAnimation is undoable', () => {
+    const state = stateWithTaggedTiles();
+    state.setTileAnimation(0, {
+      frameDuration: 200,
+      pattern: 'loop',
+      frames: [{ tileId: 0, tileset: 0 }],
+    });
+    state.undo();
+    expect(state.getWangTile(0)!.animation).toBeUndefined();
+  });
+
+  it('setTileAnimationMulti sets animation on multiple tiles', () => {
+    const state = stateWithTaggedTiles();
+    const anim: TileAnimation = {
+      frameDuration: 150,
+      pattern: 'ping-pong',
+      frames: [{ tileId: 0, tileset: 0 }],
+    };
+    state.setTileAnimationMulti([0, 1, 2], anim);
+    expect(state.getWangTile(0)!.animation).toBeDefined();
+    expect(state.getWangTile(1)!.animation).toBeDefined();
+    expect(state.getWangTile(2)!.animation).toBeDefined();
+  });
+
+  it('setTileAnimationMulti creates single undo snapshot', () => {
+    const state = stateWithTaggedTiles();
+    const anim: TileAnimation = {
+      frameDuration: 100,
+      pattern: 'loop',
+      frames: [{ tileId: 0, tileset: 0 }],
+    };
+    state.setTileAnimationMulti([0, 1], anim);
+    state.undo();
+    expect(state.getWangTile(0)!.animation).toBeUndefined();
+    expect(state.getWangTile(1)!.animation).toBeUndefined();
+  });
+
+  it('copyTileAnimation + pasteTileAnimation works with offset', () => {
+    const state = stateWithTaggedTiles();
+    // Set animation on tile 0 with offset of 3
+    state.setTileAnimation(0, {
+      frameDuration: 200,
+      pattern: 'loop',
+      frames: [
+        { tileId: 0, tileset: 0 },
+        { tileId: 3, tileset: 0 },
+        { tileId: 6, tileset: 0 },
+      ],
+    });
+
+    // Select tile 0 and copy
+    state.selectTile(0);
+    state.copyTileAnimation();
+    expect(state.animationClipboard).not.toBeNull();
+    expect(state.animationClipboard!.offset).toBe(3);
+
+    // Select tile 1 and paste
+    state.selectTile(1);
+    state.pasteTileAnimation();
+
+    // Tile 1's frames should be computed from its own ID + offset
+    const anim1 = state.getWangTile(1)!.animation!;
+    expect(anim1.frameDuration).toBe(200);
+    expect(anim1.frames[0].tileId).toBe(1);
+    expect(anim1.frames[1].tileId).toBe(4);
+    expect(anim1.frames[2].tileId).toBe(7);
+  });
+
+  it('applyAnimationToColorTiles applies to all tiles with colorId', () => {
+    const state = stateWithTaggedTiles();
+    // Set animation on tile 0
+    state.setTileAnimation(0, {
+      frameDuration: 200,
+      pattern: 'loop',
+      frames: [
+        { tileId: 0, tileset: 0 },
+        { tileId: 3, tileset: 0 },
+        { tileId: 6, tileset: 0 },
+      ],
+    });
+
+    state.selectTile(0);
+    state.applyAnimationToColorTiles(1); // color 1 = Grass
+
+    // All tiles with color 1 should now have animations
+    expect(state.getWangTile(0)!.animation).toBeDefined();
+    expect(state.getWangTile(1)!.animation).toBeDefined();
+    expect(state.getWangTile(2)!.animation).toBeDefined();
+
+    // Tile 1's animation should use its own tile ID as base
+    const anim1 = state.getWangTile(1)!.animation!;
+    expect(anim1.frames[0].tileId).toBe(1);
+    expect(anim1.frames[1].tileId).toBe(4);
+    expect(anim1.frames[2].tileId).toBe(7);
+  });
+
+  it('applyAnimationToColorTiles is undoable', () => {
+    const state = stateWithTaggedTiles();
+    state.setTileAnimation(0, {
+      frameDuration: 200,
+      pattern: 'loop',
+      frames: [
+        { tileId: 0, tileset: 0 },
+        { tileId: 3, tileset: 0 },
+      ],
+    });
+
+    state.selectTile(0);
+    state.applyAnimationToColorTiles(1);
+
+    // All should have animations
+    expect(state.getWangTile(1)!.animation).toBeDefined();
+    expect(state.getWangTile(2)!.animation).toBeDefined();
+
+    // Undo should revert the apply (but not the initial set)
+    state.undo();
+    expect(state.getWangTile(1)!.animation).toBeUndefined();
+    expect(state.getWangTile(2)!.animation).toBeUndefined();
+    // Tile 0 still has its animation from before
+    expect(state.getWangTile(0)!.animation).toBeDefined();
+  });
+
+  it('emits metadataChanged on setTileAnimation', () => {
+    const state = stateWithTaggedTiles();
+    let count = 0;
+    state.on('metadataChanged', () => count++);
+    state.setTileAnimation(0, {
+      frameDuration: 200,
+      pattern: 'loop',
+      frames: [{ tileId: 0, tileset: 0 }],
+    });
+    expect(count).toBe(1);
   });
 });

@@ -1,5 +1,5 @@
 import * as ex from 'excalibur';
-import { ProjectMetadata, TilesetDef, AnimationData } from '../core/metadata-schema.js';
+import { ProjectMetadata, TilesetDef } from '../core/metadata-schema.js';
 import { WangSet } from '../core/wang-set.js';
 import { loadMetadata } from '../core/metadata-loader.js';
 import { generateAllVariants } from '../core/variant-generator.js';
@@ -86,8 +86,4 @@ export class TilesetManager {
     return this.wangSets[0];
   }
 
-  /** Get animations from metadata */
-  get animations(): AnimationData[] {
-    return this.metadata?.animations ?? [];
-  }
 }

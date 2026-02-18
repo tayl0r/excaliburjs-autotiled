@@ -1,13 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { loadMetadata, validateMetadata } from '../../src/core/metadata-loader.js';
-import { TilesetMetadata } from '../../src/core/metadata-schema.js';
+import { loadMetadata, validateProjectMetadata } from '../../src/core/metadata-loader.js';
+import { ProjectMetadata } from '../../src/core/metadata-schema.js';
 
-const validMetadata: TilesetMetadata = {
-  tilesetImage: 'terrain.png',
-  tileWidth: 16,
-  tileHeight: 16,
-  columns: 39,
-  tileCount: 1482,
+const validMetadata: ProjectMetadata = {
+  version: 2,
+  tilesets: [
+    { tilesetImage: 'terrain.png', tileWidth: 16, tileHeight: 16, columns: 39, tileCount: 1482 },
+  ],
   wangsets: [
     {
       name: 'Ground Terrain',
@@ -66,70 +65,61 @@ describe('loadMetadata', () => {
   });
 });
 
-describe('validateMetadata', () => {
+describe('validateProjectMetadata', () => {
   it('returns no errors for valid metadata', () => {
-    expect(validateMetadata(validMetadata)).toEqual([]);
+    expect(validateProjectMetadata(validMetadata)).toEqual([]);
   });
 
   it('catches missing tilesetImage', () => {
-    const bad = { ...validMetadata, tilesetImage: '' };
-    const errors = validateMetadata(bad);
-    expect(errors).toContain('Missing tilesetImage');
+    const bad: ProjectMetadata = {
+      ...validMetadata,
+      tilesets: [{ ...validMetadata.tilesets[0], tilesetImage: '' }],
+    };
+    const errors = validateProjectMetadata(bad);
+    expect(errors).toContain('tilesets[0]: missing tilesetImage');
   });
 
   it('catches invalid tileWidth', () => {
-    const bad = { ...validMetadata, tileWidth: 0 };
-    expect(validateMetadata(bad)).toContain('Invalid tileWidth');
+    const bad: ProjectMetadata = {
+      ...validMetadata,
+      tilesets: [{ ...validMetadata.tilesets[0], tileWidth: 0 }],
+    };
+    expect(validateProjectMetadata(bad)).toContain('tilesets[0]: invalid tileWidth');
   });
 
   it('catches out-of-range tileids', () => {
-    const bad: TilesetMetadata = {
+    const bad: ProjectMetadata = {
       ...validMetadata,
       wangsets: [{
         ...validMetadata.wangsets[0],
         wangtiles: [{ tileid: 9999, wangid: [0, 1, 0, 1, 0, 1, 0, 1] }],
       }],
     };
-    const errors = validateMetadata(bad);
+    const errors = validateProjectMetadata(bad);
     expect(errors.some(e => e.includes('out of range'))).toBe(true);
   });
 
-  it('catches wrong wangid length', () => {
-    const bad: TilesetMetadata = {
+  it('catches invalid wangset type', () => {
+    const bad: ProjectMetadata = {
       ...validMetadata,
       wangsets: [{
         ...validMetadata.wangsets[0],
-        wangtiles: [{ tileid: 0, wangid: [0, 1, 0] }],
+        type: 'invalid' as any,
       }],
     };
-    const errors = validateMetadata(bad);
-    expect(errors.some(e => e.includes('8 elements'))).toBe(true);
+    const errors = validateProjectMetadata(bad);
+    expect(errors.some(e => e.includes('invalid type'))).toBe(true);
   });
 
-  it('catches edge values in corner-type sets', () => {
-    const bad: TilesetMetadata = {
+  it('catches tileset index out of range', () => {
+    const bad: ProjectMetadata = {
       ...validMetadata,
       wangsets: [{
         ...validMetadata.wangsets[0],
-        wangtiles: [{ tileid: 0, wangid: [1, 1, 0, 1, 0, 1, 0, 1] }], // index 0 is edge, should be 0
+        wangtiles: [{ tileid: 0, wangid: [0, 1, 0, 1, 0, 1, 0, 1], tileset: 5 }],
       }],
     };
-    const errors = validateMetadata(bad);
-    expect(errors.some(e => e.includes('corner type') && e.includes('edge'))).toBe(true);
-  });
-
-  it('catches duplicate tileids', () => {
-    const bad: TilesetMetadata = {
-      ...validMetadata,
-      wangsets: [{
-        ...validMetadata.wangsets[0],
-        wangtiles: [
-          { tileid: 0, wangid: [0, 1, 0, 1, 0, 1, 0, 1] },
-          { tileid: 0, wangid: [0, 2, 0, 2, 0, 2, 0, 2] },
-        ],
-      }],
-    };
-    const errors = validateMetadata(bad);
-    expect(errors.some(e => e.includes('duplicate'))).toBe(true);
+    const errors = validateProjectMetadata(bad);
+    expect(errors.some(e => e.includes('tileset index'))).toBe(true);
   });
 });

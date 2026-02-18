@@ -48,11 +48,8 @@ export class GameScene extends ex.Scene {
     this.add(this.autotileTilemap.tileMap);
     this.autotileTilemap.initializeAll(1);
 
-    // Set up animations if available
-    const animations = this.tilesetManager.animations;
-    if (animations.length > 0) {
-      this.autotileTilemap.setAnimations(animations);
-    }
+    // Set up animations from per-tile animation data
+    this.autotileTilemap.setAnimationsFromWangSets(this.tilesetManager.metadata.wangsets);
 
     // Set up camera
     const tileW = ts.tileWidth;
@@ -167,11 +164,12 @@ export class GameScene extends ex.Scene {
     const wangSet = this.tilesetManager.primaryWangSet;
     if (!wangSet) return;
     this.autotileTilemap.updateWangSet(wangSet);
+    this.autotileTilemap.setAnimationsFromWangSets(metadata.wangsets);
 
     const totalTiles = metadata.wangsets.reduce((s, ws) => s + ws.wangtiles.length, 0);
     const totalColors = metadata.wangsets.reduce((s, ws) => s + ws.colors.length, 0);
     console.log(
-      `[metadata] Reloaded terrain.autotile.json:`,
+      `[metadata] Reloaded project.autotile.json:`,
       `${metadata.wangsets.length} WangSet(s),`,
       `${totalColors} colors,`,
       `${totalTiles} tagged tiles`

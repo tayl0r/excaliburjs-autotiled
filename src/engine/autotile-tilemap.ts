@@ -3,7 +3,7 @@ import { SimpleAutotileMap } from '../core/autotile-map.js';
 import { WangSet } from '../core/wang-set.js';
 import { applyTerrainPaint } from '../core/terrain-painter.js';
 import { floodFillTerrain } from '../core/flood-fill.js';
-import { AnimationData } from '../core/metadata-schema.js';
+import { WangSetData } from '../core/metadata-schema.js';
 import { createCell } from '../core/cell.js';
 import { SpriteResolver } from './sprite-resolver.js';
 import { AnimationController } from './animation-controller.js';
@@ -107,12 +107,20 @@ export class AutotileTilemap {
     }
   }
 
-  /** Set up animations from metadata */
-  setAnimations(animations: AnimationData[]): void {
-    if (animations.length === 0) return;
+  /** Set up animations from wangset wangtiles with animation data */
+  setAnimationsFromWangSets(wangsets: WangSetData[]): void {
     this.animController = new AnimationController();
-    for (const anim of animations) {
-      this.animController.addAnimation(anim);
+    let count = 0;
+    for (const ws of wangsets) {
+      for (const wt of ws.wangtiles) {
+        if (wt.animation) {
+          this.animController.addTileAnimation(wt.tileid, wt.tileset ?? 0, wt.animation);
+          count++;
+        }
+      }
+    }
+    if (count === 0) {
+      this.animController = undefined;
     }
   }
 
@@ -123,35 +131,34 @@ export class AutotileTilemap {
     const changed = this.animController.update(deltaMs);
     if (changed.length === 0) return;
 
-    // Re-render all tiles, applying animation offsets to their base tileId
+    const changedSet = new Set(changed);
+
+    // For each cell, check if it belongs to a changed animation
     for (let y = 0; y < this.autoMap.height; y++) {
       for (let x = 0; x < this.autoMap.width; x++) {
         const cell = this.autoMap.cellAt(x, y);
         if (cell.tileId < 0) continue;
 
+        const animKey = this.animController.getAnimationForTile(cell.tilesetIndex, cell.tileId);
+        if (!animKey || !changedSet.has(animKey)) continue;
+
+        const frame = this.animController.getCurrentFrame(animKey);
+        if (!frame || frame.tileId < 0) continue;
+
         const tile = this.tileMap.getTile(x, y);
         if (!tile) continue;
 
-        // Apply the first matching animation offset
-        // (in practice, each tile base ID would determine which animation applies)
-        let totalOffset = 0;
-        for (const name of changed) {
-          totalOffset += this.animController!.getCurrentOffset(name);
-        }
-
-        if (totalOffset !== 0) {
-          tile.clearGraphics();
-          const animatedCell = createCell(
-            cell.tileId + totalOffset,
-            cell.flipH,
-            cell.flipV,
-            cell.flipD,
-            cell.tilesetIndex
-          );
-          const sprite = this.spriteResolver.resolve(animatedCell);
-          if (sprite) {
-            tile.addGraphic(sprite);
-          }
+        tile.clearGraphics();
+        const animatedCell = createCell(
+          frame.tileId,
+          cell.flipH,
+          cell.flipV,
+          cell.flipD,
+          frame.tileset
+        );
+        const sprite = this.spriteResolver.resolve(animatedCell);
+        if (sprite) {
+          tile.addGraphic(sprite);
         }
       }
     }

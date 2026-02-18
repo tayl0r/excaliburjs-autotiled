@@ -1,7 +1,7 @@
-import { AnimationData } from '../core/metadata-schema.js';
+import { TileAnimation, AnimationFrameData } from '../core/metadata-schema.js';
 
 interface AnimationState {
-  data: AnimationData;
+  animation: TileAnimation;
   elapsed: number;
   currentFrame: number;
   direction: 1 | -1; // for ping-pong
@@ -9,42 +9,52 @@ interface AnimationState {
 
 export class AnimationController {
   private animations: Map<string, AnimationState> = new Map();
+  /** Maps "tileset:tileId" to animation key for source tile lookups */
+  private sourceTileMap: Map<string, string> = new Map();
 
-  addAnimation(anim: AnimationData): void {
-    this.animations.set(anim.name, {
-      data: anim,
+  /** Register a per-tile animation, keyed by "tilesetIndex:tileId" */
+  addTileAnimation(tileId: number, tilesetIndex: number, animation: TileAnimation): void {
+    if (animation.frames.length === 0) return;
+
+    const key = `${tilesetIndex}:${tileId}`;
+    this.animations.set(key, {
+      animation,
       elapsed: 0,
       currentFrame: 0,
       direction: 1,
     });
+
+    // Register in source tile map for lookups
+    this.sourceTileMap.set(key, key);
   }
 
   /**
    * Advance animation time by deltaMs.
-   * Returns the names of animations whose frame changed this tick.
+   * Returns the keys of animations whose frame changed this tick.
    */
   update(deltaMs: number): string[] {
     const changed: string[] = [];
 
-    for (const [name, state] of this.animations) {
-      if (state.data.frameCount <= 1) continue;
+    for (const [key, state] of this.animations) {
+      const frameCount = state.animation.frames.length;
+      if (frameCount <= 1) continue;
 
       state.elapsed += deltaMs;
-      const frameDuration = state.data.frameDuration;
+      const frameDuration = state.animation.frameDuration;
 
       let frameChanged = false;
       while (state.elapsed >= frameDuration) {
         state.elapsed -= frameDuration;
         frameChanged = true;
 
-        if (state.data.pattern === 'loop') {
-          state.currentFrame = (state.currentFrame + 1) % state.data.frameCount;
+        if (state.animation.pattern === 'loop') {
+          state.currentFrame = (state.currentFrame + 1) % frameCount;
         } else {
           // ping-pong
           const nextFrame = state.currentFrame + state.direction;
-          if (nextFrame >= state.data.frameCount) {
+          if (nextFrame >= frameCount) {
             state.direction = -1;
-            state.currentFrame = state.data.frameCount - 2;
+            state.currentFrame = frameCount - 2;
           } else if (nextFrame < 0) {
             state.direction = 1;
             state.currentFrame = 1;
@@ -55,18 +65,22 @@ export class AnimationController {
       }
 
       if (frameChanged) {
-        changed.push(name);
+        changed.push(key);
       }
     }
 
     return changed;
   }
 
-  /** Get the tileIdOffset for the current frame of an animation */
-  getCurrentOffset(name: string): number {
-    const state = this.animations.get(name);
-    if (!state) return 0;
-    const frame = state.data.frames[state.currentFrame];
-    return frame ? frame.tileIdOffset : 0;
+  /** Get the current frame data for an animation by key */
+  getCurrentFrame(key: string): AnimationFrameData | null {
+    const state = this.animations.get(key);
+    if (!state) return null;
+    return state.animation.frames[state.currentFrame] ?? null;
+  }
+
+  /** Look up which animation key (if any) is registered for the given tile */
+  getAnimationForTile(tilesetIndex: number, tileId: number): string | undefined {
+    return this.sourceTileMap.get(`${tilesetIndex}:${tileId}`);
   }
 }

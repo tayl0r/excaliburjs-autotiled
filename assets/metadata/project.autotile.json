@@ -5936,7 +5936,25 @@
             0,
             1
           ],
-          "tileset": 1
+          "tileset": 1,
+          "animation": {
+            "frameDuration": 600,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 460,
+                "tileset": 1
+              },
+              {
+                "tileId": 463,
+                "tileset": 1
+              },
+              {
+                "tileId": 466,
+                "tileset": 1
+              }
+            ]
+          }
         },
         {
           "tileid": 461,
@@ -5950,7 +5968,25 @@
             0,
             1
           ],
-          "tileset": 1
+          "tileset": 1,
+          "animation": {
+            "frameDuration": 600,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 461,
+                "tileset": 1
+              },
+              {
+                "tileId": 464,
+                "tileset": 1
+              },
+              {
+                "tileId": 467,
+                "tileset": 1
+              }
+            ]
+          }
         },
         {
           "tileid": 462,
@@ -5964,7 +6000,25 @@
             0,
             1
           ],
-          "tileset": 1
+          "tileset": 1,
+          "animation": {
+            "frameDuration": 600,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 462,
+                "tileset": 1
+              },
+              {
+                "tileId": 465,
+                "tileset": 1
+              },
+              {
+                "tileId": 468,
+                "tileset": 1
+              }
+            ]
+          }
         },
         {
           "tileid": 513,
@@ -5978,7 +6032,25 @@
             0,
             12
           ],
-          "tileset": 1
+          "tileset": 1,
+          "animation": {
+            "frameDuration": 600,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 513,
+                "tileset": 1
+              },
+              {
+                "tileId": 516,
+                "tileset": 1
+              },
+              {
+                "tileId": 519,
+                "tileset": 1
+              }
+            ]
+          }
         },
         {
           "tileid": 564,
@@ -5992,7 +6064,25 @@
             0,
             12
           ],
-          "tileset": 1
+          "tileset": 1,
+          "animation": {
+            "frameDuration": 600,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 564,
+                "tileset": 1
+              },
+              {
+                "tileId": 567,
+                "tileset": 1
+              },
+              {
+                "tileId": 570,
+                "tileset": 1
+              }
+            ]
+          }
         },
         {
           "tileid": 563,
@@ -6006,7 +6096,25 @@
             0,
             12
           ],
-          "tileset": 1
+          "tileset": 1,
+          "animation": {
+            "frameDuration": 600,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 563,
+                "tileset": 1
+              },
+              {
+                "tileId": 566,
+                "tileset": 1
+              },
+              {
+                "tileId": 569,
+                "tileset": 1
+              }
+            ]
+          }
         },
         {
           "tileid": 562,
@@ -6020,7 +6128,25 @@
             0,
             1
           ],
-          "tileset": 1
+          "tileset": 1,
+          "animation": {
+            "frameDuration": 600,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 562,
+                "tileset": 1
+              },
+              {
+                "tileId": 565,
+                "tileset": 1
+              },
+              {
+                "tileId": 568,
+                "tileset": 1
+              }
+            ]
+          }
         },
         {
           "tileid": 511,
@@ -6034,7 +6160,25 @@
             0,
             1
           ],
-          "tileset": 1
+          "tileset": 1,
+          "animation": {
+            "frameDuration": 600,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 511,
+                "tileset": 1
+              },
+              {
+                "tileId": 514,
+                "tileset": 1
+              },
+              {
+                "tileId": 517,
+                "tileset": 1
+              }
+            ]
+          }
         },
         {
           "tileid": 512,
@@ -6048,7 +6192,25 @@
             0,
             12
           ],
-          "tileset": 1
+          "tileset": 1,
+          "animation": {
+            "frameDuration": 600,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 512,
+                "tileset": 1
+              },
+              {
+                "tileId": 515,
+                "tileset": 1
+              },
+              {
+                "tileId": 518,
+                "tileset": 1
+              }
+            ]
+          }
         },
         {
           "tileid": 359,
@@ -6062,7 +6224,25 @@
             0,
             1
           ],
-          "tileset": 1
+          "tileset": 1,
+          "animation": {
+            "frameDuration": 600,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 359,
+                "tileset": 1
+              },
+              {
+                "tileId": 362,
+                "tileset": 1
+              },
+              {
+                "tileId": 365,
+                "tileset": 1
+              }
+            ]
+          }
         },
         {
           "tileid": 360,
@@ -6076,7 +6256,25 @@
             0,
             12
           ],
-          "tileset": 1
+          "tileset": 1,
+          "animation": {
+            "frameDuration": 600,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 360,
+                "tileset": 1
+              },
+              {
+                "tileId": 363,
+                "tileset": 1
+              },
+              {
+                "tileId": 366,
+                "tileset": 1
+              }
+            ]
+          }
         },
         {
           "tileid": 411,
@@ -6090,7 +6288,25 @@
             0,
             12
           ],
-          "tileset": 1
+          "tileset": 1,
+          "animation": {
+            "frameDuration": 600,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 411,
+                "tileset": 1
+              },
+              {
+                "tileId": 414,
+                "tileset": 1
+              },
+              {
+                "tileId": 417,
+                "tileset": 1
+              }
+            ]
+          }
         },
         {
           "tileid": 410,
@@ -6104,7 +6320,25 @@
             0,
             12
           ],
-          "tileset": 1
+          "tileset": 1,
+          "animation": {
+            "frameDuration": 600,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 410,
+                "tileset": 1
+              },
+              {
+                "tileId": 413,
+                "tileset": 1
+              },
+              {
+                "tileId": 416,
+                "tileset": 1
+              }
+            ]
+          }
         },
         {
           "tileid": 237,
@@ -6122,6 +6356,5 @@
         }
       ]
     }
-  ],
-  "animations": []
+  ]
 }
