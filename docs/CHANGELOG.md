@@ -291,6 +291,27 @@ Verification: `tsc --noEmit` clean, 187 tests passing.
 
 ---
 
+## 2026-02-18: Map Persistence — Save/Load with Color-Only Data Model
+
+Save and load painted maps. Only terrain colors are persisted; tile IDs are recomputed on load so saved maps automatically pick up tileset changes.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Task 1: Map file schema | Done | `src/core/map-schema.ts` — `SavedMap` interface (version 1, wangSetName + flat colors) |
+| Task 2: SimpleAutotileMap serialization | Done | `getColors()`, `importColors()` on `SimpleAutotileMap` |
+| Task 3: Full tile rebuild | Done | `resolveAllTiles()` in `src/core/terrain-painter.ts` |
+| Task 4: AutotileTilemap save/load | Done | `toSavedMap()`, `loadSavedMap()` in `src/engine/autotile-tilemap.ts` |
+| Task 5: Vite API endpoints | Done | `mapSavePlugin()` in `vite.config.ts` — `POST /api/save-map`, `GET /api/list-maps` |
+| Task 6: URL-based map routing | Done | `#map=<name>` hash in `src/map-painter-main.ts` — auto-loads on page refresh |
+| Task 7: GameScene UI | Done | Save/Open toolbar buttons, `Ctrl+S`/`Ctrl+O` keyboard shortcuts |
+| Task 8: Persistence tests | Done | `tests/core/map-persistence.test.ts` — 7 tests (serialization, resolve, round-trip) |
+
+Saved maps stored at `assets/maps/<name>.json`.
+
+Verification: `tsc --noEmit` clean, 194 tests passing.
+
+---
+
 ## Summary
 
 ### Fully Complete
@@ -321,7 +342,7 @@ Verification: `tsc --noEmit` clean, 187 tests passing.
 - **Keyboard shortcuts** — core set implemented, several from spec missing (Delete, Space, P, +/-)
 - **Tile filter** — tagged/untagged/all works, no per-WangSet filter
 - **Layout patterns** — 2 of 3+ planned patterns defined (missing RPG Maker VX, custom creation)
-- **Save/load** — auto-save works, no manual save/load/export UI
+- **Save/load** — editor auto-save works; map painter has full save/load with color-only persistence; no standalone JSON export UI
 - **Validation** — completeness checking works, no real-time duplicate WangId warning
 - **Multi-tileset editor** — data model, editor state, and tileset tab bar all working; wangtile tagging scoped to active tileset
 - **Multi-spritesheet runtime** — SpriteResolver and TilesetManager support multiple spritesheets; all tileset images loaded at startup

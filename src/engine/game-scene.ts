@@ -1,5 +1,6 @@
 import * as ex from 'excalibur';
 import type { WangSet } from '../core/wang-set.js';
+import type { SavedMap } from '../core/map-schema.js';
 import { TilesetManager } from './tileset-manager.js';
 import { SpriteResolver } from './sprite-resolver.js';
 import { AutotileTilemap } from './autotile-tilemap.js';
@@ -13,6 +14,30 @@ const TOOLS: ReadonlyArray<{ mode: ToolMode; label: string; shortcut: string; ke
   { mode: 'fill', label: 'Fill', shortcut: 'G', key: ex.Keys.G },
 ];
 
+const TOOLBAR_BTN_STYLE = `
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #ccc;
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  height: 28px;
+`;
+
+const KBD_STYLE = `
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  color: #888;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  padding: 1px 5px;
+`;
+
 export class GameScene extends ex.Scene {
   private tilesetManager: TilesetManager;
   private autotileTilemap!: AutotileTilemap;
@@ -20,6 +45,8 @@ export class GameScene extends ex.Scene {
   private hud!: HTMLDivElement;
   private toolbar!: HTMLDivElement;
   private toolButtons!: Map<ToolMode, HTMLButtonElement>;
+  private currentMapName: string | null = null;
+  private currentWangSet!: WangSet;
 
   constructor(tilesetManager: TilesetManager) {
     super();
@@ -29,12 +56,13 @@ export class GameScene extends ex.Scene {
   onInitialize(engine: ex.Engine): void {
     this.tilesetManager.initialize();
 
-    const wangSet = this.tilesetManager.primaryWangSet;
-    if (!wangSet) {
+    this.currentWangSet = this.tilesetManager.primaryWangSet!;
+    if (!this.currentWangSet) {
       console.error('No WangSet found in metadata');
       return;
     }
 
+    const wangSet = this.currentWangSet;
     const ts = this.tilesetManager.primaryTileset;
     const spriteResolver = new SpriteResolver(this.tilesetManager.spriteSheets);
 
@@ -69,6 +97,17 @@ export class GameScene extends ex.Scene {
     this.createToolbar();
     this.inputHandler.setOnToolModeChange((mode) => this.updateToolbarSelection(mode));
     this.createHUD(wangSet);
+
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        this.saveMap();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+        e.preventDefault();
+        this.openMap();
+      }
+    });
   }
 
   private createHUD(wangSet: WangSet): void {
@@ -167,50 +206,48 @@ export class GameScene extends ex.Scene {
     this.toolButtons = new Map();
 
     for (const tool of TOOLS) {
-      const btn = document.createElement('button');
+      const btn = this.createToolbarButton(tool.label, tool.shortcut);
       btn.dataset.tool = tool.mode;
-      btn.style.cssText = `
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 4px 12px;
-        border: none;
-        border-radius: 4px;
-        background: transparent;
-        color: #ccc;
-        font-family: system-ui, sans-serif;
-        font-size: 13px;
-        cursor: pointer;
-        height: 28px;
-      `;
-
-      const label = document.createElement('span');
-      label.textContent = tool.label;
-
-      const kbd = document.createElement('kbd');
-      kbd.textContent = tool.shortcut;
-      kbd.style.cssText = `
-        font-family: system-ui, sans-serif;
-        font-size: 11px;
-        color: #888;
-        background: rgba(255,255,255,0.1);
-        border-radius: 3px;
-        padding: 1px 5px;
-      `;
-
-      btn.appendChild(label);
-      btn.appendChild(kbd);
-
       btn.addEventListener('click', () => {
         this.inputHandler.setToolMode(tool.mode);
       });
-
       this.toolbar.appendChild(btn);
       this.toolButtons.set(tool.mode, btn);
     }
 
+    // Separator
+    const sep = document.createElement('div');
+    sep.style.cssText = 'width: 1px; height: 20px; background: rgba(255,255,255,0.2); margin: 0 6px;';
+    this.toolbar.appendChild(sep);
+
+    // Save button
+    const saveBtn = this.createToolbarButton('Save', '\u2318S');
+    saveBtn.addEventListener('click', () => this.saveMap());
+    this.toolbar.appendChild(saveBtn);
+
+    // Open button
+    const openBtn = this.createToolbarButton('Open', '\u2318O');
+    openBtn.addEventListener('click', () => this.openMap());
+    this.toolbar.appendChild(openBtn);
+
     document.body.appendChild(this.toolbar);
     this.updateToolbarSelection(this.inputHandler.getToolMode());
+  }
+
+  private createToolbarButton(label: string, shortcut: string): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.style.cssText = TOOLBAR_BTN_STYLE;
+
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = label;
+
+    const kbd = document.createElement('kbd');
+    kbd.textContent = shortcut;
+    kbd.style.cssText = KBD_STYLE;
+
+    btn.appendChild(labelSpan);
+    btn.appendChild(kbd);
+    return btn;
   }
 
   private updateToolbarSelection(activeMode: ToolMode): void {
@@ -223,6 +260,88 @@ export class GameScene extends ex.Scene {
         btn.style.color = '#ccc';
       }
     }
+  }
+
+  async saveMap(): Promise<void> {
+    if (!this.currentMapName) {
+      const name = prompt('Map name:');
+      if (!name) return;
+      this.currentMapName = name.trim().replace(/[^a-zA-Z0-9_-]/g, '-');
+    }
+
+    const saved = this.autotileTilemap.toSavedMap(this.currentMapName, this.currentWangSet.name);
+    const filename = `${this.currentMapName}.json`;
+
+    try {
+      const resp = await fetch('/api/save-map', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename, data: saved }),
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      window.location.hash = 'map=' + this.currentMapName;
+      console.log(`[map] Saved: ${this.currentMapName}`);
+    } catch (err) {
+      console.error('[map] Save failed:', err);
+      alert('Save failed: ' + err);
+    }
+  }
+
+  async openMap(): Promise<void> {
+    try {
+      const listResp = await fetch('/api/list-maps');
+      const { files } = await listResp.json() as { files: string[] };
+      if (files.length === 0) {
+        alert('No saved maps found.');
+        return;
+      }
+
+      const list = files.map((f, i) => `${i + 1}. ${f.replace('.json', '')}`).join('\n');
+      const choice = prompt(`Open map:\n${list}\n\nEnter number or name:`);
+      if (!choice) return;
+
+      let filename: string;
+      const num = parseInt(choice, 10);
+      if (!isNaN(num) && num >= 1 && num <= files.length) {
+        filename = files[num - 1];
+      } else {
+        filename = choice.trim().endsWith('.json') ? choice.trim() : choice.trim() + '.json';
+      }
+
+      await this.loadMapByFilename(filename);
+    } catch (err) {
+      console.error('[map] Open failed:', err);
+      alert('Open failed: ' + err);
+    }
+  }
+
+  async loadMapByName(name: string): Promise<void> {
+    await this.loadMapByFilename(name + '.json');
+  }
+
+  private async loadMapByFilename(filename: string): Promise<void> {
+    const resp = await fetch(`/assets/maps/${filename}`);
+    if (!resp.ok) throw new Error(`Map not found: ${filename}`);
+    const saved: SavedMap = await resp.json();
+
+    // Find the WangSet by name
+    const wangSet = this.findWangSetByName(saved.wangSetName);
+    if (!wangSet) {
+      throw new Error(`WangSet "${saved.wangSetName}" not found in project metadata`);
+    }
+
+    this.autotileTilemap.loadSavedMap(saved, wangSet);
+    this.currentMapName = saved.name;
+    this.currentWangSet = wangSet;
+    window.location.hash = 'map=' + saved.name;
+    console.log(`[map] Loaded: ${saved.name}`);
+  }
+
+  private findWangSetByName(name: string): WangSet | undefined {
+    // The TilesetManager builds WangSets from metadata — use primaryWangSet if name matches
+    const primary = this.tilesetManager.primaryWangSet;
+    if (primary && primary.name === name) return primary;
+    return undefined;
   }
 
   onDeactivate(): void {

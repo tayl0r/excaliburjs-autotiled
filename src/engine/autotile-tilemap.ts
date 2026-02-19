@@ -1,9 +1,10 @@
 import * as ex from 'excalibur';
 import { SimpleAutotileMap } from '../core/autotile-map.js';
 import type { WangSet } from '../core/wang-set.js';
-import { applyTerrainPaint } from '../core/terrain-painter.js';
+import { applyTerrainPaint, resolveAllTiles } from '../core/terrain-painter.js';
 import { floodFillTerrain } from '../core/flood-fill.js';
 import type { WangSetData } from '../core/metadata-schema.js';
+import type { SavedMap } from '../core/map-schema.js';
 import { createCell } from '../core/cell.js';
 import { SpriteResolver } from './sprite-resolver.js';
 import { AnimationController } from './animation-controller.js';
@@ -155,8 +156,33 @@ export class AutotileTilemap {
   }
 
   /** Refresh the visual for every tile from the autoMap */
-  private refreshAllTiles(): void {
+  refreshAllTiles(): void {
     this.forEachCell((x, y) => this.refreshTile(x, y));
+  }
+
+  /** Export map state as a SavedMap (colors only, no tile IDs) */
+  toSavedMap(name: string, wangSetName: string): SavedMap {
+    return {
+      version: 1,
+      name,
+      wangSetName,
+      width: this.autoMap.width,
+      height: this.autoMap.height,
+      colors: this.autoMap.getColors(),
+    };
+  }
+
+  /** Load a SavedMap: import colors, resolve tiles, refresh visuals */
+  loadSavedMap(saved: SavedMap, wangSet: WangSet): void {
+    if (saved.width !== this.autoMap.width || saved.height !== this.autoMap.height) {
+      throw new Error(
+        `Map dimensions mismatch: saved ${saved.width}x${saved.height} vs current ${this.autoMap.width}x${this.autoMap.height}`
+      );
+    }
+    this.autoMap.importColors(saved.colors);
+    this.wangSet = wangSet;
+    resolveAllTiles(this.autoMap, wangSet);
+    this.refreshAllTiles();
   }
 
   /** Convert world position to tile coordinates */

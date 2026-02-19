@@ -60,4 +60,18 @@ export class SimpleAutotileMap implements AutotileMap {
   tileIdAt(x: number, y: number): number {
     return this.cellAt(x, y).tileId;
   }
+
+  /** Returns a copy of the internal colors array (flat row-major) */
+  getColors(): number[] {
+    return this.colors.slice();
+  }
+
+  /** Overwrites colors array and resets all cells to EMPTY_CELL. Throws if length doesn't match dimensions. */
+  importColors(colors: number[]): void {
+    if (colors.length !== this.width * this.height) {
+      throw new Error(`Color array length ${colors.length} doesn't match map dimensions ${this.width}x${this.height}`);
+    }
+    this.colors = colors.slice();
+    this.cells = new Array(this.width * this.height).fill(EMPTY_CELL);
+  }
 }

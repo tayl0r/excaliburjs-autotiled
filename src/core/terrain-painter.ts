@@ -145,6 +145,25 @@ export function recomputeTiles(
 }
 
 /**
+ * Resolve tiles for all non-empty cells from their painted colors.
+ * Used after loading a saved map — does NOT run insertIntermediates
+ * since saved colors are already correct.
+ */
+export function resolveAllTiles(map: AutotileMap, wangSet: WangSet): void {
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      if (map.colorAt(x, y) === 0) continue;
+
+      const desired = desiredWangIdFromColors(map, x, y, wangSet.type);
+      const cell = findBestMatch(wangSet, desired, wangSet.type);
+      if (cell) {
+        map.setCellAt(x, y, cell);
+      }
+    }
+  }
+}
+
+/**
  * Compute the desired WangId for tile at (x,y) directly from painted terrain colors.
  *
  * For corner-type WangSets, each corner corresponds to a terrain grid vertex.

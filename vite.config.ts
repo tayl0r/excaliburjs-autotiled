@@ -63,8 +63,74 @@ function metadataSavePlugin(): Plugin {
   };
 }
 
+/** Vite plugin for saving and listing map files. */
+function mapSavePlugin(): Plugin {
+  return {
+    name: 'map-save',
+    configureServer(server) {
+      server.middlewares.use('/api/save-map', (req, res) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end('Method not allowed');
+          return;
+        }
+
+        let body = '';
+        req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+        req.on('end', () => {
+          try {
+            const { filename, data } = JSON.parse(body);
+            if (!filename || !data) {
+              res.statusCode = 400;
+              res.end('Missing filename or data');
+              return;
+            }
+
+            const safeName = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '');
+            if (!safeName.endsWith('.json')) {
+              res.statusCode = 400;
+              res.end('Filename must end with .json');
+              return;
+            }
+
+            const mapsDir = path.resolve(__dirname, 'assets/maps');
+            if (!fs.existsSync(mapsDir)) {
+              fs.mkdirSync(mapsDir, { recursive: true });
+            }
+
+            const outPath = path.resolve(mapsDir, safeName);
+            const json = JSON.stringify(data, null, 2) + '\n';
+            fs.writeFileSync(outPath, json, 'utf-8');
+
+            console.log(`\n[map-save] Saved ${safeName} (${json.length} bytes) to ${outPath}`);
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ ok: true, path: outPath }));
+          } catch (err) {
+            res.statusCode = 500;
+            res.end(String(err));
+          }
+        });
+      });
+
+      server.middlewares.use('/api/list-maps', (_req, res) => {
+        try {
+          const mapsDir = path.resolve(__dirname, 'assets/maps');
+          const files = fs.existsSync(mapsDir)
+            ? fs.readdirSync(mapsDir).filter(f => f.endsWith('.json'))
+            : [];
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ files }));
+        } catch (err) {
+          res.statusCode = 500;
+          res.end(String(err));
+        }
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [metadataSavePlugin()],
+  plugins: [metadataSavePlugin(), mapSavePlugin()],
   build: {
     target: 'esnext',
     rollupOptions: {
@@ -87,7 +153,7 @@ export default defineConfig({
   server: {
     port: 5200,
     watch: {
-      ignored: ['**/assets/metadata/**'],
+      ignored: ['**/assets/metadata/**', '**/assets/maps/**'],
     },
   },
   preview: {

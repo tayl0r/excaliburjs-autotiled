@@ -27,6 +27,18 @@ const loader = new ex.Loader(tilesetImages);
 loader.suppressPlayButton = true;
 
 game.addScene('game', gameScene);
-game.start('game', { loader }).then(() => {
+game.start('game', { loader }).then(async () => {
   console.log('[map-painter] Loaded project metadata:', JSON.parse(JSON.stringify(projectMetadata)));
+
+  // Auto-load map from URL hash
+  const hash = window.location.hash;
+  const mapMatch = hash.match(/^#map=(.+)$/);
+  if (mapMatch) {
+    const mapName = decodeURIComponent(mapMatch[1]);
+    try {
+      await gameScene.loadMapByName(mapName);
+    } catch (err) {
+      console.warn(`[map-painter] Failed to load map "${mapName}" from URL:`, err);
+    }
+  }
 });
