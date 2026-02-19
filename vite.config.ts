@@ -58,7 +58,7 @@ function metadataSavePlugin(): Plugin {
           const safeName = sanitizeJsonFilename(filename as string);
           if (!safeName) { res.statusCode = 400; res.end('Filename must end with .json'); return; }
 
-          const { outPath, json } = writeJsonFile(path.resolve(ASSETS_DIR, 'metadata'), safeName, data);
+          const { outPath, json } = writeJsonFile(ASSETS_DIR, safeName, data);
 
           const wangsets = (data as Record<string, unknown[]>).wangsets ?? [];
           const totalTiles = wangsets.reduce((sum: number, ws: Record<string, unknown[]>) => sum + (ws.wangtiles?.length ?? 0), 0);
@@ -122,7 +122,7 @@ function mapSavePlugin(): Plugin {
 }
 
 function prefabSavePlugin(): Plugin {
-  const prefabsDir = path.resolve(ASSETS_DIR, 'metadata/prefabs');
+  const prefabsDir = path.resolve(ASSETS_DIR, 'prefabs');
 
   return {
     name: 'prefab-save',
@@ -208,7 +208,7 @@ export default defineConfig({
   server: {
     port: 5200,
     watch: {
-      ignored: ['**/assets/metadata/**', '**/assets/maps/**'],
+      ignored: ['**/assets/prefabs/**', '**/assets/maps/**'],
     },
   },
   preview: {

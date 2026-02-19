@@ -14,13 +14,25 @@ Always run `tsc --noEmit` and `vitest run` before considering work complete.
 
 ## Architecture
 
-Multi-page app with two tools sharing a core autotile engine:
+Multi-page app with three tools sharing a core autotile engine:
 
 - **`src/core/`** — Pure logic, no DOM or Excalibur deps. Wang tiles, matching, terrain painting, color distance, flood fill.
 - **`src/engine/`** — Excalibur runtime. `AutotileTilemap` bridges core autotile logic to Excalibur's `TileMap`. `GameScene` is the map painter scene.
 - **`src/editor/`** — Standalone tileset metadata editor. `EditorState` is the central store with pub/sub events. Panels in `src/editor/panels/`.
-- **Entry points:** `src/tileset-editor-main.ts` (`/tools/tileset-editor/`) and `src/map-painter-main.ts` (`/tools/map-painter/`)
-- **Vite plugins** in `vite.config.ts` provide dev-server API endpoints for saving metadata and maps.
+- **`src/prefab/`** — Prefab editor. `PrefabEditorState` manages prefab CRUD and tools (paint, erase, move, copy, anchor). `PrefabCanvas` handles rendering and mouse interaction. `PrefabEditor` builds the UI.
+- **`src/utils/`** — Shared helpers (asset path resolution, tileset image loading).
+- **Entry points:** `src/tileset-editor-main.ts` (`/tools/tileset-editor/`), `src/map-painter-main.ts` (`/tools/map-painter/`), `src/prefab-editor-main.ts` (`/tools/prefab-editor/`)
+- **Vite plugins** in `vite.config.ts` provide dev-server API endpoints for saving metadata, maps, and prefabs.
+
+## Path Aliases
+
+Vite/TypeScript path aliases: `@core` → `src/core`, `@engine` → `src/engine`, `@editor` → `src/editor`, `@utils` → `src/utils`.
+
+## Documentation
+
+- `docs/DATA_MODEL.md` — On-disk formats and runtime data structures
+- `docs/specs/` — Original project specs (autotile engine, JSON schema, tile metadata editor)
+- `docs/plans/` — Implementation plans for features
 
 ## Testing
 

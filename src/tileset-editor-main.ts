@@ -2,7 +2,7 @@ import type { ProjectMetadata } from './core/metadata-schema.js';
 import { TileEditor } from './editor/tile-editor.js';
 import { loadTilesetImage } from './utils/asset-paths.js';
 
-const resp = await fetch('/assets/metadata/project.autotile.json');
+const resp = await fetch('/assets/project.autotile.json');
 const projectMetadata: ProjectMetadata = await resp.json();
 
 const images = await Promise.all(projectMetadata.tilesets.map(loadTilesetImage));

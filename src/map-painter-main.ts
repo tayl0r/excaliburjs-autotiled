@@ -4,7 +4,7 @@ import { TilesetManager } from './engine/tileset-manager.js';
 import { GameScene } from './engine/game-scene.js';
 import { tilesetImageUrl } from './utils/asset-paths.js';
 
-const resp = await fetch('/assets/metadata/project.autotile.json');
+const resp = await fetch('/assets/project.autotile.json');
 const projectMetadata: ProjectMetadata = await resp.json();
 
 const tilesetImages = projectMetadata.tilesets.map(

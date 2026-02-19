@@ -357,7 +357,7 @@ New third tool — a prefab editor at `/tools/prefab-editor/` for composing reus
 | Startup loading | Done | Fetches prefab list + all prefab JSONs on page load |
 | Vite build config | Done | Added `prefab-editor` to rollup input |
 
-Prefabs saved as individual JSON files in `assets/metadata/prefabs/<name>.json`.
+Prefabs saved as individual JSON files in `assets/prefabs/<name>.json`.
 
 Verification: `tsc --noEmit` clean, 194 tests passing.
 

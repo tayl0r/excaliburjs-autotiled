@@ -4,7 +4,7 @@ import { PrefabEditorState } from './prefab/prefab-state.js';
 import { PrefabEditor } from './prefab/prefab-editor.js';
 import { loadTilesetImage } from './utils/asset-paths.js';
 
-const resp = await fetch('/assets/metadata/project.autotile.json');
+const resp = await fetch('/assets/project.autotile.json');
 const projectMetadata: ProjectMetadata = await resp.json();
 
 const images = await Promise.all(projectMetadata.tilesets.map(loadTilesetImage));
@@ -13,7 +13,7 @@ const listResp = await fetch('/api/list-prefabs');
 const { files } = (await listResp.json()) as { files: string[] };
 
 const prefabPromises = files.map(async (filename) => {
-  const r = await fetch(`/assets/metadata/prefabs/${filename}`);
+  const r = await fetch(`/assets/prefabs/${filename}`);
   return (await r.json()) as SavedPrefab;
 });
 const prefabs = await Promise.all(prefabPromises);
