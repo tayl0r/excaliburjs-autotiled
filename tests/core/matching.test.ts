@@ -1,15 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { WangId } from '../../src/core/wang-id.js';
 import { WangSet } from '../../src/core/wang-set.js';
-import type { WangColor } from '../../src/core/wang-color.js';
 import { SimpleAutotileMap } from '../../src/core/autotile-map.js';
 import { wangIdFromSurroundings, findBestMatch } from '../../src/core/matching.js';
 import { computeColorDistances } from '../../src/core/color-distance.js';
 import { generateAllVariants } from '../../src/core/variant-generator.js';
 import { applyTerrainPaint } from '../../src/core/terrain-painter.js';
-import { DEFAULT_TRANSFORMATIONS } from '../../src/core/metadata-schema.js';
 import { createCell } from '../../src/core/cell.js';
-import { createGrassDirtWangSet, createThreeColorWangSet } from './test-helpers.js';
+import {
+  createGrassDirtWangSet,
+  createThreeColorWangSet,
+  addCornerTilePair,
+  finalizeWangSet,
+  initMapTiles,
+  makeColor,
+} from './test-helpers.js';
 
 describe('computeColorDistances', () => {
   it('self-distance is 0', () => {
@@ -118,21 +123,13 @@ describe('findBestMatch', () => {
   });
 
   it('returns undefined when no match possible', () => {
-    // Create WangSet with only all-grass tile
-    const grass: WangColor = { id: 1, name: 'Grass', color: '#00ff00', imageTileId: 0, tilesetIndex: 0, probability: 1.0 };
-    const dirt: WangColor = { id: 2, name: 'Dirt', color: '#8b4513', imageTileId: 1, tilesetIndex: 0, probability: 1.0 };
-    const ws = new WangSet('Ground', 'corner', [grass, dirt]);
+    // Create WangSet with only all-grass tile (no transition to dirt exists)
+    const ws = new WangSet('Ground', 'corner', [makeColor(1, 'Grass'), makeColor(2, 'Dirt')]);
     ws.addTileMapping(0, 0, WangId.fromArray([0, 1, 0, 1, 0, 1, 0, 1]));
-    ws.setVariants(generateAllVariants(ws, DEFAULT_TRANSFORMATIONS));
-    const { distances: dist, nextHop: hop } = computeColorDistances(ws);
-    ws.setDistanceMatrix(dist);
-    ws.setNextHopMatrix(hop);
+    finalizeWangSet(ws);
 
-    // Desired all-dirt, but only grass tile available
     const desired = WangId.fromArray([0, 2, 0, 2, 0, 2, 0, 2]);
     const cell = findBestMatch(ws, desired, 'corner');
-    // Should fail since grass (1) can't transition to dirt (2) - no tile has both colors
-    // Actually, with only grass tiles, distance(1,2) = -1, so no match
     expect(cell).toBeUndefined();
   });
 });
@@ -152,13 +149,7 @@ describe('applyTerrainPaint', () => {
   it('uses vertex mapping for corner tiles', () => {
     const ws = createGrassDirtWangSet();
     const map = new SimpleAutotileMap(5, 5, 1); // All grass
-
-    // Initialize all tiles so they have valid tile IDs
-    for (let y = 0; y < 5; y++) {
-      for (let x = 0; x < 5; x++) {
-        applyTerrainPaint(map, ws, x, y, 1);
-      }
-    }
+    initMapTiles(map, ws, 1);
 
     // Paint dirt at (2,2)
     applyTerrainPaint(map, ws, 2, 2, 2);
@@ -194,13 +185,7 @@ describe('applyTerrainPaint', () => {
   it('2x2 dirt block produces all-dirt center', () => {
     const ws = createGrassDirtWangSet();
     const map = new SimpleAutotileMap(5, 5, 1);
-
-    // Initialize
-    for (let y = 0; y < 5; y++) {
-      for (let x = 0; x < 5; x++) {
-        applyTerrainPaint(map, ws, x, y, 1);
-      }
-    }
+    initMapTiles(map, ws, 1);
 
     // Paint a 2x2 block of dirt at (2,2), (3,2), (2,3), (3,3)
     applyTerrainPaint(map, ws, 2, 2, 2);
@@ -249,9 +234,7 @@ describe('Cell flip flags preserved through map storage', () => {
 
   it('preserves flip flags when terrain paint resolves a flipped variant', () => {
     // Create a WangSet with limited tiles + allowFlipH so flipping is required
-    const grass: WangColor = { id: 1, name: 'Grass', color: '#00ff00', imageTileId: 0, tilesetIndex: 0, probability: 1.0 };
-    const dirt: WangColor = { id: 2, name: 'Dirt', color: '#8b4513', imageTileId: 15, tilesetIndex: 0, probability: 1.0 };
-    const ws = new WangSet('Ground', 'corner', [grass, dirt]);
+    const ws = new WangSet('Ground', 'corner', [makeColor(1, 'Grass'), makeColor(2, 'Dirt')]);
 
     // Only provide tiles where TL differs from TR but BR=BL
     // Tile 4: TL=Grass, TR=Dirt, BR=Grass, BL=Grass  (only TR is dirt)
@@ -279,11 +262,7 @@ describe('Cell flip flags preserved through map storage', () => {
 
     // Now verify the full round-trip through terrain paint
     const map = new SimpleAutotileMap(5, 5, 1);
-    for (let y = 0; y < 5; y++) {
-      for (let x = 0; x < 5; x++) {
-        applyTerrainPaint(map, ws, x, y, 1);
-      }
-    }
+    initMapTiles(map, ws, 1);
 
     // Paint dirt at (2,2)
     applyTerrainPaint(map, ws, 2, 2, 2);
@@ -305,13 +284,7 @@ describe('applyTerrainPaint preserves existing tiles', () => {
   it('repainting same color preserves existing tile (no re-randomization)', () => {
     const ws = createGrassDirtWangSet();
     const map = new SimpleAutotileMap(5, 5, 1); // All grass
-
-    // Initialize all tiles
-    for (let y = 0; y < 5; y++) {
-      for (let x = 0; x < 5; x++) {
-        applyTerrainPaint(map, ws, x, y, 1);
-      }
-    }
+    initMapTiles(map, ws, 1);
 
     // Paint dirt at center
     applyTerrainPaint(map, ws, 2, 2, 2);
@@ -340,13 +313,8 @@ describe('applyTerrainPaint preserves existing tiles', () => {
 describe('applyTerrainPaint with intermediates', () => {
   it('auto-inserts grass between dirt and sand', () => {
     const ws = createThreeColorWangSet();
-    // 7-wide map: all sand initially
     const map = new SimpleAutotileMap(7, 1, 3);
-
-    // Initialize tiles
-    for (let x = 0; x < 7; x++) {
-      applyTerrainPaint(map, ws, x, 0, 3);
-    }
+    initMapTiles(map, ws, 3);
 
     // Paint dirt at center (x=3) — next to sand on both sides
     // Dirt→Sand distance is 2 (via Grass), so Grass should be auto-inserted
@@ -366,15 +334,8 @@ describe('applyTerrainPaint with intermediates', () => {
 
   it('auto-inserts grass at all 8 neighbors (including diagonals) on a 2D map', () => {
     const ws = createThreeColorWangSet();
-    // 5x5 map, all dirt
     const map = new SimpleAutotileMap(5, 5, 2);
-
-    // Initialize tiles
-    for (let y = 0; y < 5; y++) {
-      for (let x = 0; x < 5; x++) {
-        applyTerrainPaint(map, ws, x, y, 2);
-      }
-    }
+    initMapTiles(map, ws, 2);
 
     // Paint sand at center (2,2) — Dirt→Sand distance is 2 (via Grass)
     applyTerrainPaint(map, ws, 2, 2, 3);
@@ -401,13 +362,7 @@ describe('applyTerrainPaint with intermediates', () => {
   it('all resolved tiles use at most 2 colors after 2D intermediate insertion', () => {
     const ws = createThreeColorWangSet();
     const map = new SimpleAutotileMap(5, 5, 2);
-
-    // Initialize tiles
-    for (let y = 0; y < 5; y++) {
-      for (let x = 0; x < 5; x++) {
-        applyTerrainPaint(map, ws, x, y, 2);
-      }
-    }
+    initMapTiles(map, ws, 2);
 
     // Paint sand at center
     applyTerrainPaint(map, ws, 2, 2, 3);
@@ -431,12 +386,8 @@ describe('applyTerrainPaint with intermediates', () => {
 
   it('does not insert intermediates for direct transitions', () => {
     const ws = createThreeColorWangSet();
-    const map = new SimpleAutotileMap(5, 1, 1); // All grass
-
-    // Initialize tiles
-    for (let x = 0; x < 5; x++) {
-      applyTerrainPaint(map, ws, x, 0, 1);
-    }
+    const map = new SimpleAutotileMap(5, 1, 1);
+    initMapTiles(map, ws, 1);
 
     // Paint dirt at center — Grass→Dirt distance is 1, no intermediate needed
     applyTerrainPaint(map, ws, 2, 0, 2);
@@ -448,51 +399,18 @@ describe('applyTerrainPaint with intermediates', () => {
 
   it('cascades intermediates for multi-hop distances', () => {
     // With A↔B, B↔C, C↔D: painting A next to D should insert B then C
-    const a: WangColor = { id: 1, name: 'A', color: '#ff0000', imageTileId: 0, tilesetIndex: 0, probability: 1.0 };
-    const b: WangColor = { id: 2, name: 'B', color: '#00ff00', imageTileId: 0, tilesetIndex: 0, probability: 1.0 };
-    const c: WangColor = { id: 3, name: 'C', color: '#0000ff', imageTileId: 0, tilesetIndex: 0, probability: 1.0 };
-    const d: WangColor = { id: 4, name: 'D', color: '#ffff00', imageTileId: 0, tilesetIndex: 0, probability: 1.0 };
-    const ws = new WangSet('Test', 'corner', [a, b, c, d]);
+    const ws = new WangSet('Test', 'corner', [
+      makeColor(1, 'A'), makeColor(2, 'B'), makeColor(3, 'C'), makeColor(4, 'D'),
+    ]);
+    addCornerTilePair(ws, 1, 2, 0);   // A-B tiles (0-15)
+    addCornerTilePair(ws, 2, 3, 16);  // B-C tiles (16-31)
+    addCornerTilePair(ws, 3, 4, 32);  // C-D tiles (32-47)
+    finalizeWangSet(ws);
 
-    let tileId = 0;
-    // A-B tiles
-    for (let n = 0; n < 16; n++) {
-      const tl = (n & 8) ? 2 : 1;
-      const tr = (n & 4) ? 2 : 1;
-      const br = (n & 2) ? 2 : 1;
-      const bl = (n & 1) ? 2 : 1;
-      ws.addTileMapping(0, tileId++, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
-    }
-    // B-C tiles
-    for (let n = 0; n < 16; n++) {
-      const tl = (n & 8) ? 3 : 2;
-      const tr = (n & 4) ? 3 : 2;
-      const br = (n & 2) ? 3 : 2;
-      const bl = (n & 1) ? 3 : 2;
-      ws.addTileMapping(0, tileId++, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
-    }
-    // C-D tiles
-    for (let n = 0; n < 16; n++) {
-      const tl = (n & 8) ? 4 : 3;
-      const tr = (n & 4) ? 4 : 3;
-      const br = (n & 2) ? 4 : 3;
-      const bl = (n & 1) ? 4 : 3;
-      ws.addTileMapping(0, tileId++, WangId.fromArray([0, tr, 0, br, 0, bl, 0, tl]));
-    }
-
-    ws.setVariants(generateAllVariants(ws, DEFAULT_TRANSFORMATIONS));
-    const { distances, nextHop } = computeColorDistances(ws);
-    ws.setDistanceMatrix(distances);
-    ws.setNextHopMatrix(nextHop);
-
-    // Distance A→D should be 3
     expect(ws.colorDistance(1, 4)).toBe(3);
 
-    // Create a 7-cell wide map, all D
     const map = new SimpleAutotileMap(7, 1, 4);
-    for (let x = 0; x < 7; x++) {
-      applyTerrainPaint(map, ws, x, 0, 4);
-    }
+    initMapTiles(map, ws, 4);
 
     // Paint A at center (x=3)
     applyTerrainPaint(map, ws, 3, 0, 1);

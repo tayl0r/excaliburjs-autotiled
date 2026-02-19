@@ -46,10 +46,9 @@ export function validateProjectMetadata(json: ProjectMetadata): string[] {
     const ts = json.tilesets[ti];
     const prefix = `tilesets[${ti}]`;
     if (!ts.tilesetImage) errors.push(`${prefix}: missing tilesetImage`);
-    if (!ts.tileWidth || ts.tileWidth <= 0) errors.push(`${prefix}: invalid tileWidth`);
-    if (!ts.tileHeight || ts.tileHeight <= 0) errors.push(`${prefix}: invalid tileHeight`);
-    if (!ts.columns || ts.columns <= 0) errors.push(`${prefix}: invalid columns`);
-    if (!ts.tileCount || ts.tileCount <= 0) errors.push(`${prefix}: invalid tileCount`);
+    for (const field of ['tileWidth', 'tileHeight', 'columns', 'tileCount'] as const) {
+      if (!ts[field] || ts[field] <= 0) errors.push(`${prefix}: invalid ${field}`);
+    }
   }
 
   if (!json.wangsets || !Array.isArray(json.wangsets)) {

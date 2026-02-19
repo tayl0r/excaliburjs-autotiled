@@ -3,6 +3,12 @@ import type { WangSet } from './wang-set.js';
 import { WangId, NEIGHBOR_OFFSETS } from './wang-id.js';
 import { findBestMatch } from './matching.js';
 
+/** Parse a "x,y" coordinate key into [x, y]. */
+function parseCoordKey(key: string): [number, number] {
+  const comma = key.indexOf(',');
+  return [+key.slice(0, comma), +key.slice(comma + 1)];
+}
+
 /**
  * Paint a terrain color at (x, y) and update all affected tiles.
  * Returns the list of (x, y) positions that were updated.
@@ -94,9 +100,7 @@ export function recomputeTiles(
   // Expand affected region: all color-changed cells + ±1 ring for tile corner propagation
   const affectedSet = new Set<string>();
   for (const key of colorChanged) {
-    const comma = key.indexOf(',');
-    const cx = +key.slice(0, comma);
-    const cy = +key.slice(comma + 1);
+    const [cx, cy] = parseCoordKey(key);
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         const nx = cx + dx;
@@ -109,11 +113,7 @@ export function recomputeTiles(
   }
 
   // Sort affected positions center-outward (Manhattan distance from center)
-  const affected: Array<[number, number]> = [];
-  for (const key of affectedSet) {
-    const comma = key.indexOf(',');
-    affected.push([+key.slice(0, comma), +key.slice(comma + 1)]);
-  }
+  const affected: Array<[number, number]> = [...affectedSet].map(parseCoordKey);
   affected.sort(
     (a, b) =>
       (Math.abs(a[0] - centerX) + Math.abs(a[1] - centerY)) -

@@ -2,6 +2,7 @@ import { EditorState } from '../editor-state.js';
 import { TEMPLATE_SLOTS, templateSlotWangId } from '../template-utils.js';
 import { colRowFromTileId } from '../../utils/tile-math.js';
 import { wangColorHex } from '../../core/wang-color.js';
+import { sectionHeader, panelButton, selectInput, DANGER_BTN_STYLE, SELECT_STYLE } from '../dom-helpers.js';
 import type { WangSetData } from '../../core/metadata-schema.js';
 
 /**
@@ -37,11 +38,7 @@ export class TemplatePanel {
   }
 
   private buildUI(): void {
-    // Header
-    const header = document.createElement('h3');
-    header.textContent = 'Template';
-    header.style.cssText = 'margin: 0 0 8px 0; font-size: 13px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;';
-    this.element.appendChild(header);
+    this.element.appendChild(sectionHeader('Template'));
 
     // Color selectors
     const colorRow = document.createElement('div');
@@ -54,7 +51,7 @@ export class TemplatePanel {
     colorRow.appendChild(colorALabel);
 
     this.colorASelect = document.createElement('select');
-    this.colorASelect.style.cssText = this.selectStyle();
+    this.colorASelect.style.cssText = SELECT_STYLE + '; flex: 1; cursor: pointer;';
     this.colorASelect.addEventListener('change', () => {
       this.state.setTemplateColorA(parseInt(this.colorASelect.value, 10));
     });
@@ -67,7 +64,7 @@ export class TemplatePanel {
     colorRow.appendChild(colorBLabel);
 
     this.colorBSelect = document.createElement('select');
-    this.colorBSelect.style.cssText = this.selectStyle();
+    this.colorBSelect.style.cssText = SELECT_STYLE + '; flex: 1; cursor: pointer;';
     this.colorBSelect.addEventListener('change', () => {
       this.state.setTemplateColorB(parseInt(this.colorBSelect.value, 10));
     });
@@ -86,20 +83,10 @@ export class TemplatePanel {
     `;
     this.element.appendChild(this.gridContainer);
 
-    // Buttons
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
-
-    const clearAllBtn = document.createElement('button');
-    clearAllBtn.textContent = 'Clear All';
-    clearAllBtn.style.cssText = `
-      background: #4a2020; color: #ccc; border: 1px solid #633;
-      padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;
-    `;
+    // Clear All button
+    const clearAllBtn = panelButton('Clear All', DANGER_BTN_STYLE);
     clearAllBtn.addEventListener('click', () => this.clearAll());
-    buttonContainer.appendChild(clearAllBtn);
-
-    this.element.appendChild(buttonContainer);
+    this.element.appendChild(clearAllBtn);
   }
 
   render(): void {
@@ -115,16 +102,20 @@ export class TemplatePanel {
     const ws = this.state.activeWangSet;
     const colors = ws?.colors ?? [];
 
-    // Preserve current values
     const prevA = this.state.templateColorA;
     const prevB = this.state.templateColorB;
 
+    const options = colors.map((c, i) => ({
+      value: String(i + 1),
+      text: c.name,
+    }));
+
     for (const select of [this.colorASelect, this.colorBSelect]) {
       select.replaceChildren();
-      for (let i = 0; i < colors.length; i++) {
+      for (const item of options) {
         const opt = document.createElement('option');
-        opt.value = String(i + 1);
-        opt.textContent = colors[i].name;
+        opt.value = item.value;
+        opt.textContent = item.text;
         select.appendChild(opt);
       }
     }
@@ -161,9 +152,6 @@ export class TemplatePanel {
     }
   }
 
-  /**
-   * Render the 4x4 grid of template slot cells.
-   */
   private renderGrid(): void {
     this.gridContainer.replaceChildren();
 
@@ -181,21 +169,17 @@ export class TemplatePanel {
         overflow: hidden;
       `;
 
-      // Draw corner color indicators
       this.drawCornerIndicators(cell, slotIndex, ws);
 
-      // Draw tile image if assigned
       const tileId = this.slotAssignments.get(slotIndex);
       if (tileId !== undefined) {
         this.drawTilePreview(cell, tileId);
       }
 
-      // Click: set active template slot
       cell.addEventListener('click', () => {
         this.state.setActiveTemplateSlot(slotIndex);
       });
 
-      // Right-click: clear assignment
       cell.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         const assignedTileId = this.slotAssignments.get(slotIndex);
@@ -213,7 +197,6 @@ export class TemplatePanel {
    */
   private drawCornerIndicators(cell: HTMLDivElement, slotIndex: number, ws: WangSetData | undefined): void {
     const slot = TEMPLATE_SLOTS[slotIndex];
-    const colors = ws?.colors ?? [];
 
     const corners: { key: 'tl' | 'tr' | 'br' | 'bl'; top: string; left: string }[] = [
       { key: 'tl', top: '2px', left: '2px' },
@@ -223,7 +206,7 @@ export class TemplatePanel {
     ];
 
     for (const corner of corners) {
-      const letter = slot[corner.key]; // 'A' or 'B'
+      const letter = slot[corner.key];
       const colorId = letter === 'A' ? this.state.templateColorA : this.state.templateColorB;
       const displayColor = colorId > 0 ? wangColorHex(colorId) : '#555';
 
@@ -243,9 +226,6 @@ export class TemplatePanel {
     }
   }
 
-  /**
-   * Draw a tile image preview in the center of a cell using a canvas.
-   */
   private drawTilePreview(cell: HTMLDivElement, tileId: number): void {
     const { tileWidth, tileHeight, columns, tileCount } = this.state;
     if (tileId < 0 || tileId >= tileCount) return;
@@ -265,21 +245,10 @@ export class TemplatePanel {
     cell.appendChild(canvas);
   }
 
-  /**
-   * Clear all 16 tile assignments from the active WangSet.
-   */
   private clearAll(): void {
     const tileIds = [...this.slotAssignments.values()];
     if (tileIds.length > 0) {
       this.state.removeWangTileMulti(tileIds);
     }
-  }
-
-  private selectStyle(): string {
-    return `
-      background: #1e1e3a; color: #e0e0e0; border: 1px solid #555;
-      font-size: 11px; padding: 2px 4px; border-radius: 3px;
-      flex: 1; cursor: pointer;
-    `;
   }
 }

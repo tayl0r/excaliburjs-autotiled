@@ -388,13 +388,14 @@ Verification: `tsc --noEmit` clean, 194 tests passing.
 - Multi-tileset data model (ProjectMetadata, TilesetDef, Cell.tilesetIndex, composite WangSet keys)
 - Legacy code removed — all code uses ProjectMetadata v2 exclusively (no migration needed)
 - Prefab editor tool — compose reusable tile arrangements with paint/erase/anchor/move/copy tools, autosave, multi-tileset support
+- Multi-layer system — maps (9 layers, 5 editable) and prefabs (5 layers) with visibility modes (all/highlight/solo), v1→v2 schema migration
 
 ### Partially Complete
 
 - **Keyboard shortcuts** — core set implemented, several from spec missing (Delete, Space, P, +/-)
 - **Tile filter** — tagged/untagged/all works, no per-WangSet filter
 - **Layout patterns** — 2 of 3+ planned patterns defined (missing RPG Maker VX, custom creation)
-- **Save/load** — editor auto-save works; map painter has full save/load with color-only persistence; no standalone JSON export UI
+- **Save/load** — editor auto-save works; map painter has autosave (5s debounce) + manual save/load with color-only persistence; no standalone JSON export UI
 - **Validation** — completeness checking works, no real-time duplicate WangId warning
 - **Multi-tileset editor** — data model, editor state, and tileset tab bar all working; wangtile tagging scoped to active tileset
 - **Multi-spritesheet runtime** — SpriteResolver and TilesetManager support multiple spritesheets; all tileset images loaded at startup
@@ -403,3 +404,142 @@ Verification: `tsc --noEmit` clean, 194 tests passing.
 
 - **Transformation preview** — no UI to view generated variants
 - **Asset authoring** for Water, Forest, Cliff, Desert, Dungeon, Castle tilesets
+
+---
+
+## 2026-02-19: Layer System for Maps and Prefabs
+
+Added multi-layer support to both the map painter and prefab editor.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Shared layer constants | Done | `src/core/layers.ts` — `NUM_PREFAB_LAYERS=5`, `NUM_MAP_LAYERS=9`, `NUM_EDITABLE_LAYERS=5`, `LayerVisibility` type |
+| Map schema v2 with layers | Done | `src/core/map-schema.ts` — `SavedMapV1`, `SavedMap` (v2 with `layers: number[][]`), `migrateMapV1toV2()`, `parseSavedMap()` |
+| Prefab schema v2 with layers | Done | `src/core/prefab-schema.ts` — `SavedPrefabV1`, `SavedPrefab` (v2 with `layers: PrefabTile[][]`), `migratePrefabV1toV2()`, `parseSavedPrefab()` |
+| AutotileTilemap opacity + loadColors | Done | `setOpacity()`, `loadColors()`, opacity-aware `renderCell()` |
+| InputHandler setTilemap | Done | One-line setter for layer switching |
+| GameScene multi-layer | Done | 9 `AutotileTilemap` instances, layer bar UI (5 editable), visibility modes (all/highlight/solo), save/load v2, keyboard shortcuts 1-5 |
+| Map painter hash parsing | Done | Switched to `URLSearchParams`, added `layer` param |
+| Prefab state layer-aware | Done | `activeLayer`, `visibilityMode`, all tile ops on `prefab.layers[activeLayer]`, `prefabExtent` and `fitCanvasToPrefab` check all layers |
+| Prefab canvas layer rendering | Done | Draws all 5 layers with visibility modes, selection/move/copy operate on active layer |
+| Prefab editor layer bar | Done | Grid layout with layer bar row spanning all columns, 5 numbered buttons + visibility cycle button, 1-5 and V keyboard shortcuts |
+| Prefab list tile count | Done | Badge sums tiles across all layers |
+| Prefab editor main | Done | `parseSavedPrefab()` for v1 migration on load, `layer` in hash params |
+| Migration tests | Done | `tests/core/layer-migration.test.ts` — 10 tests for map and prefab v1→v2 migration |
+
+### Architecture
+
+- **Maps**: 9 layers total. Layers 1-5 are user-editable (shown in UI). Layers 6-9 are overflow for prefab placement when a 5-layer prefab is placed on map layer 5.
+- **Prefabs**: 5 layers, all editable.
+- **Visibility modes**: All (full opacity), Highlight (active layer full, others 25%), Solo/Hidden (only active layer visible).
+- **V1 migration**: Both map and prefab schemas auto-migrate from v1 on load. Map v1 `colors` becomes layer 0; prefab v1 `tiles` becomes layer 0.
+
+Verification: `tsc --noEmit` clean, 204 tests passing.
+
+---
+
+## 2026-02-19: Map Painter UI Overhaul + Prefab Placement
+
+Consolidated three separate UI zones (top toolbar, layer bar, bottom HUD) into a collapsible left sidebar. Added prefab placement capability to the map painter.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Map schema — PlacedPrefab | Done | `src/core/map-schema.ts` — `PlacedPrefab` interface, `placedPrefabs?` on `SavedMap`, defaults to `[]` in `parseSavedMap()` |
+| AutotileTilemap — placeCell/clearCell | Done | `src/engine/autotile-tilemap.ts` — public `placeCell()`, `clearCell()`, `renderCell()` made public |
+| InputHandler — prefab tool mode | Done | `src/engine/input-handler.ts` — `'prefab'` tool mode, cursor position tracking, `onCursorMove`/`onPrefabPlace` callbacks |
+| GameScene — sidebar UI | Done | `src/engine/game-scene.ts` — removed toolbar/HUD/layer bar, replaced with 240px left sidebar (dark theme, collapsible sections for File, Tools, Layers, Colors, Prefabs) |
+| GameScene — prefab preview | Done | 5 preview tilemaps at z=100..104 with 0.4 opacity, efficient cell tracking for preview clear |
+| GameScene — prefab placement | Done | Multi-layer placement with undo/redo stacks, Ctrl+Z to undo, Ctrl+Shift+Z to redo |
+| GameScene — save/load prefabs | Done | `placedPrefabs` in saved map JSON, prefab expansion on load |
+| map-painter-main — load prefabs | Done | `src/map-painter-main.ts` — fetches prefab list + JSON at startup, passes to `GameScene.setPrefabs()` |
+| Tests | Done | 3 new tests in `tests/core/layer-migration.test.ts` — placedPrefabs default, preserve, v1 migration |
+| Map painter autosave | Done | `src/engine/game-scene.ts` — 5s debounce after paint/fill/prefab changes, save indicator in sidebar header |
+| Keyboard shortcuts | Done | Tab (toggle sidebar), Escape (cancel prefab), Ctrl+Z (undo), Ctrl+Shift+Z (redo), B/G/1-5/V/Ctrl+S/Ctrl+O preserved |
+
+### UI Changes
+
+- **Sidebar** (240px, left overlay): Header with collapse button, File (Save/Open), Tools (Brush/Fill), Layers (1-5 + visibility cycle), Colors (collapsible, thumbnails + names), Prefabs (collapsible, click to select)
+- **Dark theme**: `#1e1e2e` background, `#333` borders, `#ccc` text
+- **Collapsible**: Colors and Prefabs sections toggle with click; entire sidebar collapses with Tab key
+- **Color selection**: Clicking a color switches to brush mode and selects that color
+- **Prefab selection**: Clicking a prefab enters prefab mode; Escape cancels back to brush
+
+Verification: `tsc --noEmit` clean, 207 tests passing.
+
+---
+
+## 2026-02-19: Core & Test Simplification (Round 4)
+
+Focused code review of `src/core/`, `src/utils/`, and `tests/`. No behavioral changes.
+
+| Area | Change | Files |
+|------|--------|-------|
+| Test deduplication | Extracted `addCornerTilePair()` helper to replace 6 identical 16-tile generation loops across test helpers and test files | `tests/core/test-helpers.ts`, `tests/core/matching.test.ts` |
+| Test deduplication | Extracted `finalizeWangSet()` helper wrapping repeated `setVariants` + `computeColorDistances` + `setDistanceMatrix` + `setNextHopMatrix` boilerplate | `tests/core/test-helpers.ts`, `tests/core/matching.test.ts` |
+| Test deduplication | Extracted `initMapTiles()` helper to replace 8 identical nested init loops across 3 test files | `tests/core/test-helpers.ts`, `tests/core/matching.test.ts`, `tests/core/flood-fill.test.ts`, `tests/core/map-persistence.test.ts` |
+| Test cleanup | Replaced inline `WangColor` literals with `makeColor()` calls where applicable | `tests/core/matching.test.ts` |
+| Test cleanup | Removed unused `WangColor` type import, `DEFAULT_TRANSFORMATIONS` import | `tests/core/matching.test.ts` |
+| Core simplification | Simplified `activeIndices()` from loop-based to direct return of constant arrays | `src/core/wang-id.ts` |
+| Core simplification | Extracted `parseCoordKey()` helper to deduplicate manual `indexOf`/`slice` key parsing in `recomputeTiles()` | `src/core/terrain-painter.ts` |
+| Core simplification | Consolidated 4 tileset field validations into single loop | `src/core/metadata-loader.ts` |
+| Core simplification | Replaced imperative layer-building loops with `Array.from()` in migration functions | `src/core/map-schema.ts`, `src/core/prefab-schema.ts` |
+| Comment cleanup | Simplified misleading comment about opposite index in `wangIdFromSurroundings()` | `src/core/matching.ts` |
+
+Verification: `tsc --noEmit` clean, 207 tests passing.
+
+---
+
+## 2026-02-19: Editor Panel Simplification (Round 5)
+
+Focused simplification of `src/editor/` and `src/editor/panels/`. Extracted shared DOM construction helpers to reduce repetitive element creation code across all panels. No behavioral changes.
+
+| Area | Change | Files |
+|------|--------|-------|
+| Shared helpers | Created `dom-helpers.ts` with reusable element factories: `sectionHeader()`, `panelButton()`, `deleteButton()`, `badge()`, `probabilityBadge()`, `selectInput()`, `numberInput()`, `textInput()`, `applyTabStyle()` | New `src/editor/dom-helpers.ts` |
+| Style deduplication | Extracted 8 shared CSS style constants (`PANEL_BTN_STYLE`, `DANGER_BTN_STYLE`, `SELECT_STYLE`, etc.) replacing 20+ inline duplicates | `src/editor/dom-helpers.ts` |
+| Tab style deduplication | Unified tab styling via shared `applyTabStyle()`, replacing 3 identical inline tab style implementations | `tileset-panel.ts`, `tile-editor.ts` |
+| Panel decomposition | Broke monolithic `render()` in WangSetPanel into focused sub-methods: `createWangSetEntry()`, `createWangSetHeader()`, `createColorsSection()`, `createSetRepTileButton()`, `createRepTileThumbnail()` | `wangset-panel.ts` |
+| Panel decomposition | Broke monolithic `renderAnimationSection()` in InspectorPanel into focused sub-methods: `createAnimatedCheckbox()`, `createAnimationControls()`, `createFrameSlotsGrid()`, `createFrameSlot()`, `createPopulateRow()`, `createAnimationButtons()`, `createAnimationPreview()` | `inspector-panel.ts` |
+| Panel decomposition | Extracted `createRightPanel()` from TileEditor constructor to isolate right-panel layout logic | `tile-editor.ts` |
+| Inline rename dedup | Generalized `startInlineRename()` in WangSetPanel to accept a callback, replacing separate WangSet/Color rename implementations | `wangset-panel.ts` |
+| Region panel cleanup | Extracted `readColorSelections()`, `createPatternSelect()`, `createCopyPasteRow()` from monolithic `render()` | `region-assign-panel.ts` |
+| Template panel cleanup | Removed private `selectStyle()` method (replaced by shared `SELECT_STYLE` constant) | `template-panel.ts` |
+| Import cleanup | Removed unused `PANEL_BTN_STYLE`, `INPUT_STYLE` imports from consumer files | `inspector-panel.ts`, `wangset-panel.ts` |
+
+Verification: `tsc --noEmit` clean, 207 tests passing.
+
+---
+
+## 2026-02-19: Engine & Map Painter Simplification (Round 6)
+
+Focused simplification of `src/engine/game-scene.ts` and `src/map-painter-main.ts`. No behavioral changes.
+
+| Area | Change | Files |
+|------|--------|-------|
+| Deduplication | Extracted `setButtonActive()` module-level helper replacing 4 duplicated update methods | `game-scene.ts` |
+| Deduplication | Extracted `cellFromPrefabTile()` helper replacing repeated `createCell(tile.tileId, false, false, false, tile.tilesetIndex)` | `game-scene.ts` |
+| Deduplication | Extracted `forEachPrefabTile()` method consolidating triple-nested loop in preview/place/load (~30 lines eliminated) | `game-scene.ts` |
+| Deduplication | Consolidated `undoPrefab()`/`redoPrefab()` via shared `swapCellSnapshots()` method | `game-scene.ts` |
+| Deduplication | Extracted `postMap()` method for shared fetch call from autosave/saveMap | `game-scene.ts` |
+| Readability | Named `CellSnapshot` interface for undo/redo entries | `game-scene.ts` |
+| Readability | Extracted `VISIBILITY_ORDER` constant and `addLayer` local helper | `game-scene.ts` |
+| Simplification | Simplified `applyVisibility` with ternary for `inactiveOpacity` | `game-scene.ts` |
+
+Verification: `tsc --noEmit` clean, 207 tests passing.
+
+---
+
+## 2026-02-19: Prefab Editor Simplification (Round 7)
+
+Focused simplification of `src/prefab/`. Extracted shared canvas helpers and decomposed large methods. No behavioral changes.
+
+| Area | Change | Files |
+|------|--------|-------|
+| Shared helpers | Created `canvas-helpers.ts` with `buildCanvasLayout()`, `drawGridLines()`, `attachWheelZoom()` | New `src/prefab/canvas-helpers.ts` |
+| State cleanup | Extracted `clampZoom()`, `findTileIndex()`, `emptyLayers()`, `allLayerBounds()` helpers | `prefab-state.ts` |
+| Canvas cleanup | Refactored to use `canvas-helpers`, extracted `cursorColorForTool()` helper | `prefab-canvas.ts` |
+| Tileset viewer | Refactored to use shared `canvas-helpers` for layout/grid/zoom | `tileset-viewer.ts` |
+| Editor cleanup | Extracted `handleKeydown()` and `toggleTool()` from monolithic constructor | `prefab-editor.ts` |
+| List panel | Reused `startInlineEdit()` pattern, extracted server API methods | `prefab-list-panel.ts` |
+
+Verification: `tsc --noEmit` clean, 207 tests passing.

@@ -1,5 +1,6 @@
 import type { PrefabTool } from './prefab-state.js';
 import type { SavedPrefab } from '../core/prefab-schema.js';
+import { NUM_PREFAB_LAYERS, type LayerVisibility } from '../core/layers.js';
 import { PrefabEditorState } from './prefab-state.js';
 import { PrefabListPanel } from './prefab-list-panel.js';
 import { PrefabCanvasPanel } from './prefab-canvas.js';
@@ -23,6 +24,12 @@ const TOOL_BUTTONS: Array<{ tool: PrefabTool; label: string }> = [
   { tool: 'anchor', label: 'Set Anchor' },
 ];
 
+const VISIBILITY_LABELS: Record<LayerVisibility, string> = {
+  all: 'All',
+  highlight: 'Highlight',
+  hidden: 'Solo',
+};
+
 function applyTabStyle(btn: HTMLButtonElement, isActive: boolean): void {
   btn.style.cssText = `
     padding: 5px 14px; border: none; cursor: pointer;
@@ -42,6 +49,8 @@ export class PrefabEditor {
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private saveIndicator: HTMLDivElement;
   private toolButtons = new Map<PrefabTool, HTMLButtonElement>();
+  private layerButtons: HTMLButtonElement[] = [];
+  private visibilityButton!: HTMLButtonElement;
 
   constructor(state: PrefabEditorState, images: HTMLImageElement[]) {
     this.state = state;
@@ -70,32 +79,50 @@ export class PrefabEditor {
     // Flush pending save before switching away from a prefab
     this.state.on('activePrefabChanged', () => this.flushPendingSave());
 
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      if (e.target instanceof HTMLInputElement) return;
-      const key = e.key.toLowerCase();
-      if ((e.ctrlKey || e.metaKey) && key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        this.state.undo();
-      } else if ((e.ctrlKey || e.metaKey) && key === 'z' && e.shiftKey) {
-        e.preventDefault();
-        this.state.redo();
-      } else if ((e.ctrlKey || e.metaKey) && key === 'y') {
-        e.preventDefault();
-        this.state.redo();
-      } else if (key === 'e') {
-        this.state.setTool(this.state.tool === 'erase' ? 'paint' : 'erase');
-      } else if (key === 'm') {
-        this.state.setTool(this.state.tool === 'move' ? 'paint' : 'move');
-      } else if (key === 'c' && !e.ctrlKey && !e.metaKey) {
-        this.state.setTool(this.state.tool === 'copy' ? 'paint' : 'copy');
-      } else if (key === 'escape') {
-        this.state.resetTool();
-      }
-    });
+    document.addEventListener('keydown', (e) => this.handleKeydown(e));
 
     // Update tool button styles when tool changes
     this.state.on('toolChanged', () => this.updateToolButtonStyles());
+
+    // Update layer bar when layer changes
+    this.state.on('activeLayerChanged', () => this.updateLayerBarSelection());
+    this.state.on('visibilityChanged', () => this.updateVisibilityButton());
+  }
+
+  private toggleTool(tool: PrefabTool): void {
+    this.state.setTool(this.state.tool === tool ? 'paint' : tool);
+  }
+
+  private handleKeydown(e: KeyboardEvent): void {
+    if (e.target instanceof HTMLInputElement) return;
+    const key = e.key.toLowerCase();
+    const mod = e.ctrlKey || e.metaKey;
+
+    if (mod && key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      this.state.undo();
+    } else if (mod && key === 'z' && e.shiftKey) {
+      e.preventDefault();
+      this.state.redo();
+    } else if (mod && key === 'y') {
+      e.preventDefault();
+      this.state.redo();
+    } else if (key === 'e') {
+      this.toggleTool('erase');
+    } else if (key === 'm') {
+      this.toggleTool('move');
+    } else if (key === 'c' && !mod) {
+      this.toggleTool('copy');
+    } else if (key === 'v' && !mod) {
+      this.state.cycleVisibility();
+    } else if (key === 'escape') {
+      this.state.resetTool();
+    } else {
+      const num = parseInt(key, 10);
+      if (num >= 1 && num <= NUM_PREFAB_LAYERS) {
+        this.state.setActiveLayer(num - 1);
+      }
+    }
   }
 
   private setupLayout(): void {
@@ -115,7 +142,7 @@ export class PrefabEditor {
     grid.style.cssText = `
       display: grid;
       grid-template-columns: 220px 1fr 1fr;
-      grid-template-rows: 40px 1fr;
+      grid-template-rows: 40px 32px 1fr;
       height: 100%;
       width: 100%;
       gap: 0;
@@ -147,6 +174,19 @@ export class PrefabEditor {
     const topRight = document.createElement('div');
     topRight.style.cssText = topBarStyle + 'border-left: 1px solid #333; justify-content: center;';
     this.buildTilesetTabs(topRight);
+
+    // Layer bar (row 2, spans all 3 columns)
+    const layerBar = document.createElement('div');
+    layerBar.style.cssText = `
+      grid-column: 1 / -1;
+      background: #16213e;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      border-bottom: 1px solid #333;
+      gap: 4px;
+    `;
+    this.buildLayerBar(layerBar);
 
     // Left sidebar
     const leftSidebar = document.createElement('div');
@@ -180,6 +220,7 @@ export class PrefabEditor {
     grid.appendChild(topLeft);
     grid.appendChild(topCenter);
     grid.appendChild(topRight);
+    grid.appendChild(layerBar);
     grid.appendChild(leftSidebar);
     grid.appendChild(centerPanel);
     grid.appendChild(rightPanel);
@@ -191,9 +232,7 @@ export class PrefabEditor {
       const btn = document.createElement('button');
       btn.textContent = label;
       btn.style.cssText = BTN_STYLE;
-      btn.addEventListener('click', () => {
-        this.state.setTool(this.state.tool === tool ? 'paint' : tool);
-      });
+      btn.addEventListener('click', () => this.toggleTool(tool));
       this.toolButtons.set(tool, btn);
       container.appendChild(btn);
     }
@@ -203,6 +242,46 @@ export class PrefabEditor {
     expandBtn.style.cssText = BTN_STYLE;
     expandBtn.addEventListener('click', () => this.state.expandCanvas());
     container.appendChild(expandBtn);
+  }
+
+  private buildLayerBar(container: HTMLDivElement): void {
+    const label = document.createElement('span');
+    label.textContent = 'Layer:';
+    label.style.cssText = 'color: #888; font-size: 12px; margin-right: 4px;';
+    container.appendChild(label);
+
+    this.layerButtons = [];
+    for (let i = 0; i < NUM_PREFAB_LAYERS; i++) {
+      const btn = document.createElement('button');
+      btn.textContent = String(i + 1);
+      btn.style.cssText = BTN_STYLE;
+      btn.addEventListener('click', () => this.state.setActiveLayer(i));
+      container.appendChild(btn);
+      this.layerButtons.push(btn);
+    }
+
+    const sep = document.createElement('div');
+    sep.style.cssText = 'width: 1px; height: 20px; background: rgba(255,255,255,0.2); margin: 0 6px;';
+    container.appendChild(sep);
+
+    this.visibilityButton = document.createElement('button');
+    this.visibilityButton.textContent = VISIBILITY_LABELS[this.state.visibilityMode] + ' (V)';
+    this.visibilityButton.style.cssText = BTN_STYLE;
+    this.visibilityButton.addEventListener('click', () => this.state.cycleVisibility());
+    container.appendChild(this.visibilityButton);
+
+    this.updateLayerBarSelection();
+  }
+
+  private updateLayerBarSelection(): void {
+    const activeLayer = this.state.activeLayer;
+    for (let i = 0; i < this.layerButtons.length; i++) {
+      this.layerButtons[i].style.cssText = i === activeLayer ? ACTIVE_BTN_STYLE : BTN_STYLE;
+    }
+  }
+
+  private updateVisibilityButton(): void {
+    this.visibilityButton.textContent = VISIBILITY_LABELS[this.state.visibilityMode] + ' (V)';
   }
 
   private updateToolButtonStyles(): void {
@@ -272,7 +351,8 @@ export class PrefabEditor {
         }),
       });
       if (!resp.ok) throw new Error(await resp.text());
-      console.log(`[prefab-editor] Saved ${prefab.name}.json (${prefab.tiles.length} tiles)`);
+      const tileCount = prefab.layers.reduce((sum, l) => sum + l.length, 0);
+      console.log(`[prefab-editor] Saved ${prefab.name}.json (${tileCount} tiles)`);
       this.showIndicator('Saved', 2000);
     } catch (err) {
       console.error('Failed to save prefab:', err);

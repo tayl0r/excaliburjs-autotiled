@@ -1,6 +1,16 @@
 import type { PrefabTile, SavedPrefab } from '../core/prefab-schema.js';
-import { PrefabEditorState } from './prefab-state.js';
-import { colRowFromTileId } from '../utils/tile-math.js';
+import { NUM_PREFAB_LAYERS } from '../core/layers.js';
+import { type PrefabTool, PrefabEditorState } from './prefab-state.js';
+import { colRowFromTileId, computeTileBounds } from '../utils/tile-math.js';
+import { buildCanvasLayout, drawGridLines, attachWheelZoom } from './canvas-helpers.js';
+
+function cursorColorForTool(tool: PrefabTool): string {
+  switch (tool) {
+    case 'erase': return 'rgba(255,100,100,0.6)';
+    case 'anchor': return 'rgba(255,200,50,0.6)';
+    default: return 'rgba(255,255,255,0.4)';
+  }
+}
 
 export class PrefabCanvasPanel {
   readonly element: HTMLDivElement;
@@ -35,32 +45,11 @@ export class PrefabCanvasPanel {
     this.state = state;
     this.images = images;
 
-    this.element = document.createElement('div');
-    this.element.style.cssText = `
-      width: 100%; height: 100%;
-      display: flex; flex-direction: column;
-      position: relative;
-    `;
-
-    // Status bar
-    this.statusBar = document.createElement('div');
-    this.statusBar.style.cssText = `
-      flex-shrink: 0; padding: 4px 8px;
-      background: #16213e; border-bottom: 1px solid #333;
-      font-size: 11px; color: #999; text-align: center;
-    `;
-    this.element.appendChild(this.statusBar);
-
-    const scrollArea = document.createElement('div');
-    scrollArea.style.cssText = 'flex: 1; overflow: auto; cursor: crosshair;';
-
-    this.canvas = document.createElement('canvas');
-    this.canvas.style.cssText = 'image-rendering: pixelated;';
-    scrollArea.appendChild(this.canvas);
-    this.element.appendChild(scrollArea);
-
-    this.ctx = this.canvas.getContext('2d')!;
-    this.ctx.imageSmoothingEnabled = false;
+    const layout = buildCanvasLayout();
+    this.element = layout.element;
+    this.statusBar = layout.statusBar;
+    this.canvas = layout.canvas;
+    this.ctx = layout.ctx;
 
     this.setupEvents();
 
@@ -69,6 +58,8 @@ export class PrefabCanvasPanel {
     this.state.on('tileSelectionChanged', () => this.render());
     this.state.on('toolChanged', () => this.render());
     this.state.on('zoomChanged', () => { this.updateStatusBar(); this.render(); });
+    this.state.on('activeLayerChanged', () => { this.updateStatusBar(); this.render(); });
+    this.state.on('visibilityChanged', () => this.render());
 
     this.updateStatusBar();
     this.render();
@@ -79,7 +70,8 @@ export class PrefabCanvasPanel {
     if (prefab) {
       const w = this.state.prefabWidth;
       const h = this.state.prefabHeight;
-      this.statusBar.textContent = `prefab: ${prefab.name} (${w}x${h})`;
+      const layerLabel = `L${this.state.activeLayer + 1}`;
+      this.statusBar.textContent = `prefab: ${prefab.name} (${w}x${h}) — ${layerLabel}`;
     } else {
       this.statusBar.textContent = 'prefab: (none)';
     }
@@ -266,13 +258,11 @@ export class PrefabCanvasPanel {
       this.render();
     });
 
-    this.element.addEventListener('wheel', (e) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const factor = Math.pow(1.01, -e.deltaY);
-        this.state.setPrefabZoom(this.state.prefabZoom * factor);
-      }
-    }, { passive: false });
+    attachWheelZoom(
+      this.element,
+      () => this.state.prefabZoom,
+      (z) => this.state.setPrefabZoom(z),
+    );
 
     // Clear tool state when tool changes
     this.state.on('toolChanged', () => {
@@ -314,26 +304,17 @@ export class PrefabCanvasPanel {
 
     const columns = this.state.columns;
     const tilesetIndex = this.state.activeTilesetIndex;
+    const { minCol, minRow } = computeTileBounds(selectedIds, columns);
 
-    // Compute bounding box of selected tiles
-    let minCol = Infinity, minRow = Infinity;
-    for (const id of selectedIds) {
+    return selectedIds.map(id => {
       const [c, r] = colRowFromTileId(id, columns);
-      if (c < minCol) minCol = c;
-      if (r < minRow) minRow = r;
-    }
-
-    const tiles: PrefabTile[] = [];
-    for (const id of selectedIds) {
-      const [c, r] = colRowFromTileId(id, columns);
-      tiles.push({
+      return {
         x: cursorX + (c - minCol),
         y: cursorY + (r - minRow),
         tileId: id,
         tilesetIndex,
-      });
-    }
-    return tiles;
+      };
+    });
   }
 
   private drawTile(tile: PrefabTile, destX: number, destY: number, tw: number, th: number): void {
@@ -360,12 +341,13 @@ export class PrefabCanvasPanel {
     this.ctx.strokeRect(minX * tw + 1, minY * th + 1, w - 2, h - 2);
   }
 
+  /** Filter tiles from active layer within selection rectangle */
   private tilesInSelectionRect(prefab: SavedPrefab): PrefabTile[] {
     const minX = Math.min(this.selectStartX, this.selectEndX);
     const maxX = Math.max(this.selectStartX, this.selectEndX);
     const minY = Math.min(this.selectStartY, this.selectEndY);
     const maxY = Math.max(this.selectStartY, this.selectEndY);
-    return prefab.tiles.filter(
+    return prefab.layers[this.state.activeLayer].filter(
       t => t.x >= minX && t.x <= maxX && t.y >= minY && t.y <= maxY,
     );
   }
@@ -386,23 +368,7 @@ export class PrefabCanvasPanel {
     this.ctx.imageSmoothingEnabled = false;
     this.ctx.clearRect(0, 0, cw, ch);
 
-    // Draw grid lines
-    this.ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-    this.ctx.lineWidth = 1;
-    for (let c = 0; c <= canvasW; c++) {
-      const x = c * tw;
-      this.ctx.beginPath();
-      this.ctx.moveTo(x + 0.5, 0);
-      this.ctx.lineTo(x + 0.5, ch);
-      this.ctx.stroke();
-    }
-    for (let r = 0; r <= canvasH; r++) {
-      const y = r * th;
-      this.ctx.beginPath();
-      this.ctx.moveTo(0, y + 0.5);
-      this.ctx.lineTo(cw, y + 0.5);
-      this.ctx.stroke();
-    }
+    drawGridLines(this.ctx, canvasW, canvasH, tw, th, 'rgba(255,255,255,0.06)');
 
     if (!prefab) {
       this.ctx.fillStyle = '#555';
@@ -411,10 +377,30 @@ export class PrefabCanvasPanel {
       return;
     }
 
-    // Draw placed tiles
-    for (const tile of prefab.tiles) {
-      this.drawTile(tile, tile.x * tw, tile.y * th, tw, th);
+    // Draw placed tiles across all layers with visibility
+    const activeLayer = this.state.activeLayer;
+    const visibility = this.state.visibilityMode;
+
+    for (let i = 0; i < NUM_PREFAB_LAYERS; i++) {
+      const layer = prefab.layers[i];
+      if (!layer || layer.length === 0) continue;
+
+      if (i === activeLayer) {
+        // Active layer always at full opacity
+        this.ctx.globalAlpha = 1.0;
+      } else if (visibility === 'hidden') {
+        continue; // Skip non-active layers
+      } else if (visibility === 'highlight') {
+        this.ctx.globalAlpha = 0.25;
+      } else {
+        this.ctx.globalAlpha = 1.0;
+      }
+
+      for (const tile of layer) {
+        this.drawTile(tile, tile.x * tw, tile.y * th, tw, th);
+      }
     }
+    this.ctx.globalAlpha = 1.0;
 
     // Draw anchor highlight
     this.ctx.strokeStyle = '#ff4444';
@@ -481,11 +467,7 @@ export class PrefabCanvasPanel {
 
     // Draw cursor highlight on hover
     if (this.hoverGridX >= 0) {
-      const tool = this.state.tool;
-      let cursorColor = 'rgba(255,255,255,0.4)';
-      if (tool === 'erase') cursorColor = 'rgba(255,100,100,0.6)';
-      else if (tool === 'anchor') cursorColor = 'rgba(255,200,50,0.6)';
-      this.ctx.strokeStyle = cursorColor;
+      this.ctx.strokeStyle = cursorColorForTool(this.state.tool);
       this.ctx.lineWidth = 2;
       this.ctx.strokeRect(this.hoverGridX * tw + 1, this.hoverGridY * th + 1, tw - 2, th - 2);
     }

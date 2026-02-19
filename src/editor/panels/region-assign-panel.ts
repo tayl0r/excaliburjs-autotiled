@@ -1,6 +1,7 @@
 import { EditorState } from '../editor-state.js';
 import { ALL_PATTERNS, applyLayoutPattern } from '../layout-patterns.js';
 import { computeTileBounds } from '../../utils/tile-math.js';
+import { sectionHeader, panelButton, selectInput, SELECT_STYLE } from '../dom-helpers.js';
 import type { WangSetData } from '../../core/metadata-schema.js';
 
 /**
@@ -40,11 +41,7 @@ export class RegionAssignPanel {
     const regionW = maxCol - minCol + 1;
     const regionH = maxRow - minRow + 1;
 
-    // Header
-    const header = document.createElement('h3');
-    header.textContent = 'Region Assign';
-    header.style.cssText = 'margin: 12px 0 8px 0; font-size: 13px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;';
-    this.element.appendChild(header);
+    this.element.appendChild(sectionHeader('Region Assign', 'margin-top: 12px;'));
 
     // Selection info
     const info = document.createElement('div');
@@ -61,100 +58,56 @@ export class RegionAssignPanel {
       return;
     }
 
-    // Color A/B selects — persisted via state.templateColorA/B
-    const colorARow = this.createColorSelect('Color A:', this.state.templateColorA, ws);
-    this.element.appendChild(colorARow);
+    // Color A/B selects
+    this.element.appendChild(this.createColorSelect('Color A:', 'colorA', this.state.templateColorA, ws));
+    this.element.appendChild(this.createColorSelect('Color B:', 'colorB', this.state.templateColorB, ws));
 
-    const colorBRow = this.createColorSelect('Color B:', this.state.templateColorB, ws);
-    this.element.appendChild(colorBRow);
-
-    // Pattern select — all patterns shown, non-matching ones disabled
-    const patternRow = document.createElement('div');
-    patternRow.style.cssText = 'display: flex; gap: 6px; align-items: center; margin-bottom: 8px;';
-    const patternLabel = document.createElement('span');
-    patternLabel.textContent = 'Pattern:';
-    patternLabel.style.cssText = 'font-size: 11px; color: #aaa; min-width: 50px;';
-    patternRow.appendChild(patternLabel);
-
-    const patternSelect = document.createElement('select');
-    patternSelect.style.cssText = 'background: #1e1e3a; color: #e0e0e0; border: 1px solid #555; font-size: 11px; padding: 2px 4px; border-radius: 3px; flex: 1;';
-    let firstMatch = true;
-    for (const pattern of ALL_PATTERNS) {
-      const matches = pattern.width === regionW && pattern.height === regionH;
-      const opt = document.createElement('option');
-      opt.value = pattern.name;
-      opt.textContent = `${pattern.name} (${pattern.width}\u00D7${pattern.height})`;
-      opt.disabled = !matches;
-      if (matches && firstMatch) {
-        opt.selected = true;
-        firstMatch = false;
-      }
-      patternSelect.appendChild(opt);
-    }
-    patternRow.appendChild(patternSelect);
-    this.element.appendChild(patternRow);
+    // Pattern select
+    const hasMatch = ALL_PATTERNS.some(p => p.width === regionW && p.height === regionH);
+    this.element.appendChild(this.createPatternSelect(regionW, regionH));
 
     // Apply button
-    const hasMatch = ALL_PATTERNS.some(p => p.width === regionW && p.height === regionH);
-    const applyBtn = document.createElement('button');
-    applyBtn.textContent = 'Apply Pattern';
+    const applyBtn = panelButton('Apply Pattern');
     applyBtn.disabled = !hasMatch;
-    applyBtn.style.cssText = `background: #333; color: ${hasMatch ? '#ccc' : '#666'}; border: 1px solid #555; padding: 6px 12px; border-radius: 3px; cursor: ${hasMatch ? 'pointer' : 'not-allowed'}; font-size: 12px; width: 100%;`;
+    applyBtn.style.cssText += `
+      width: 100%;
+      padding: 6px 12px; font-size: 12px;
+      color: ${hasMatch ? '#ccc' : '#666'};
+      cursor: ${hasMatch ? 'pointer' : 'not-allowed'};
+    `;
     applyBtn.addEventListener('click', () => {
-      const colorASelect = this.element.querySelector('[data-role="colorA"]') as HTMLSelectElement;
-      const colorBSelect = this.element.querySelector('[data-role="colorB"]') as HTMLSelectElement;
-      const colorA = parseInt(colorASelect?.value ?? '1', 10);
-      const colorB = parseInt(colorBSelect?.value ?? '2', 10);
-
-      const patternName = patternSelect.value;
-      const pattern = ALL_PATTERNS.find(p => p.name === patternName);
+      const { colorA, colorB } = this.readColorSelections();
+      const patternSelect = this.element.querySelector('[data-role="pattern"]') as HTMLSelectElement;
+      const pattern = ALL_PATTERNS.find(p => p.name === patternSelect?.value);
       if (!pattern) return;
 
-      // Origin = top-left of selection
       const originTileId = minRow * columns + minCol;
       const assignments = applyLayoutPattern(
         pattern, originTileId, columns, this.state.tileCount, colorA, colorB
       );
-
       this.state.setWangIdMulti(assignments.map(([tileId, wangid]) => ({ tileId, wangid })));
     });
     this.element.appendChild(applyBtn);
 
     // Copy/Paste buttons
-    const clip = this.state.wangClipboard;
-    const canPaste = clip != null && clip.width === regionW && clip.height === regionH;
-
-    const copyPasteRow = document.createElement('div');
-    copyPasteRow.style.cssText = 'display: flex; gap: 6px; margin-top: 6px;';
-
-    const copyBtn = document.createElement('button');
-    copyBtn.textContent = 'Copy';
-    copyBtn.style.cssText = 'background: #333; color: #ccc; border: 1px solid #555; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; flex: 1;';
-    copyBtn.addEventListener('click', () => {
-      this.state.copyWangRegion();
-    });
-    copyPasteRow.appendChild(copyBtn);
-
-    const pasteBtn = document.createElement('button');
-    pasteBtn.textContent = clip ? `Paste (${clip.width}\u00D7${clip.height})` : 'Paste';
-    pasteBtn.disabled = !canPaste;
-    pasteBtn.style.cssText = `background: #333; color: ${canPaste ? '#ccc' : '#666'}; border: 1px solid #555; padding: 6px 12px; border-radius: 3px; cursor: ${canPaste ? 'pointer' : 'not-allowed'}; font-size: 12px; flex: 1;`;
-    pasteBtn.addEventListener('click', () => {
-      if (!canPaste) return;
-      const colorASelect = this.element.querySelector('[data-role="colorA"]') as HTMLSelectElement;
-      const colorBSelect = this.element.querySelector('[data-role="colorB"]') as HTMLSelectElement;
-      const colorA = parseInt(colorASelect?.value ?? '1', 10);
-      const colorB = parseInt(colorBSelect?.value ?? '2', 10);
-      this.state.pasteWangRegion(colorA, colorB);
-    });
-    copyPasteRow.appendChild(pasteBtn);
-
-    this.element.appendChild(copyPasteRow);
+    this.element.appendChild(this.createCopyPasteRow(regionW, regionH));
   }
 
-  private createColorSelect(label: string, defaultColorId: number, ws: WangSetData): HTMLDivElement {
-    const role = label.includes('A') ? 'colorA' : 'colorB';
+  private readColorSelections(): { colorA: number; colorB: number } {
+    const colorASelect = this.element.querySelector('[data-role="colorA"]') as HTMLSelectElement;
+    const colorBSelect = this.element.querySelector('[data-role="colorB"]') as HTMLSelectElement;
+    return {
+      colorA: parseInt(colorASelect?.value ?? '1', 10),
+      colorB: parseInt(colorBSelect?.value ?? '2', 10),
+    };
+  }
 
+  private createColorSelect(
+    label: string,
+    role: string,
+    defaultColorId: number,
+    ws: WangSetData,
+  ): HTMLDivElement {
     const row = document.createElement('div');
     row.style.cssText = 'display: flex; gap: 6px; align-items: center; margin-bottom: 6px;';
 
@@ -163,17 +116,10 @@ export class RegionAssignPanel {
     lbl.style.cssText = 'font-size: 11px; color: #aaa; min-width: 50px;';
     row.appendChild(lbl);
 
-    const select = document.createElement('select');
+    const items = ws.colors.map((c, i) => ({ value: String(i + 1), text: c.name }));
+    const selected = String(Math.min(defaultColorId, ws.colors.length));
+    const select = selectInput(items, selected, SELECT_STYLE + '; flex: 1;');
     select.dataset.role = role;
-    select.style.cssText = 'background: #1e1e3a; color: #e0e0e0; border: 1px solid #555; font-size: 11px; padding: 2px 4px; border-radius: 3px; flex: 1;';
-
-    for (let i = 0; i < ws.colors.length; i++) {
-      const opt = document.createElement('option');
-      opt.value = String(i + 1);
-      opt.textContent = ws.colors[i].name;
-      select.appendChild(opt);
-    }
-    select.value = String(Math.min(defaultColorId, ws.colors.length));
     select.addEventListener('change', () => {
       const val = parseInt(select.value, 10);
       if (role === 'colorA') this.state.setTemplateColorA(val);
@@ -182,5 +128,63 @@ export class RegionAssignPanel {
     row.appendChild(select);
 
     return row;
+  }
+
+  private createPatternSelect(regionW: number, regionH: number): HTMLDivElement {
+    const patternRow = document.createElement('div');
+    patternRow.style.cssText = 'display: flex; gap: 6px; align-items: center; margin-bottom: 8px;';
+
+    const patternLabel = document.createElement('span');
+    patternLabel.textContent = 'Pattern:';
+    patternLabel.style.cssText = 'font-size: 11px; color: #aaa; min-width: 50px;';
+    patternRow.appendChild(patternLabel);
+
+    let firstMatchValue = '';
+    const items = ALL_PATTERNS.map(p => {
+      const matches = p.width === regionW && p.height === regionH;
+      if (matches && !firstMatchValue) firstMatchValue = p.name;
+      return {
+        value: p.name,
+        text: `${p.name} (${p.width}\u00D7${p.height})`,
+        disabled: !matches,
+      };
+    });
+
+    const select = selectInput(items, firstMatchValue, SELECT_STYLE + '; flex: 1;');
+    select.dataset.role = 'pattern';
+    patternRow.appendChild(select);
+
+    return patternRow;
+  }
+
+  private createCopyPasteRow(regionW: number, regionH: number): HTMLDivElement {
+    const clip = this.state.wangClipboard;
+    const canPaste = clip != null && clip.width === regionW && clip.height === regionH;
+
+    const copyPasteRow = document.createElement('div');
+    copyPasteRow.style.cssText = 'display: flex; gap: 6px; margin-top: 6px;';
+
+    const copyBtn = panelButton('Copy');
+    copyBtn.style.cssText += 'padding: 6px 12px; font-size: 12px; flex: 1;';
+    copyBtn.addEventListener('click', () => {
+      this.state.copyWangRegion();
+    });
+    copyPasteRow.appendChild(copyBtn);
+
+    const pasteBtn = panelButton(clip ? `Paste (${clip.width}\u00D7${clip.height})` : 'Paste');
+    pasteBtn.disabled = !canPaste;
+    pasteBtn.style.cssText += `
+      padding: 6px 12px; font-size: 12px; flex: 1;
+      color: ${canPaste ? '#ccc' : '#666'};
+      cursor: ${canPaste ? 'pointer' : 'not-allowed'};
+    `;
+    pasteBtn.addEventListener('click', () => {
+      if (!canPaste) return;
+      const { colorA, colorB } = this.readColorSelections();
+      this.state.pasteWangRegion(colorA, colorB);
+    });
+    copyPasteRow.appendChild(pasteBtn);
+
+    return copyPasteRow;
   }
 }

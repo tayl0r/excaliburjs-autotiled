@@ -1,5 +1,6 @@
 import type { ProjectMetadata } from '../core/metadata-schema.js';
-import type { SavedPrefab, PrefabTile } from '../core/prefab-schema.js';
+import { type SavedPrefab, type PrefabTile } from '../core/prefab-schema.js';
+import { NUM_PREFAB_LAYERS, type LayerVisibility } from '../core/layers.js';
 import { UndoManager } from '../editor/undo-manager.js';
 
 export type PrefabTool = 'paint' | 'erase' | 'anchor' | 'move' | 'copy';
@@ -11,12 +12,45 @@ export type PrefabEvent =
   | 'tileSelectionChanged'
   | 'activeTilesetChanged'
   | 'toolChanged'
-  | 'zoomChanged';
+  | 'zoomChanged'
+  | 'activeLayerChanged'
+  | 'visibilityChanged';
 
 const CANVAS_EXPAND_STEP = 10;
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 8;
 
 function ceilToStep(value: number, step: number): number {
   return Math.ceil(value / step) * step;
+}
+
+function clampZoom(zoom: number): number {
+  return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+}
+
+/** Find the index of a tile at (x, y), or -1 if not found */
+function findTileIndex(tiles: PrefabTile[], x: number, y: number): number {
+  return tiles.findIndex(t => t.x === x && t.y === y);
+}
+
+/** Create an array of empty layers for a new prefab */
+function emptyLayers(): PrefabTile[][] {
+  return Array.from({ length: NUM_PREFAB_LAYERS }, () => []);
+}
+
+/** Compute bounding box of tiles across all layers; returns null if no tiles */
+function allLayerBounds(layers: PrefabTile[][]): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const layer of layers) {
+    for (const t of layer) {
+      if (t.x < minX) minX = t.x;
+      if (t.y < minY) minY = t.y;
+      if (t.x > maxX) maxX = t.x;
+      if (t.y > maxY) maxY = t.y;
+    }
+  }
+  if (minX === Infinity) return null;
+  return { minX, minY, maxX, maxY };
 }
 
 type Listener = () => void;
@@ -33,6 +67,8 @@ export class PrefabEditorState {
   private _canvasWidth = 16;
   private _canvasHeight = 16;
   private _metadata: ProjectMetadata;
+  private _activeLayer = 0;
+  private _visibilityMode: LayerVisibility = 'all';
   private listeners = new Map<PrefabEvent, Set<Listener>>();
   private undoManager = new UndoManager<SavedPrefab>();
 
@@ -58,19 +94,23 @@ export class PrefabEditorState {
   get canvasWidth(): number { return this._canvasWidth; }
   get canvasHeight(): number { return this._canvasHeight; }
 
-  get prefabWidth(): number { return this.prefabExtent('x'); }
-  get prefabHeight(): number { return this.prefabExtent('y'); }
+  get prefabWidth(): number {
+    const bounds = this.activePrefab ? allLayerBounds(this.activePrefab.layers) : null;
+    return bounds ? bounds.maxX - bounds.minX + 1 : 0;
+  }
+  get prefabHeight(): number {
+    const bounds = this.activePrefab ? allLayerBounds(this.activePrefab.layers) : null;
+    return bounds ? bounds.maxY - bounds.minY + 1 : 0;
+  }
 
-  private prefabExtent(axis: 'x' | 'y'): number {
+  get activeLayer(): number { return this._activeLayer; }
+  get visibilityMode(): LayerVisibility { return this._visibilityMode; }
+
+  /** Get tiles on the active layer of the active prefab */
+  get activeLayerTiles(): PrefabTile[] {
     const prefab = this.activePrefab;
-    if (!prefab || prefab.tiles.length === 0) return 0;
-    let min = Infinity, max = -Infinity;
-    for (const t of prefab.tiles) {
-      const v = t[axis];
-      if (v < min) min = v;
-      if (v > max) max = v;
-    }
-    return max - min + 1;
+    if (!prefab) return [];
+    return prefab.layers[this._activeLayer];
   }
 
   get activeTileset() {
@@ -80,6 +120,22 @@ export class PrefabEditorState {
   get tileCount(): number { return this.activeTileset.tileCount; }
   get tileWidth(): number { return this.activeTileset.tileWidth; }
   get tileHeight(): number { return this.activeTileset.tileHeight; }
+
+  // --- Layer ---
+
+  setActiveLayer(index: number): void {
+    if (index < 0 || index >= NUM_PREFAB_LAYERS) return;
+    if (this._activeLayer === index) return;
+    this._activeLayer = index;
+    this.emit('activeLayerChanged');
+  }
+
+  cycleVisibility(): void {
+    const modes: LayerVisibility[] = ['all', 'highlight', 'hidden'];
+    const idx = modes.indexOf(this._visibilityMode);
+    this._visibilityMode = modes[(idx + 1) % modes.length];
+    this.emit('visibilityChanged');
+  }
 
   // --- Prefab CRUD ---
 
@@ -99,9 +155,9 @@ export class PrefabEditorState {
   createPrefab(name: string): void {
     if (this._prefabs.has(name)) return;
     const prefab: SavedPrefab = {
-      version: 1,
+      version: 2,
       name,
-      tiles: [],
+      layers: emptyLayers(),
       anchorX: 0,
       anchorY: 0,
     };
@@ -120,10 +176,10 @@ export class PrefabEditorState {
       n++;
       name = `${sourceName} Copy ${n}`;
     }
-    const prefab = {
+    const prefab: SavedPrefab = {
       ...source,
       name,
-      tiles: source.tiles.map(t => ({ ...t })),
+      layers: source.layers.map(layer => layer.map(t => ({ ...t }))),
     };
     this._prefabs.set(name, prefab);
     this._activePrefabName = name;
@@ -164,14 +220,11 @@ export class PrefabEditorState {
 
   private fitCanvasToPrefab(): void {
     const prefab = this.activePrefab;
-    if (!prefab || prefab.tiles.length === 0) return;
-    let maxX = 0, maxY = 0;
-    for (const t of prefab.tiles) {
-      if (t.x + 1 > maxX) maxX = t.x + 1;
-      if (t.y + 1 > maxY) maxY = t.y + 1;
-    }
-    this._canvasWidth = Math.max(this._canvasWidth, ceilToStep(maxX, CANVAS_EXPAND_STEP));
-    this._canvasHeight = Math.max(this._canvasHeight, ceilToStep(maxY, CANVAS_EXPAND_STEP));
+    if (!prefab) return;
+    const bounds = allLayerBounds(prefab.layers);
+    if (!bounds) return;
+    this._canvasWidth = Math.max(this._canvasWidth, ceilToStep(bounds.maxX + 1, CANVAS_EXPAND_STEP));
+    this._canvasHeight = Math.max(this._canvasHeight, ceilToStep(bounds.maxY + 1, CANVAS_EXPAND_STEP));
   }
 
   // --- Undo/Redo ---
@@ -199,19 +252,17 @@ export class PrefabEditorState {
     this.emit('prefabDataChanged');
   }
 
-  // --- Tile placement ---
+  // --- Tile placement (operates on active layer) ---
 
   placeTiles(tiles: PrefabTile[]): void {
     const prefab = this.activePrefab;
     if (!prefab) return;
     this.saveSnapshot();
+    const layerTiles = prefab.layers[this._activeLayer];
     for (const tile of tiles) {
-      const idx = prefab.tiles.findIndex(t => t.x === tile.x && t.y === tile.y);
-      if (idx >= 0) {
-        prefab.tiles[idx] = tile;
-      } else {
-        prefab.tiles.push(tile);
-      }
+      const idx = findTileIndex(layerTiles, tile.x, tile.y);
+      if (idx >= 0) layerTiles[idx] = tile;
+      else layerTiles.push(tile);
     }
     this.emit('prefabDataChanged');
   }
@@ -219,12 +270,12 @@ export class PrefabEditorState {
   eraseTile(x: number, y: number): void {
     const prefab = this.activePrefab;
     if (!prefab) return;
-    const idx = prefab.tiles.findIndex(t => t.x === x && t.y === y);
-    if (idx >= 0) {
-      this.saveSnapshot();
-      prefab.tiles.splice(idx, 1);
-      this.emit('prefabDataChanged');
-    }
+    const layerTiles = prefab.layers[this._activeLayer];
+    const idx = findTileIndex(layerTiles, x, y);
+    if (idx < 0) return;
+    this.saveSnapshot();
+    layerTiles.splice(idx, 1);
+    this.emit('prefabDataChanged');
   }
 
   setAnchor(x: number, y: number): void {
@@ -242,17 +293,18 @@ export class PrefabEditorState {
     const prefab = this.activePrefab;
     if (!prefab) return;
     this.saveSnapshot();
+    const layerTiles = prefab.layers[this._activeLayer];
     // Remove tiles at old positions
     for (const t of tiles) {
-      const idx = prefab.tiles.findIndex(p => p.x === t.x && p.y === t.y);
-      if (idx >= 0) prefab.tiles.splice(idx, 1);
+      const idx = findTileIndex(layerTiles, t.x, t.y);
+      if (idx >= 0) layerTiles.splice(idx, 1);
     }
     // Place tiles at new positions
     for (const t of tiles) {
       const newTile = { ...t, x: t.x + dx, y: t.y + dy };
-      const idx = prefab.tiles.findIndex(p => p.x === newTile.x && p.y === newTile.y);
-      if (idx >= 0) prefab.tiles[idx] = newTile;
-      else prefab.tiles.push(newTile);
+      const idx = findTileIndex(layerTiles, newTile.x, newTile.y);
+      if (idx >= 0) layerTiles[idx] = newTile;
+      else layerTiles.push(newTile);
     }
     this.emit('prefabDataChanged');
   }
@@ -351,14 +403,14 @@ export class PrefabEditorState {
   }
 
   setTilesetZoom(zoom: number): void {
-    const clamped = Math.max(1, Math.min(8, zoom));
+    const clamped = clampZoom(zoom);
     if (clamped === this._tilesetZoom) return;
     this._tilesetZoom = clamped;
     this.emit('zoomChanged');
   }
 
   setPrefabZoom(zoom: number): void {
-    const clamped = Math.max(1, Math.min(8, zoom));
+    const clamped = clampZoom(zoom);
     if (clamped === this._prefabZoom) return;
     this._prefabZoom = clamped;
     this.emit('zoomChanged');

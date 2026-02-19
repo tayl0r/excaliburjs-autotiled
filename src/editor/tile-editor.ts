@@ -6,6 +6,13 @@ import { WangSetPanel } from './panels/wangset-panel.js';
 import { InspectorPanel } from './panels/inspector-panel.js';
 import { TemplatePanel } from './panels/template-panel.js';
 import { RegionAssignPanel } from './panels/region-assign-panel.js';
+import { panelButton, applyTabStyle } from './dom-helpers.js';
+
+const UNDO_REDO_BTN_STYLE = `
+  background: #333; color: #ccc; border: 1px solid #555;
+  padding: 3px 10px; border-radius: 3px; cursor: pointer;
+  font-size: 12px; font-family: inherit;
+`;
 
 /**
  * Top-level editor controller. Creates and wires all editor components.
@@ -44,55 +51,7 @@ export class TileEditor {
     this.createUndoRedoButtons();
 
     // Right panel: tab bar + Inspector/Template panels
-    const rightWrapper = document.createElement('div');
-    rightWrapper.style.cssText = 'display: flex; flex-direction: column; height: 100%;';
-
-    // Tab bar
-    const tabBar = document.createElement('div');
-    tabBar.style.cssText = 'display: flex; gap: 0; border-bottom: 1px solid #333; margin-bottom: 8px;';
-
-    const tabBtnStyle = 'padding: 6px 16px; border: none; cursor: pointer; font-size: 12px; font-family: inherit;';
-    const activeTabStyle = `${tabBtnStyle} background: #1e1e3a; color: #e0e0e0; border-bottom: 2px solid #6666cc;`;
-    const inactiveTabStyle = `${tabBtnStyle} background: transparent; color: #888; border-bottom: 2px solid transparent;`;
-
-    this.inspectorTab = document.createElement('button');
-    this.inspectorTab.textContent = 'Inspector';
-    this.inspectorTab.style.cssText = activeTabStyle;
-    this.inspectorTab.addEventListener('click', () => {
-      this.state.setTemplateMode(false);
-    });
-
-    this.templateTab = document.createElement('button');
-    this.templateTab.textContent = 'Template';
-    this.templateTab.style.cssText = inactiveTabStyle;
-    this.templateTab.addEventListener('click', () => {
-      this.state.setTemplateMode(true);
-    });
-
-    tabBar.appendChild(this.inspectorTab);
-    tabBar.appendChild(this.templateTab);
-    rightWrapper.appendChild(tabBar);
-
-    // Panel containers
-    this.inspectorPanel.element.style.display = 'block';
-    this.templatePanel.element.style.display = 'none';
-
-    // Mount region assign panel inside inspector, above animation section
-    this.inspectorPanel.mountBeforeAnimation(this.regionAssignPanel.element);
-
-    rightWrapper.appendChild(this.inspectorPanel.element);
-    rightWrapper.appendChild(this.templatePanel.element);
-
-    this.overlay.mountRight(rightWrapper);
-
-    // Listen for template mode changes to toggle panel visibility and tab states
-    this.state.on('templateModeChanged', () => {
-      const isTemplate = this.state.templateMode;
-      this.inspectorPanel.element.style.display = isTemplate ? 'none' : 'block';
-      this.templatePanel.element.style.display = isTemplate ? 'block' : 'none';
-      this.inspectorTab.style.cssText = isTemplate ? inactiveTabStyle : activeTabStyle;
-      this.templateTab.style.cssText = isTemplate ? activeTabStyle : inactiveTabStyle;
-    });
+    this.overlay.mountRight(this.createRightPanel());
 
     // Save indicator (shown in top bar area)
     this.saveIndicator = document.createElement('div');
@@ -129,32 +88,69 @@ export class TileEditor {
     this.state.setActiveColor(colorId);
   }
 
-  /** Get the current metadata (for saving or applying to game) */
   getMetadata(): ProjectMetadata {
     return this.state.metadata;
+  }
+
+  private createRightPanel(): HTMLDivElement {
+    const rightWrapper = document.createElement('div');
+    rightWrapper.style.cssText = 'display: flex; flex-direction: column; height: 100%;';
+
+    // Tab bar
+    const tabBar = document.createElement('div');
+    tabBar.style.cssText = 'display: flex; gap: 0; border-bottom: 1px solid #333; margin-bottom: 8px;';
+
+    this.inspectorTab = document.createElement('button');
+    this.inspectorTab.textContent = 'Inspector';
+    applyTabStyle(this.inspectorTab, true);
+    this.inspectorTab.addEventListener('click', () => {
+      this.state.setTemplateMode(false);
+    });
+
+    this.templateTab = document.createElement('button');
+    this.templateTab.textContent = 'Template';
+    applyTabStyle(this.templateTab, false);
+    this.templateTab.addEventListener('click', () => {
+      this.state.setTemplateMode(true);
+    });
+
+    tabBar.appendChild(this.inspectorTab);
+    tabBar.appendChild(this.templateTab);
+    rightWrapper.appendChild(tabBar);
+
+    // Panel containers
+    this.inspectorPanel.element.style.display = 'block';
+    this.templatePanel.element.style.display = 'none';
+
+    // Mount region assign panel inside inspector, above animation section
+    this.inspectorPanel.mountBeforeAnimation(this.regionAssignPanel.element);
+
+    rightWrapper.appendChild(this.inspectorPanel.element);
+    rightWrapper.appendChild(this.templatePanel.element);
+
+    // Listen for template mode changes to toggle panel visibility and tab states
+    this.state.on('templateModeChanged', () => {
+      const isTemplate = this.state.templateMode;
+      this.inspectorPanel.element.style.display = isTemplate ? 'none' : 'block';
+      this.templatePanel.element.style.display = isTemplate ? 'block' : 'none';
+      applyTabStyle(this.inspectorTab, !isTemplate);
+      applyTabStyle(this.templateTab, isTemplate);
+    });
+
+    return rightWrapper;
   }
 
   private createUndoRedoButtons(): void {
     const container = document.createElement('div');
     container.style.cssText = 'display: flex; gap: 2px; margin-left: 12px;';
 
-    const btnStyle = `
-      background: #333; color: #ccc; border: 1px solid #555;
-      padding: 3px 10px; border-radius: 3px; cursor: pointer;
-      font-size: 12px; font-family: inherit;
-    `;
-
-    const undoBtn = document.createElement('button');
-    undoBtn.textContent = 'Undo';
+    const undoBtn = panelButton('Undo', UNDO_REDO_BTN_STYLE);
     undoBtn.title = 'Undo (Ctrl+Z)';
-    undoBtn.style.cssText = btnStyle;
     undoBtn.addEventListener('click', () => this.state.undo());
     container.appendChild(undoBtn);
 
-    const redoBtn = document.createElement('button');
-    redoBtn.textContent = 'Redo';
+    const redoBtn = panelButton('Redo', UNDO_REDO_BTN_STYLE);
     redoBtn.title = 'Redo (Ctrl+Shift+Z)';
-    redoBtn.style.cssText = btnStyle;
     redoBtn.addEventListener('click', () => this.state.redo());
     container.appendChild(redoBtn);
 

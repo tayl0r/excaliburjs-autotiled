@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SimpleAutotileMap } from '../../src/core/autotile-map.js';
 import { resolveAllTiles, applyTerrainPaint } from '../../src/core/terrain-painter.js';
-import { createGrassDirtWangSet } from './test-helpers.js';
+import { createGrassDirtWangSet, initMapTiles } from './test-helpers.js';
 
 describe('SimpleAutotileMap serialization', () => {
   it('getColors() returns correct flat array', () => {
@@ -87,13 +87,7 @@ describe('round-trip persistence', () => {
   it('paint -> save -> clear -> load -> verify', () => {
     const ws = createGrassDirtWangSet();
     const map = new SimpleAutotileMap(4, 4, 0);
-
-    // Paint all cells with Grass first to initialize tiles
-    for (let y = 0; y < 4; y++) {
-      for (let x = 0; x < 4; x++) {
-        applyTerrainPaint(map, ws, x, y, 1);
-      }
-    }
+    initMapTiles(map, ws, 1);
 
     // Paint top-left quadrant as Dirt
     for (let y = 0; y < 2; y++) {

@@ -142,9 +142,7 @@ export function isActiveIndex(index: number, type: 'corner' | 'edge' | 'mixed'):
 
 /** Get the mask of active indices for a type (returns which indices to check) */
 export function activeIndices(type: 'corner' | 'edge' | 'mixed'): number[] {
-  const result: number[] = [];
-  for (let i = 0; i < WANG_INDEX_COUNT; i++) {
-    if (isActiveIndex(i, type)) result.push(i);
-  }
-  return result;
+  if (type === 'corner') return [1, 3, 5, 7];
+  if (type === 'edge') return [0, 2, 4, 6];
+  return [0, 1, 2, 3, 4, 5, 6, 7];
 }

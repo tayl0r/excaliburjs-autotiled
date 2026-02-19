@@ -33,15 +33,21 @@ Used to define WangSets, colors, and tag tiles with WangIds.
 
 ### Map Painter (`/tools/map-painter/`)
 
-Used to paint terrain on a grid. Tiles are auto-resolved by the WangSet.
+Used to paint terrain on a grid and place prefabs. Tiles are auto-resolved by the WangSet.
 
 | Term | Meaning |
 |------|---------|
 | **Brush** | Click/drag to paint the active color one tile at a time. Shortcut: **B**. |
 | **Fill (Flood Fill)** | Click to fill all connected same-color tiles with the active color. Shortcut: **G**. |
-| **Active Color** | The currently selected terrain color. Shown as buttons in the HUD. |
+| **Active Color** | The currently selected terrain color. Shown in the sidebar Colors section. |
 | **Autotiling** | The automatic process of picking the correct tile sprite based on neighboring terrain colors. Happens in real-time as you paint. |
 | **Indirect Transition** | When two colors have no direct transition tile, the engine inserts intermediate colors (e.g. grass → dirt → sand). Powered by the distance/next-hop matrices. |
+| **Layer** | Maps have 9 layers (5 editable via UI, 4 overflow for prefab placement). Layer 1 is the base terrain. |
+| **Visibility Mode** | Controls how non-active layers render: **All** (full opacity), **Highlight** (active full, others 25%), **Solo** (only active layer visible). Shortcut: **V**. |
+| **Prefab Placement** | Select a prefab from the sidebar, hover to preview, click to place. Prefab layers stack onto map layers starting from the active layer. |
+| **Placed Prefab** | A reference to a prefab placed at a specific map position and layer. Stored in the saved map for tracking. |
+| **Autosave** | Maps are saved automatically 5 seconds after any paint, fill, or prefab operation (only when the map has been named/saved once). |
+| **Sidebar** | Collapsible left panel (240px) containing all controls: File, Tools, Layers, Colors, and Prefabs. Toggle with **Tab**. |
 
 ### Prefab Editor (`/tools/prefab-editor/`)
 
@@ -180,51 +186,74 @@ For `type: "corner"`, only odd indices (1, 3, 5, 7) are used. For `type: "edge"`
 
 Maps store **only terrain colors**, not tile IDs. When a map is loaded, the autotile engine recomputes which specific tiles to use based on the current WangSet definitions. This means saved maps automatically pick up tileset changes.
 
+Maps have 9 layers. Layers 0-4 are user-editable (shown as layers 1-5 in the UI). Layers 5-8 are overflow layers used when a 5-layer prefab is placed on map layer 5.
+
 ```jsonc
 {
-  "version": 1,
+  "version": 2,
   "name": "test1",
   "wangSetName": "grass",       // Which WangSet to use for tile resolution
   "width": 20,                  // Grid dimensions
   "height": 20,
-  "colors": [1, 1, 1, 2, ...]  // Flat row-major array (length = width * height)
-                                // Each value is a color ID from the WangSet
+  "layers": [                   // 9 arrays, each flat row-major (length = width * height)
+    [1, 1, 1, 2, ...],         // Layer 0 (base terrain)
+    [0, 0, 0, 0, ...],         // Layer 1
+    // ... up to 9 layers total
+  ],
+  "placedPrefabs": [            // Optional — tracks which prefabs were placed on the map
+    {
+      "prefabName": "tree",     // Name of the prefab (matches prefab filename)
+      "x": 5,                   // Anchor cell X on map
+      "y": 3,                   // Anchor cell Y on map
+      "layer": 0                // Base map layer (0-indexed) the prefab was placed on
+    }
+  ]
 }
 ```
 
-Color values are 1-indexed WangSet color IDs. The array reads left-to-right, top-to-bottom:
+Color values are 1-indexed WangSet color IDs. 0 means empty. Each layer array reads left-to-right, top-to-bottom:
 
 ```javascript
-colors[0]       = cell (0, 0) // top-left
-colors[width-1] = cell (width-1, 0) // top-right
-colors[width]   = cell (0, 1) // second row, first column
+layer[0]       = cell (0, 0) // top-left
+layer[width-1] = cell (width-1, 0) // top-right
+layer[width]   = cell (0, 1) // second row, first column
 ```
 
-Maps are loaded via URL hash: `/tools/map-painter/#map=test1` loads `assets/maps/test1.json`.
+V1 maps (single `colors[]` array) are automatically migrated to v2 on load — the colors become layer 0, all other layers are filled with zeros.
+
+Maps are loaded via URL hash: `/tools/map-painter/#map=test1` loads `assets/maps/test1.json`. Layer can be specified: `#map=test1&layer=2`.
 
 ## Saved Prefabs (`assets/prefabs/<name>.json`)
 
-Prefabs are reusable tile arrangements — a collection of specific tiles placed at grid positions. Unlike maps, prefabs store **exact tile IDs** (not terrain colors), so they reference specific sprites.
+Prefabs are reusable tile arrangements — a collection of specific tiles placed at grid positions across 5 layers. Unlike maps, prefabs store **exact tile IDs** (not terrain colors), so they reference specific sprites.
 
 ```jsonc
 {
-  "version": 1,
+  "version": 2,
   "name": "house front",
-  "tiles": [
-    {
-      "x": 6,                  // Grid position within the prefab canvas
-      "y": 4,
-      "tileId": 661,           // Specific tile from the spritesheet
-      "tilesetIndex": 5        // Which tileset (index into project tilesets[])
-    }
-    // ... more tiles
+  "layers": [                  // 5 layer arrays
+    [                          // Layer 0
+      {
+        "x": 6,               // Grid position within the prefab canvas
+        "y": 4,
+        "tileId": 661,        // Specific tile from the spritesheet
+        "tilesetIndex": 5     // Which tileset (index into project tilesets[])
+      }
+      // ... more tiles
+    ],
+    [],                        // Layer 1 (empty)
+    // ... up to 5 layers total
   ],
-  "anchorX": 0,                // Anchor point for placement origin
+  "anchorX": 0,               // Anchor point for placement origin
   "anchorY": 0
 }
 ```
 
 Prefabs can contain tiles from multiple tilesets (each tile has its own `tilesetIndex`). The anchor point defines the origin when placing the prefab on a map.
+
+V1 prefabs (single `tiles[]` array) are automatically migrated to v2 on load — the tiles become layer 0, other layers are empty.
+
+When a prefab is placed on a map, its layers stack onto consecutive map layers starting from the active layer. For example, placing a prefab on map layer 2 puts prefab layer 0 on map layer 2, prefab layer 1 on map layer 3, etc.
 
 ## How They Connect
 
@@ -237,13 +266,15 @@ project.autotile.json
   └── transformations   ← variant generation config
 
 maps/<name>.json
-  └── colors[]          ← terrain color IDs (resolved to tiles at load time via WangSet)
+  ├── layers[]          ← 9 layers of terrain color IDs (resolved to tiles at load time)
+  └── placedPrefabs[]   ← references to prefabs placed on the map
+        └── prefabName  → prefabs/<name>.json (looked up at load time)
 
 prefabs/<name>.json
-  └── tiles[]           ← exact tileId + tilesetIndex (no autotile resolution)
+  └── layers[]          ← 5 layers of exact tileId + tilesetIndex (no autotile resolution)
 ```
 
-Key difference: **Maps are abstract** (colors only, tiles resolved dynamically) while **prefabs are concrete** (exact tile references).
+Key difference: **Maps are abstract** (colors only, tiles resolved dynamically) while **prefabs are concrete** (exact tile references). When a prefab is placed on a map, its tiles are stamped directly onto the map's tile layers, and a `PlacedPrefab` reference is stored so the placement can be tracked and undone.
 
 ---
 

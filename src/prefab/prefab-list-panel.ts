@@ -1,4 +1,5 @@
 import { PrefabEditorState } from './prefab-state.js';
+import { startInlineEdit } from '../editor/inline-edit.js';
 
 export class PrefabListPanel {
   readonly element: HTMLDivElement;
@@ -58,15 +59,16 @@ export class PrefabListPanel {
         });
         row.appendChild(label);
 
-        // Tile count badge
+        // Tile count badge (sum across all layers)
+        const tileCount = prefab.layers.reduce((sum, l) => sum + l.length, 0);
         const badge = document.createElement('span');
-        badge.textContent = `${prefab.tiles.length}`;
+        badge.textContent = `${tileCount}`;
         badge.style.cssText = `
           font-size: 10px; color: #888;
           background: #2a2a2a; padding: 0 4px;
           border-radius: 2px; border: 1px solid #444;
         `;
-        badge.title = `${prefab.tiles.length} tiles`;
+        badge.title = `${tileCount} tiles`;
         row.appendChild(badge);
 
         row.appendChild(this.rowButton('\u2398', `Duplicate prefab "${name}"`, () => {
@@ -76,11 +78,7 @@ export class PrefabListPanel {
         row.appendChild(this.rowButton('\u00d7', `Delete prefab "${name}"`, () => {
           if (confirm(`Delete prefab "${name}"?`)) {
             this.state.deletePrefab(name);
-            fetch('/api/delete-prefab', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ filename: `${name}.json` }),
-            }).catch(console.error);
+            this.deletePrefabFromServer(name);
           }
         }));
 
@@ -142,44 +140,37 @@ export class PrefabListPanel {
       font-size: 12px; padding: 1px 4px; border-radius: 2px; outline: none;
     `;
 
-    let committed = false;
-    const commit = () => {
-      if (committed) return;
-      committed = true;
-      const newName = input.value.trim();
-      if (newName && newName !== currentName) {
-        this.state.renamePrefab(currentName, newName);
-        const prefab = this.state.prefabs.get(newName);
-        if (prefab) {
-          fetch('/api/save-prefab', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: `${newName}.json`, data: prefab }),
-          }).catch(console.error);
-          fetch('/api/delete-prefab', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: `${currentName}.json` }),
-          }).catch(console.error);
+    startInlineEdit(
+      target,
+      input,
+      (inp) => {
+        const newName = inp.value.trim();
+        if (newName && newName !== currentName) {
+          this.state.renamePrefab(currentName, newName);
+          const prefab = this.state.prefabs.get(newName);
+          if (prefab) {
+            this.savePrefabToServer(newName, prefab);
+            this.deletePrefabFromServer(currentName);
+          }
         }
-      }
-      this.render();
-    };
+      },
+      () => this.render(),
+    );
+  }
 
-    input.addEventListener('keydown', (e) => {
-      e.stopPropagation();
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        commit();
-      } else if (e.key === 'Escape') {
-        committed = true;
-        this.render();
-      }
-    });
-    input.addEventListener('blur', commit);
+  private savePrefabToServer(name: string, data: unknown): void {
+    fetch('/api/save-prefab', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: `${name}.json`, data }),
+    }).catch(console.error);
+  }
 
-    target.replaceWith(input);
-    input.focus();
-    input.select();
+  private deletePrefabFromServer(name: string): void {
+    fetch('/api/delete-prefab', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: `${name}.json` }),
+    }).catch(console.error);
   }
 }

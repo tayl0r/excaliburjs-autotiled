@@ -3,6 +3,7 @@ import { EditorState, TileFilter } from '../editor-state.js';
 import { colRowFromTileId, tileIdFromColRow } from '../../utils/tile-math.js';
 import { templateSlotWangId } from '../template-utils.js';
 import { wangColorHex } from '../../core/wang-color.js';
+import { applyTabStyle } from '../dom-helpers.js';
 
 /**
  * Spritesheet viewer panel rendered on an HTML canvas.
@@ -131,15 +132,7 @@ export class TilesetPanel {
   private updateTilesetTabStyles(): void {
     const activeIdx = this.state.activeTilesetIndex;
     for (const btn of this.tilesetTabs) {
-      const idx = Number(btn.dataset.tilesetIndex);
-      const isActive = idx === activeIdx;
-      btn.style.cssText = `
-        padding: 5px 14px; border: none; cursor: pointer;
-        font-size: 11px; font-family: inherit;
-        background: ${isActive ? '#1e1e3a' : 'transparent'};
-        color: ${isActive ? '#e0e0e0' : '#666'};
-        border-bottom: 2px solid ${isActive ? '#6666cc' : 'transparent'};
-      `;
+      applyTabStyle(btn, Number(btn.dataset.tilesetIndex) === activeIdx);
     }
   }
 

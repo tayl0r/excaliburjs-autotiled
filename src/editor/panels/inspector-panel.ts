@@ -1,8 +1,12 @@
 import { EditorState } from '../editor-state.js';
 import { startInlineEdit } from '../inline-edit.js';
-import type { TileAnimation } from '../../core/metadata-schema.js';
 import { colRowFromTileId } from '../../utils/tile-math.js';
 import { wangColorHex } from '../../core/wang-color.js';
+import {
+  sectionHeader, panelButton, probabilityBadge, numberInput, selectInput,
+  DANGER_BTN_STYLE,
+} from '../dom-helpers.js';
+import type { TileAnimation } from '../../core/metadata-schema.js';
 
 const EMPTY_WANGID = [0, 0, 0, 0, 0, 0, 0, 0];
 
@@ -53,10 +57,7 @@ export class InspectorPanel {
   }
 
   private buildUI(): void {
-    const header = document.createElement('h3');
-    header.textContent = 'Inspector';
-    header.style.cssText = 'margin: 0 0 8px 0; font-size: 13px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;';
-    this.element.appendChild(header);
+    this.element.appendChild(sectionHeader('Inspector'));
 
     // === WangId Section (wrapped in a div for show/hide) ===
     this.wangIdSection = document.createElement('div');
@@ -98,14 +99,12 @@ export class InspectorPanel {
     `;
     gridRow.appendChild(this.gridContainer);
 
-    const fillBtn = document.createElement('button');
-    fillBtn.textContent = 'Fill';
-    fillBtn.title = 'Set all zones to active color';
-    fillBtn.style.cssText = `
+    const fillBtn = panelButton('Fill', `
       background: #2a2a3a; color: #aaa; border: 1px solid #555;
       padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;
       align-self: center;
-    `;
+    `);
+    fillBtn.title = 'Set all zones to active color';
     fillBtn.addEventListener('click', () => this.paintAllZones());
     gridRow.appendChild(fillBtn);
 
@@ -135,12 +134,7 @@ export class InspectorPanel {
     const actions = document.createElement('div');
     actions.style.cssText = 'margin-top: 12px; display: flex; flex-direction: column; gap: 4px;';
 
-    const clearBtn = document.createElement('button');
-    clearBtn.textContent = 'Clear WangId';
-    clearBtn.style.cssText = `
-      background: #4a2020; color: #ccc; border: 1px solid #633;
-      padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;
-    `;
+    const clearBtn = panelButton('Clear WangId', DANGER_BTN_STYLE);
     clearBtn.addEventListener('click', () => {
       if (this.state.selectedTileIds.size > 1) {
         this.state.removeWangTileMulti([...this.state.selectedTileIds]);
@@ -234,6 +228,18 @@ export class InspectorPanel {
     this.animationSection.appendChild(sectionLabel);
 
     // "Is animated?" checkbox
+    this.animationSection.appendChild(this.createAnimatedCheckbox(tileId, anim));
+
+    if (!anim) return;
+
+    this.animationSection.appendChild(this.createAnimationControls(tileId, anim));
+    this.animationSection.appendChild(this.createFrameSlotsGrid(tileId, anim));
+    this.animationSection.appendChild(this.createPopulateRow(tileId, anim));
+    this.animationSection.appendChild(this.createAnimationButtons(tileId, anim));
+    this.animationSection.appendChild(this.createAnimationPreview(anim));
+  }
+
+  private createAnimatedCheckbox(tileId: number, anim: TileAnimation | undefined): HTMLDivElement {
     const checkRow = document.createElement('div');
     checkRow.style.cssText = 'display: flex; align-items: center; gap: 6px; margin-bottom: 8px;';
 
@@ -244,7 +250,6 @@ export class InspectorPanel {
     checkbox.addEventListener('change', () => {
       const selectedIds = [...this.state.selectedTileIds];
       if (checkbox.checked) {
-        // Create default animation for primary tile
         const defaultAnim: TileAnimation = {
           frameDuration: 200,
           pattern: 'loop',
@@ -256,7 +261,6 @@ export class InspectorPanel {
         };
         this.state.setTileAnimation(tileId, defaultAnim);
       } else if (selectedIds.length > 1) {
-        // Remove animation from all selected tiles
         this.state.setTileAnimationMulti(selectedIds, undefined);
       } else {
         this.state.setTileAnimation(tileId, undefined);
@@ -270,15 +274,12 @@ export class InspectorPanel {
     checkLabel.addEventListener('click', () => { checkbox.click(); });
     checkRow.appendChild(checkLabel);
 
-    this.animationSection.appendChild(checkRow);
+    return checkRow;
+  }
 
-    if (!anim) return;
-
-    // Controls row: Duration, Frame count, Pattern
+  private createAnimationControls(tileId: number, anim: TileAnimation): HTMLDivElement {
     const controlsRow = document.createElement('div');
     controlsRow.style.cssText = 'display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; font-size: 11px; align-items: center;';
-
-    const inputStyle = 'background: #1e1e3a; color: #e0e0e0; border: 1px solid #555; font-size: 11px; padding: 2px 4px; border-radius: 3px; width: 50px;';
 
     // Duration
     const durLabel = document.createElement('span');
@@ -286,16 +287,11 @@ export class InspectorPanel {
     durLabel.style.color = '#aaa';
     controlsRow.appendChild(durLabel);
 
-    const durInput = document.createElement('input');
-    durInput.type = 'number';
-    durInput.value = String(anim.frameDuration);
-    durInput.min = '1';
-    durInput.style.cssText = inputStyle;
+    const durInput = numberInput(anim.frameDuration, { min: '1' });
     durInput.addEventListener('change', () => {
       const val = parseInt(durInput.value, 10);
       if (!isNaN(val) && val > 0) {
-        const updated = { ...anim, frameDuration: val };
-        this.state.setTileAnimation(tileId, updated);
+        this.state.setTileAnimation(tileId, { ...anim, frameDuration: val });
       }
     });
     durInput.addEventListener('keydown', (e) => e.stopPropagation());
@@ -312,11 +308,7 @@ export class InspectorPanel {
     fcLabel.style.cssText = 'color: #aaa; margin-left: 6px;';
     controlsRow.appendChild(fcLabel);
 
-    const fcInput = document.createElement('input');
-    fcInput.type = 'number';
-    fcInput.value = String(anim.frames.length);
-    fcInput.min = '1';
-    fcInput.style.cssText = inputStyle;
+    const fcInput = numberInput(anim.frames.length, { min: '1' });
     fcInput.addEventListener('change', () => {
       const val = parseInt(fcInput.value, 10);
       if (!isNaN(val) && val >= 1) {
@@ -325,8 +317,7 @@ export class InspectorPanel {
           frames.push({ tileId: -1, tileset: this.state.activeTilesetIndex });
         }
         if (val < frames.length) frames.length = val;
-        const updated: TileAnimation = { ...anim, frames };
-        this.state.setTileAnimation(tileId, updated);
+        this.state.setTileAnimation(tileId, { ...anim, frames });
       }
     });
     fcInput.addEventListener('keydown', (e) => e.stopPropagation());
@@ -338,123 +329,118 @@ export class InspectorPanel {
     patLabel.style.cssText = 'color: #aaa; margin-left: 6px;';
     controlsRow.appendChild(patLabel);
 
-    const patSelect = document.createElement('select');
-    patSelect.style.cssText = 'background: #1e1e3a; color: #e0e0e0; border: 1px solid #555; font-size: 11px; padding: 2px 4px; border-radius: 3px;';
-    const loopOpt = document.createElement('option');
-    loopOpt.value = 'loop';
-    loopOpt.textContent = 'loop';
-    loopOpt.selected = anim.pattern === 'loop';
-    const ppOpt = document.createElement('option');
-    ppOpt.value = 'ping-pong';
-    ppOpt.textContent = 'ping-pong';
-    ppOpt.selected = anim.pattern === 'ping-pong';
-    patSelect.appendChild(loopOpt);
-    patSelect.appendChild(ppOpt);
+    const patSelect = selectInput(
+      [
+        { value: 'loop', text: 'loop' },
+        { value: 'ping-pong', text: 'ping-pong' },
+      ],
+      anim.pattern,
+    );
     patSelect.addEventListener('change', () => {
-      const updated = { ...anim, pattern: patSelect.value as 'loop' | 'ping-pong' };
-      this.state.setTileAnimation(tileId, updated);
+      this.state.setTileAnimation(tileId, { ...anim, pattern: patSelect.value as 'loop' | 'ping-pong' });
     });
     controlsRow.appendChild(patSelect);
 
-    this.animationSection.appendChild(controlsRow);
+    return controlsRow;
+  }
 
-    // Frame slots label
+  private createFrameSlotsGrid(tileId: number, anim: TileAnimation): HTMLDivElement {
+    const wrapper = document.createElement('div');
+
     const slotsLabel = document.createElement('div');
     slotsLabel.textContent = 'Frame Slots';
     slotsLabel.style.cssText = 'font-size: 11px; color: #888; margin-bottom: 4px;';
-    this.animationSection.appendChild(slotsLabel);
+    wrapper.appendChild(slotsLabel);
 
-    // Frame slots grid
     const slotsContainer = document.createElement('div');
     slotsContainer.style.cssText = 'display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px;';
 
     anim.frames.forEach((frame, frameIdx) => {
-      const slotWrapper = document.createElement('div');
-      slotWrapper.style.cssText = 'position: relative;';
-
-      const isLocked = frameIdx === 0;
-      const canvas = document.createElement('canvas');
-      canvas.width = 48;
-      canvas.height = 48;
-      canvas.style.cssText = `
-        image-rendering: pixelated;
-        border: 2px solid ${isLocked ? '#6666cc' : '#444'};
-        border-radius: 3px;
-        background: #111;
-      `;
-
-      if (frame.tileId >= 0) {
-        this.drawFrameThumb(canvas, frame.tileId, frame.tileset);
-      } else {
-        // Dashed empty box
-        const ctx = canvas.getContext('2d')!;
-        ctx.strokeStyle = '#555';
-        ctx.setLineDash([4, 3]);
-        ctx.strokeRect(4, 4, 40, 40);
-      }
-
-      slotWrapper.appendChild(canvas);
-
-      // Frame number label
-      const label = document.createElement('div');
-      label.textContent = String(frameIdx);
-      label.style.cssText = `
-        position: absolute; top: 2px; left: 4px;
-        font-size: 9px; color: rgba(255,255,255,0.6);
-        background: rgba(0,0,0,0.5); padding: 0 3px;
-        border-radius: 2px; pointer-events: none;
-      `;
-      slotWrapper.appendChild(label);
-
-      // X button to clear slot (only if assigned and not locked frame 0)
-      if (frame.tileId >= 0 && frameIdx > 0) {
-        const clearBtn = document.createElement('button');
-        clearBtn.textContent = '\u00d7';
-        clearBtn.style.cssText = `
-          position: absolute; top: 2px; right: 2px;
-          background: rgba(0,0,0,0.7); color: #ccc; border: none;
-          cursor: pointer; font-size: 12px; line-height: 1;
-          padding: 0 3px; border-radius: 2px;
-        `;
-        clearBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const frames = anim.frames.map((f, i) =>
-            i === frameIdx ? { tileId: -1, tileset: this.state.activeTilesetIndex } : { ...f }
-          );
-          this.state.setTileAnimation(tileId, { ...anim, frames });
-        });
-        slotWrapper.appendChild(clearBtn);
-      }
-
-      slotsContainer.appendChild(slotWrapper);
+      slotsContainer.appendChild(this.createFrameSlot(tileId, anim, frame, frameIdx));
     });
 
-    this.animationSection.appendChild(slotsContainer);
+    wrapper.appendChild(slotsContainer);
+    return wrapper;
+  }
 
-    // "Populate from offset" row
+  private createFrameSlot(
+    tileId: number,
+    anim: TileAnimation,
+    frame: { tileId: number; tileset: number },
+    frameIdx: number,
+  ): HTMLDivElement {
+    const slotWrapper = document.createElement('div');
+    slotWrapper.style.cssText = 'position: relative;';
+
+    const isLocked = frameIdx === 0;
+    const canvas = document.createElement('canvas');
+    canvas.width = 48;
+    canvas.height = 48;
+    canvas.style.cssText = `
+      image-rendering: pixelated;
+      border: 2px solid ${isLocked ? '#6666cc' : '#444'};
+      border-radius: 3px;
+      background: #111;
+    `;
+
+    if (frame.tileId >= 0) {
+      this.drawFrameThumb(canvas, frame.tileId, frame.tileset);
+    } else {
+      const ctx = canvas.getContext('2d')!;
+      ctx.strokeStyle = '#555';
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(4, 4, 40, 40);
+    }
+
+    slotWrapper.appendChild(canvas);
+
+    // Frame number label
+    const label = document.createElement('div');
+    label.textContent = String(frameIdx);
+    label.style.cssText = `
+      position: absolute; top: 2px; left: 4px;
+      font-size: 9px; color: rgba(255,255,255,0.6);
+      background: rgba(0,0,0,0.5); padding: 0 3px;
+      border-radius: 2px; pointer-events: none;
+    `;
+    slotWrapper.appendChild(label);
+
+    // X button to clear slot (only if assigned and not locked frame 0)
+    if (frame.tileId >= 0 && frameIdx > 0) {
+      const clearBtn = document.createElement('button');
+      clearBtn.textContent = '\u00d7';
+      clearBtn.style.cssText = `
+        position: absolute; top: 2px; right: 2px;
+        background: rgba(0,0,0,0.7); color: #ccc; border: none;
+        cursor: pointer; font-size: 12px; line-height: 1;
+        padding: 0 3px; border-radius: 2px;
+      `;
+      clearBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const frames = anim.frames.map((f, i) =>
+          i === frameIdx ? { tileId: -1, tileset: this.state.activeTilesetIndex } : { ...f }
+        );
+        this.state.setTileAnimation(tileId, { ...anim, frames });
+      });
+      slotWrapper.appendChild(clearBtn);
+    }
+
+    return slotWrapper;
+  }
+
+  private createPopulateRow(tileId: number, anim: TileAnimation): HTMLDivElement {
     const offsetRow = document.createElement('div');
     offsetRow.style.cssText = 'display: flex; align-items: center; gap: 6px; margin-bottom: 8px;';
 
-    const offsetInput = document.createElement('input');
-    offsetInput.type = 'number';
-    offsetInput.value = '3';
-    offsetInput.min = '1';
-    offsetInput.style.cssText = inputStyle;
+    const offsetInput = numberInput(3, { min: '1' });
     offsetInput.addEventListener('keydown', (e) => e.stopPropagation());
     offsetRow.appendChild(offsetInput);
 
-    const populateBtn = document.createElement('button');
-    populateBtn.textContent = 'Populate from offset';
-    populateBtn.style.cssText = `
-      background: #333; color: #ccc; border: 1px solid #555;
-      cursor: pointer; font-size: 11px; padding: 4px 10px;
-      border-radius: 3px;
-    `;
+    const populateBtn = panelButton('Populate from offset');
     populateBtn.addEventListener('click', () => {
       const offset = parseInt(offsetInput.value, 10);
       if (isNaN(offset) || offset <= 0) return;
-      const frameCount = anim.frames.length;
-      const frames = Array.from({ length: frameCount }, (_, i) => ({
+      const frames = Array.from({ length: anim.frames.length }, (_, i) => ({
         tileId: tileId + i * offset,
         tileset: this.state.activeTilesetIndex,
       }));
@@ -462,20 +448,16 @@ export class InspectorPanel {
     });
     offsetRow.appendChild(populateBtn);
 
-    this.animationSection.appendChild(offsetRow);
+    return offsetRow;
+  }
 
-    // Buttons row
+  private createAnimationButtons(tileId: number, anim: TileAnimation): HTMLDivElement {
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px;';
 
     // Copy animation button
-    const copyBtn = document.createElement('button');
-    copyBtn.textContent = 'Copy Animation';
-    copyBtn.style.cssText = `
-      background: #333; color: #ccc; border: 1px solid #555;
-      cursor: pointer; font-size: 11px; padding: 6px 10px;
-      border-radius: 3px; width: 100%;
-    `;
+    const copyBtn = panelButton('Copy Animation');
+    copyBtn.style.cssText += 'padding: 6px 10px; width: 100%;';
     copyBtn.addEventListener('click', () => {
       this.state.copyTileAnimation();
     });
@@ -483,13 +465,11 @@ export class InspectorPanel {
 
     // Paste animation button (only when clipboard has data)
     if (this.state.animationClipboard) {
-      const pasteBtn = document.createElement('button');
-      pasteBtn.textContent = 'Paste Animation';
-      pasteBtn.style.cssText = `
+      const pasteBtn = panelButton('Paste Animation', `
         background: #2a3a2a; color: #ccc; border: 1px solid #585;
         cursor: pointer; font-size: 11px; padding: 6px 10px;
         border-radius: 3px; width: 100%;
-      `;
+      `);
       pasteBtn.addEventListener('click', () => {
         this.state.pasteTileAnimation();
       });
@@ -501,26 +481,27 @@ export class InspectorPanel {
     const colorId = this.state.activeColorId;
     if (ws && colorId > 0 && colorId <= ws.colors.length) {
       const colorName = ws.colors[colorId - 1].name;
-      const applyBtn = document.createElement('button');
-      applyBtn.textContent = `Apply to all ${colorName} tiles`;
-      applyBtn.style.cssText = `
+      const applyBtn = panelButton(`Apply to all ${colorName} tiles`, `
         background: #2a2a3a; color: #ccc; border: 1px solid #558;
         cursor: pointer; font-size: 11px; padding: 6px 10px;
         border-radius: 3px; width: 100%;
-      `;
+      `);
       applyBtn.addEventListener('click', () => {
         this.state.applyAnimationToColorTiles(colorId);
       });
       btnRow.appendChild(applyBtn);
     }
 
-    this.animationSection.appendChild(btnRow);
+    return btnRow;
+  }
 
-    // Animation preview
+  private createAnimationPreview(anim: TileAnimation): HTMLDivElement {
+    const wrapper = document.createElement('div');
+
     const previewLabel = document.createElement('div');
     previewLabel.textContent = 'Preview';
     previewLabel.style.cssText = 'font-size: 11px; color: #888; margin-bottom: 4px;';
-    this.animationSection.appendChild(previewLabel);
+    wrapper.appendChild(previewLabel);
 
     const previewCanvas = document.createElement('canvas');
     previewCanvas.width = 64;
@@ -532,11 +513,11 @@ export class InspectorPanel {
       background: #111;
       margin-bottom: 4px;
     `;
-    this.animationSection.appendChild(previewCanvas);
+    wrapper.appendChild(previewCanvas);
 
     const frameCounter = document.createElement('div');
     frameCounter.style.cssText = 'font-size: 11px; color: #888;';
-    this.animationSection.appendChild(frameCounter);
+    wrapper.appendChild(frameCounter);
 
     // Only animate if there are valid frames
     const validFrames = anim.frames.filter(f => f.tileId >= 0);
@@ -545,7 +526,7 @@ export class InspectorPanel {
       let direction = 1;
       const frameCount = anim.frames.length;
 
-      const renderFrame = () => {
+      const renderFrame = (): void => {
         const ctx = previewCanvas.getContext('2d')!;
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, 64, 64);
@@ -579,6 +560,8 @@ export class InspectorPanel {
     } else {
       frameCounter.textContent = 'No tiles assigned';
     }
+
+    return wrapper;
   }
 
   private cleanUpAnimPreview(): void {
@@ -706,44 +689,30 @@ export class InspectorPanel {
     if (!wt) return;
 
     const prob = wt.probability ?? 1.0;
-    const isDefault = prob === 1.0;
 
     const label = document.createElement('span');
     label.textContent = 'Tile Prob ';
     label.style.cssText = 'font-size: 11px; color: #888;';
     this.probabilityContainer.appendChild(label);
 
-    const badge = document.createElement('span');
-    badge.textContent = `P:${+prob.toPrecision(4)}`;
-    badge.style.cssText = `
-      font-size: 10px; color: ${isDefault ? '#888' : '#eeb300'};
-      background: #2a2a2a; padding: 0 4px;
-      border-radius: 2px; border: 1px solid ${isDefault ? '#444' : '#887700'};
-      cursor: pointer; user-select: none;
-    `;
-    badge.title = 'Click to edit tile probability';
-    badge.addEventListener('click', (e) => {
+    const probBadge = probabilityBadge(prob);
+    probBadge.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.startTileProbabilityEdit(badge, tileId);
+      this.startTileProbabilityEdit(probBadge, tileId);
     });
-    this.probabilityContainer.appendChild(badge);
+    this.probabilityContainer.appendChild(probBadge);
   }
 
-  private startTileProbabilityEdit(badge: HTMLSpanElement, tileId: number): void {
+  private startTileProbabilityEdit(elem: HTMLSpanElement, tileId: number): void {
     const wt = this.state.getWangTile(tileId);
     if (!wt) return;
 
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.min = '0';
-    input.step = '0.1';
-    input.value = String(wt.probability ?? 1.0);
-    input.style.cssText = `
-      width: 48px; background: #1e1e3a; color: #e0e0e0; border: 1px solid #6666cc;
-      font-size: 11px; padding: 1px 4px; border-radius: 2px; outline: none;
-    `;
+    const input = numberInput(wt.probability ?? 1.0, {
+      min: '0', step: '0.1', width: '48px',
+    });
+    input.style.cssText += '; border-color: #6666cc; outline: none;';
 
-    startInlineEdit(badge, input, () => {
+    startInlineEdit(elem, input, () => {
       const val = parseFloat(input.value);
       if (!isNaN(val) && val >= 0) {
         if (this.state.selectedTileIds.size > 1) {

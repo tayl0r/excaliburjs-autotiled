@@ -1,5 +1,6 @@
 import { PrefabEditorState } from './prefab-state.js';
 import { colRowFromTileId, tileIdFromColRow, computeTileBounds } from '../utils/tile-math.js';
+import { buildCanvasLayout, drawGridLines, attachWheelZoom } from './canvas-helpers.js';
 
 export class TilesetViewerPanel {
   readonly element: HTMLDivElement;
@@ -19,32 +20,11 @@ export class TilesetViewerPanel {
     this.state = state;
     this.images = images;
 
-    this.element = document.createElement('div');
-    this.element.style.cssText = `
-      width: 100%; height: 100%;
-      display: flex; flex-direction: column;
-      position: relative;
-    `;
-
-    // Status bar
-    this.statusBar = document.createElement('div');
-    this.statusBar.style.cssText = `
-      flex-shrink: 0; padding: 4px 8px;
-      background: #16213e; border-bottom: 1px solid #333;
-      font-size: 11px; color: #999; text-align: center;
-    `;
-    this.element.appendChild(this.statusBar);
-
-    const scrollArea = document.createElement('div');
-    scrollArea.style.cssText = 'flex: 1; overflow: auto; cursor: crosshair;';
-
-    this.canvas = document.createElement('canvas');
-    this.canvas.style.cssText = 'image-rendering: pixelated;';
-    scrollArea.appendChild(this.canvas);
-    this.element.appendChild(scrollArea);
-
-    this.ctx = this.canvas.getContext('2d')!;
-    this.ctx.imageSmoothingEnabled = false;
+    const layout = buildCanvasLayout();
+    this.element = layout.element;
+    this.statusBar = layout.statusBar;
+    this.canvas = layout.canvas;
+    this.ctx = layout.ctx;
 
     // Tooltip
     this.tooltip = document.createElement('div');
@@ -146,13 +126,11 @@ export class TilesetViewerPanel {
       this.render();
     });
 
-    this.element.addEventListener('wheel', (e) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const factor = Math.pow(1.01, -e.deltaY);
-        this.state.setTilesetZoom(this.state.tilesetZoom * factor);
-      }
-    }, { passive: false });
+    attachWheelZoom(
+      this.element,
+      () => this.state.tilesetZoom,
+      (z) => this.state.setTilesetZoom(z),
+    );
   }
 
   private tileIdAtMouse(e: MouseEvent): number {
@@ -192,23 +170,7 @@ export class TilesetViewerPanel {
     // Draw spritesheet
     this.ctx.drawImage(this.images[this.state.activeTilesetIndex], 0, 0, cw, ch);
 
-    // Grid lines
-    this.ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    this.ctx.lineWidth = 1;
-    for (let c = 0; c <= columns; c++) {
-      const x = c * tw;
-      this.ctx.beginPath();
-      this.ctx.moveTo(x + 0.5, 0);
-      this.ctx.lineTo(x + 0.5, ch);
-      this.ctx.stroke();
-    }
-    for (let r = 0; r <= rows; r++) {
-      const y = r * th;
-      this.ctx.beginPath();
-      this.ctx.moveTo(0, y + 0.5);
-      this.ctx.lineTo(cw, y + 0.5);
-      this.ctx.stroke();
-    }
+    drawGridLines(this.ctx, columns, rows, tw, th, 'rgba(255,255,255,0.1)');
 
     // Hover highlight
     if (this.hoveredTileId >= 0) {

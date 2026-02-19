@@ -25,11 +25,9 @@ export function wangIdFromSurroundings(
 
     const neighborCell = map.cellAt(nx, ny);
     if (neighborCell.tileId < 0) {
-      // No tile placed, use painted color as a hint
+      // No tile placed yet — assume all edges/corners match the painted color
       const neighborColor = map.colorAt(nx, ny);
       if (neighborColor > 0) {
-        // For the neighbor's color, we want the OPPOSITE index's value
-        // Since the neighbor is painted as a solid color, all its corners/edges are that color
         colors[index] = neighborColor;
       }
       continue;
