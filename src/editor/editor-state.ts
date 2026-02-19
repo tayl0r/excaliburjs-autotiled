@@ -46,7 +46,7 @@ export class EditorState {
   private _wangClipboard: WangRegionClipboard | null = null;
   private _animationClipboard: { animation: TileAnimation; offset: number } | null = null;
   private listeners = new Map<EditorEvent, Set<Listener>>();
-  private undoManager = new UndoManager();
+  private undoManager = new UndoManager<ProjectMetadata>();
 
   constructor(metadata: ProjectMetadata) {
     this._metadata = metadata;

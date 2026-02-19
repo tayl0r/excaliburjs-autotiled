@@ -129,8 +129,110 @@ function mapSavePlugin(): Plugin {
   };
 }
 
+/** Vite plugin for saving, listing, and deleting prefab files. */
+function prefabSavePlugin(): Plugin {
+  return {
+    name: 'prefab-save',
+    configureServer(server) {
+      server.middlewares.use('/api/save-prefab', (req, res) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end('Method not allowed');
+          return;
+        }
+
+        let body = '';
+        req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+        req.on('end', () => {
+          try {
+            const { filename, data } = JSON.parse(body);
+            if (!filename || !data) {
+              res.statusCode = 400;
+              res.end('Missing filename or data');
+              return;
+            }
+
+            const safeName = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '');
+            if (!safeName.endsWith('.json')) {
+              res.statusCode = 400;
+              res.end('Filename must end with .json');
+              return;
+            }
+
+            const prefabsDir = path.resolve(__dirname, 'assets/metadata/prefabs');
+            if (!fs.existsSync(prefabsDir)) {
+              fs.mkdirSync(prefabsDir, { recursive: true });
+            }
+
+            const outPath = path.resolve(prefabsDir, safeName);
+            const json = JSON.stringify(data, null, 2) + '\n';
+            fs.writeFileSync(outPath, json, 'utf-8');
+
+            console.log(`\n[prefab-save] Saved ${safeName} (${json.length} bytes) to ${outPath}`);
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ ok: true, path: outPath }));
+          } catch (err) {
+            res.statusCode = 500;
+            res.end(String(err));
+          }
+        });
+      });
+
+      server.middlewares.use('/api/list-prefabs', (_req, res) => {
+        try {
+          const prefabsDir = path.resolve(__dirname, 'assets/metadata/prefabs');
+          const files = fs.existsSync(prefabsDir)
+            ? fs.readdirSync(prefabsDir).filter(f => f.endsWith('.json'))
+            : [];
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ files }));
+        } catch (err) {
+          res.statusCode = 500;
+          res.end(String(err));
+        }
+      });
+
+      server.middlewares.use('/api/delete-prefab', (req, res) => {
+        if (req.method !== 'DELETE' && req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end('Method not allowed');
+          return;
+        }
+
+        let body = '';
+        req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+        req.on('end', () => {
+          try {
+            const { filename } = JSON.parse(body);
+            if (!filename) {
+              res.statusCode = 400;
+              res.end('Missing filename');
+              return;
+            }
+
+            const safeName = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '');
+            const prefabsDir = path.resolve(__dirname, 'assets/metadata/prefabs');
+            const filePath = path.resolve(prefabsDir, safeName);
+
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+              console.log(`\n[prefab-save] Deleted ${safeName}`);
+            }
+
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ ok: true }));
+          } catch (err) {
+            res.statusCode = 500;
+            res.end(String(err));
+          }
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [metadataSavePlugin(), mapSavePlugin()],
+  plugins: [metadataSavePlugin(), mapSavePlugin(), prefabSavePlugin()],
   build: {
     target: 'esnext',
     rollupOptions: {
@@ -138,6 +240,7 @@ export default defineConfig({
         main: path.resolve(__dirname, 'index.html'),
         'tileset-editor': path.resolve(__dirname, 'tools/tileset-editor/index.html'),
         'map-painter': path.resolve(__dirname, 'tools/map-painter/index.html'),
+        'prefab-editor': path.resolve(__dirname, 'tools/prefab-editor/index.html'),
       },
     },
   },

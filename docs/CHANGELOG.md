@@ -312,6 +312,34 @@ Verification: `tsc --noEmit` clean, 194 tests passing.
 
 ---
 
+## 2026-02-18: Prefab Editor Tool
+
+New third tool — a prefab editor at `/tools/prefab-editor/` for composing reusable tile arrangements ("prefabs") by selecting tiles from tilesets and stamping them onto a grid canvas.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Prefab schema (`PrefabTile`, `SavedPrefab`) | Done | `src/core/prefab-schema.ts` |
+| Prefab editor state with pub/sub | Done | `src/prefab/prefab-state.ts` — 7 event types, CRUD, tile placement, tool/zoom management |
+| Vite API endpoints | Done | `prefabSavePlugin()` in `vite.config.ts` — `POST /api/save-prefab`, `GET /api/list-prefabs`, `DELETE /api/delete-prefab` |
+| HTML page + entry point | Done | `tools/prefab-editor/index.html`, `src/prefab-editor-main.ts` |
+| Landing page link | Done | Added "Prefab Editor" to `index.html` |
+| Prefab editor controller + layout | Done | `src/prefab/prefab-editor.ts` — 3-zone grid layout, toolbar, autosave (5s debounce), keyboard shortcuts |
+| Tileset viewer panel | Done | `src/prefab/tileset-viewer.ts` — spritesheet rendering, click/shift/ctrl selection, zoom, tooltip |
+| Prefab list panel | Done | `src/prefab/prefab-list-panel.ts` — CRUD with inline rename, delete with server sync, tile count badge |
+| Prefab canvas panel | Done | `src/prefab/prefab-canvas.ts` — grid rendering, tile stamp preview, placed tile drawing, anchor highlight, paint/erase/anchor tools |
+| Move tool | Done | `src/prefab/prefab-canvas.ts` — select-rectangle + drag-to-move with ghost preview, single undo step |
+| Copy tool | Done | `src/prefab/prefab-canvas.ts` — select-rectangle copies tiles as stamp, switches to paint mode for stamping |
+| Keyboard shortcuts | Done | `E` toggles eraser, `M` toggles move, `C` toggles copy |
+| Autosave wiring | Done | `prefabDataChanged` → 5s debounce → `POST /api/save-prefab` |
+| Startup loading | Done | Fetches prefab list + all prefab JSONs on page load |
+| Vite build config | Done | Added `prefab-editor` to rollup input |
+
+Prefabs saved as individual JSON files in `assets/metadata/prefabs/<name>.json`.
+
+Verification: `tsc --noEmit` clean, 194 tests passing.
+
+---
+
 ## Summary
 
 ### Fully Complete
@@ -336,6 +364,7 @@ Verification: `tsc --noEmit` clean, 194 tests passing.
 - Ground terrain asset authoring (terrain.autotile.json → project.autotile.json)
 - Multi-tileset data model (ProjectMetadata, TilesetDef, Cell.tilesetIndex, composite WangSet keys)
 - Legacy code removed — all code uses ProjectMetadata v2 exclusively (no migration needed)
+- Prefab editor tool — compose reusable tile arrangements with paint/erase/anchor/move/copy tools, autosave, multi-tileset support
 
 ### Partially Complete
 

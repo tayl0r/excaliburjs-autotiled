@@ -1,0 +1,191 @@
+import { PrefabEditorState } from './prefab-state.js';
+
+export class PrefabListPanel {
+  readonly element: HTMLDivElement;
+  private state: PrefabEditorState;
+  private listContainer: HTMLDivElement;
+
+  constructor(state: PrefabEditorState) {
+    this.state = state;
+
+    this.element = document.createElement('div');
+
+    const header = document.createElement('h3');
+    header.textContent = 'Prefabs';
+    header.style.cssText = 'margin: 0 0 8px 0; font-size: 13px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;';
+    this.element.appendChild(header);
+
+    this.listContainer = document.createElement('div');
+    this.element.appendChild(this.listContainer);
+
+    this.state.on('prefabListChanged', () => this.render());
+    this.state.on('activePrefabChanged', () => this.render());
+    this.state.on('prefabDataChanged', () => this.render());
+
+    this.render();
+  }
+
+  private render(): void {
+    this.listContainer.replaceChildren();
+
+    const prefabs = this.state.prefabs;
+
+    if (prefabs.size === 0) {
+      const empty = document.createElement('div');
+      empty.textContent = 'No prefabs yet.';
+      empty.style.cssText = 'color: #666; font-style: italic; padding: 8px 0;';
+      this.listContainer.appendChild(empty);
+    } else {
+      for (const [name, prefab] of prefabs) {
+        const row = document.createElement('div');
+        const isActive = name === this.state.activePrefabName;
+        row.style.cssText = `
+          display: flex; align-items: center; gap: 6px;
+          padding: 4px 6px; margin: 2px 0;
+          cursor: pointer; border-radius: 3px;
+          background: ${isActive ? '#3a3a6a' : 'transparent'};
+          border: 1px solid ${isActive ? '#6666cc' : 'transparent'};
+        `;
+        row.addEventListener('click', () => this.state.setActivePrefab(name));
+
+        // Name label (double-click to rename)
+        const label = document.createElement('span');
+        label.textContent = name;
+        label.style.cssText = 'flex: 1; font-size: 12px;';
+        label.addEventListener('dblclick', (e) => {
+          e.stopPropagation();
+          this.startInlineRename(label, name);
+        });
+        row.appendChild(label);
+
+        // Tile count badge
+        const badge = document.createElement('span');
+        badge.textContent = `${prefab.tiles.length}`;
+        badge.style.cssText = `
+          font-size: 10px; color: #888;
+          background: #2a2a2a; padding: 0 4px;
+          border-radius: 2px; border: 1px solid #444;
+        `;
+        badge.title = `${prefab.tiles.length} tiles`;
+        row.appendChild(badge);
+
+        // Copy button
+        const copyBtn = document.createElement('button');
+        copyBtn.textContent = '\u2398';
+        copyBtn.title = `Duplicate prefab "${name}"`;
+        copyBtn.style.cssText = `
+          background: #333; color: #ccc; border: none; cursor: pointer;
+          font-size: 12px; line-height: 1; padding: 1px 5px;
+          border-radius: 3px;
+        `;
+        copyBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.state.duplicatePrefab(name);
+        });
+        row.appendChild(copyBtn);
+
+        // Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '\u00d7';
+        deleteBtn.title = `Delete prefab "${name}"`;
+        deleteBtn.style.cssText = `
+          background: #333; color: #ccc; border: none; cursor: pointer;
+          font-size: 12px; line-height: 1; padding: 1px 5px;
+          border-radius: 3px;
+        `;
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (confirm(`Delete prefab "${name}"?`)) {
+            this.state.deletePrefab(name);
+            fetch('/api/delete-prefab', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ filename: `${name}.json` }),
+            }).catch(console.error);
+          }
+        });
+        row.appendChild(deleteBtn);
+
+        this.listContainer.appendChild(row);
+      }
+    }
+
+    // "+ New Prefab" button
+    const addBtn = document.createElement('button');
+    addBtn.textContent = '+ New Prefab';
+    addBtn.style.cssText = `
+      background: #333; color: #ccc; border: 1px solid #555;
+      cursor: pointer; font-size: 11px; padding: 4px 10px;
+      border-radius: 3px; margin-top: 8px; width: 100%;
+    `;
+    addBtn.addEventListener('click', () => {
+      let n = this.state.prefabs.size + 1;
+      let name = `Prefab ${n}`;
+      while (this.state.prefabs.has(name)) {
+        n++;
+        name = `Prefab ${n}`;
+      }
+      this.state.createPrefab(name);
+      // createPrefab triggers prefabListChanged -> render(), which rebuilds the DOM.
+      // Find the newly created label and start inline editing it.
+      const labels = this.listContainer.querySelectorAll('span');
+      for (const span of labels) {
+        if (span.textContent === name) {
+          this.startInlineRename(span as HTMLSpanElement, name);
+          break;
+        }
+      }
+    });
+    this.listContainer.appendChild(addBtn);
+  }
+
+  private startInlineRename(target: HTMLSpanElement, currentName: string): void {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentName;
+    input.style.cssText = `
+      flex: 1; background: #1e1e3a; color: #e0e0e0; border: 1px solid #6666cc;
+      font-size: 12px; padding: 1px 4px; border-radius: 2px; outline: none;
+    `;
+
+    let committed = false;
+    const commit = () => {
+      if (committed) return;
+      committed = true;
+      const newName = input.value.trim();
+      if (newName && newName !== currentName) {
+        this.state.renamePrefab(currentName, newName);
+        const prefab = this.state.prefabs.get(newName);
+        if (prefab) {
+          fetch('/api/save-prefab', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: `${newName}.json`, data: prefab }),
+          }).catch(console.error);
+          fetch('/api/delete-prefab', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: `${currentName}.json` }),
+          }).catch(console.error);
+        }
+      }
+      this.render();
+    };
+
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commit();
+      } else if (e.key === 'Escape') {
+        committed = true;
+        this.render();
+      }
+    });
+    input.addEventListener('blur', commit);
+
+    target.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+}

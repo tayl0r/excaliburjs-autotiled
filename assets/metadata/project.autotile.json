@@ -14,6 +14,55 @@
       "tileHeight": 16,
       "columns": 51,
       "tileCount": 2805
+    },
+    {
+      "tilesetImage": "castle.png",
+      "tileWidth": 16,
+      "tileHeight": 16,
+      "columns": 34,
+      "tileCount": 578
+    },
+    {
+      "tilesetImage": "desert.png",
+      "tileWidth": 16,
+      "tileHeight": 16,
+      "columns": 18,
+      "tileCount": 414
+    },
+    {
+      "tilesetImage": "dungeon.png",
+      "tileWidth": 16,
+      "tileHeight": 16,
+      "columns": 51,
+      "tileCount": 1479
+    },
+    {
+      "tilesetImage": "house.png",
+      "tileWidth": 16,
+      "tileHeight": 16,
+      "columns": 69,
+      "tileCount": 2622
+    },
+    {
+      "tilesetImage": "inside.png",
+      "tileWidth": 16,
+      "tileHeight": 16,
+      "columns": 48,
+      "tileCount": 1680
+    },
+    {
+      "tilesetImage": "outside.png",
+      "tileWidth": 16,
+      "tileHeight": 16,
+      "columns": 52,
+      "tileCount": 1248
+    },
+    {
+      "tilesetImage": "world.png",
+      "tileWidth": 16,
+      "tileHeight": 16,
+      "columns": 39,
+      "tileCount": 1014
     }
   ],
   "transformations": {

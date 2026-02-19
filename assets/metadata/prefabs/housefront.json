@@ -1,0 +1,302 @@
+{
+  "version": 1,
+  "name": "house front",
+  "tiles": [
+    {
+      "x": 6,
+      "y": 4,
+      "tileId": 661,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "tileId": 662,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 8,
+      "y": 4,
+      "tileId": 663,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 9,
+      "y": 4,
+      "tileId": 664,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 10,
+      "y": 4,
+      "tileId": 665,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 11,
+      "y": 4,
+      "tileId": 666,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 12,
+      "y": 4,
+      "tileId": 667,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "tileId": 730,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "tileId": 731,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "tileId": 732,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 9,
+      "y": 5,
+      "tileId": 733,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 10,
+      "y": 5,
+      "tileId": 734,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 11,
+      "y": 5,
+      "tileId": 735,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 12,
+      "y": 5,
+      "tileId": 736,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 6,
+      "y": 6,
+      "tileId": 799,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 7,
+      "y": 6,
+      "tileId": 800,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 8,
+      "y": 6,
+      "tileId": 801,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 9,
+      "y": 6,
+      "tileId": 802,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 10,
+      "y": 6,
+      "tileId": 803,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 11,
+      "y": 6,
+      "tileId": 804,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 12,
+      "y": 6,
+      "tileId": 805,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 6,
+      "y": 7,
+      "tileId": 1282,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 7,
+      "y": 7,
+      "tileId": 1283,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 8,
+      "y": 7,
+      "tileId": 1284,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 9,
+      "y": 7,
+      "tileId": 1285,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 10,
+      "y": 7,
+      "tileId": 1286,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 11,
+      "y": 7,
+      "tileId": 1287,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 12,
+      "y": 7,
+      "tileId": 1288,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 6,
+      "y": 8,
+      "tileId": 1351,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 7,
+      "y": 8,
+      "tileId": 1352,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 8,
+      "y": 8,
+      "tileId": 1353,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 9,
+      "y": 8,
+      "tileId": 1354,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 10,
+      "y": 8,
+      "tileId": 1355,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 11,
+      "y": 8,
+      "tileId": 1356,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 12,
+      "y": 8,
+      "tileId": 1357,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 7,
+      "y": 9,
+      "tileId": 970,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 7,
+      "y": 10,
+      "tileId": 1039,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 8,
+      "y": 9,
+      "tileId": 971,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 8,
+      "y": 10,
+      "tileId": 1040,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 9,
+      "y": 9,
+      "tileId": 972,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 9,
+      "y": 10,
+      "tileId": 1041,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 10,
+      "y": 9,
+      "tileId": 978,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 10,
+      "y": 10,
+      "tileId": 1047,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 11,
+      "y": 9,
+      "tileId": 979,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 11,
+      "y": 10,
+      "tileId": 1048,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 6,
+      "y": 9,
+      "tileId": 967,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 6,
+      "y": 10,
+      "tileId": 1036,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 12,
+      "y": 9,
+      "tileId": 969,
+      "tilesetIndex": 5
+    },
+    {
+      "x": 12,
+      "y": 10,
+      "tileId": 1038,
+      "tilesetIndex": 5
+    }
+  ],
+  "anchorX": 6,
+  "anchorY": 10
+}
