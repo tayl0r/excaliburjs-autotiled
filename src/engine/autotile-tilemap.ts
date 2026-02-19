@@ -5,7 +5,7 @@ import { applyTerrainPaint, resolveAllTiles } from '../core/terrain-painter.js';
 import { floodFillTerrain } from '../core/flood-fill.js';
 import type { WangSetData } from '../core/metadata-schema.js';
 import type { SavedMap } from '../core/map-schema.js';
-import { createCell } from '../core/cell.js';
+import { type Cell, createCell } from '../core/cell.js';
 import { SpriteResolver } from './sprite-resolver.js';
 import { AnimationController } from './animation-controller.js';
 
@@ -14,8 +14,6 @@ export class AutotileTilemap {
   readonly autoMap: SimpleAutotileMap;
   private wangSet: WangSet;
   private spriteResolver: SpriteResolver;
-  private tileWidth: number;
-  private tileHeight: number;
   private animController?: AnimationController;
 
   constructor(
@@ -27,8 +25,6 @@ export class AutotileTilemap {
     spriteResolver: SpriteResolver,
     defaultColor: number = 1
   ) {
-    this.tileWidth = tileWidth;
-    this.tileHeight = tileHeight;
     this.wangSet = wangSet;
     this.spriteResolver = spriteResolver;
 
@@ -44,27 +40,14 @@ export class AutotileTilemap {
 
   /** Paint terrain at (x, y) and refresh affected tiles */
   paintTerrain(x: number, y: number, colorId: number): void {
-    const affected = applyTerrainPaint(this.autoMap, this.wangSet, x, y, colorId);
-
-    for (const [ax, ay] of affected) {
-      this.refreshTile(ax, ay);
-    }
+    this.refreshAffected(applyTerrainPaint(this.autoMap, this.wangSet, x, y, colorId));
   }
 
   /** Refresh the visual tile at (x, y) from the autoMap */
   refreshTile(x: number, y: number): void {
     const cell = this.autoMap.cellAt(x, y);
     if (cell.tileId < 0) return;
-
-    const tile = this.tileMap.getTile(x, y);
-    if (!tile) return;
-
-    tile.clearGraphics();
-
-    const sprite = this.spriteResolver.resolve(cell);
-    if (sprite) {
-      tile.addGraphic(sprite);
-    }
+    this.renderCell(x, y, cell);
   }
 
   /** Initialize all tiles with a color */
@@ -89,11 +72,7 @@ export class AutotileTilemap {
 
   /** Fill terrain at (x, y) with flood fill and refresh affected tiles */
   fillTerrain(x: number, y: number, colorId: number): void {
-    const affected = floodFillTerrain(this.autoMap, this.wangSet, x, y, colorId);
-
-    for (const [ax, ay] of affected) {
-      this.refreshTile(ax, ay);
-    }
+    this.refreshAffected(floodFillTerrain(this.autoMap, this.wangSet, x, y, colorId));
   }
 
   /** Set up animations from wangset wangtiles with animation data */
@@ -128,22 +107,26 @@ export class AutotileTilemap {
       const frame = this.animController!.getCurrentFrame(animKey);
       if (!frame || frame.tileId < 0) return;
 
-      const tile = this.tileMap.getTile(x, y);
-      if (!tile) return;
-
-      tile.clearGraphics();
-      const animatedCell = createCell(
-        frame.tileId,
-        cell.flipH,
-        cell.flipV,
-        cell.flipD,
-        frame.tileset
-      );
-      const sprite = this.spriteResolver.resolve(animatedCell);
-      if (sprite) {
-        tile.addGraphic(sprite);
-      }
+      this.renderCell(x, y, createCell(frame.tileId, cell.flipH, cell.flipV, cell.flipD, frame.tileset));
     });
+  }
+
+  /** Apply a Cell's sprite to the TileMap at (x, y) */
+  private renderCell(x: number, y: number, cell: Cell): void {
+    const tile = this.tileMap.getTile(x, y);
+    if (!tile) return;
+    tile.clearGraphics();
+    const sprite = this.spriteResolver.resolve(cell);
+    if (sprite) {
+      tile.addGraphic(sprite);
+    }
+  }
+
+  /** Refresh visuals for a list of [x, y] positions */
+  private refreshAffected(positions: [number, number][]): void {
+    for (const [ax, ay] of positions) {
+      this.refreshTile(ax, ay);
+    }
   }
 
   /** Run a callback for every cell in the map */
@@ -187,8 +170,8 @@ export class AutotileTilemap {
 
   /** Convert world position to tile coordinates */
   worldToTile(worldX: number, worldY: number): [number, number] | undefined {
-    const col = Math.floor(worldX / this.tileWidth);
-    const row = Math.floor(worldY / this.tileHeight);
+    const col = Math.floor(worldX / this.tileMap.tileWidth);
+    const row = Math.floor(worldY / this.tileMap.tileHeight);
     if (!this.autoMap.inBounds(col, row)) return undefined;
     return [col, row];
   }

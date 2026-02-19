@@ -67,16 +67,16 @@ export class InputHandler {
   }
 
   private paintAt(worldPos: ex.Vector): void {
-    const tilePos = this.tilemap.worldToTile(worldPos.x, worldPos.y);
-    if (!tilePos) return;
-    const [col, row] = tilePos;
-    this.tilemap.paintTerrain(col, row, this.activeColor);
+    this.applyAtTile(worldPos, (col, row) => this.tilemap.paintTerrain(col, row, this.activeColor));
   }
 
   private fillAt(worldPos: ex.Vector): void {
+    this.applyAtTile(worldPos, (col, row) => this.tilemap.fillTerrain(col, row, this.activeColor));
+  }
+
+  private applyAtTile(worldPos: ex.Vector, fn: (col: number, row: number) => void): void {
     const tilePos = this.tilemap.worldToTile(worldPos.x, worldPos.y);
     if (!tilePos) return;
-    const [col, row] = tilePos;
-    this.tilemap.fillTerrain(col, row, this.activeColor);
+    fn(tilePos[0], tilePos[1]);
   }
 }

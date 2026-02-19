@@ -69,32 +69,11 @@ export class PrefabListPanel {
         badge.title = `${prefab.tiles.length} tiles`;
         row.appendChild(badge);
 
-        // Copy button
-        const copyBtn = document.createElement('button');
-        copyBtn.textContent = '\u2398';
-        copyBtn.title = `Duplicate prefab "${name}"`;
-        copyBtn.style.cssText = `
-          background: #333; color: #ccc; border: none; cursor: pointer;
-          font-size: 12px; line-height: 1; padding: 1px 5px;
-          border-radius: 3px;
-        `;
-        copyBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
+        row.appendChild(this.rowButton('\u2398', `Duplicate prefab "${name}"`, () => {
           this.state.duplicatePrefab(name);
-        });
-        row.appendChild(copyBtn);
+        }));
 
-        // Delete button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = '\u00d7';
-        deleteBtn.title = `Delete prefab "${name}"`;
-        deleteBtn.style.cssText = `
-          background: #333; color: #ccc; border: none; cursor: pointer;
-          font-size: 12px; line-height: 1; padding: 1px 5px;
-          border-radius: 3px;
-        `;
-        deleteBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
+        row.appendChild(this.rowButton('\u00d7', `Delete prefab "${name}"`, () => {
           if (confirm(`Delete prefab "${name}"?`)) {
             this.state.deletePrefab(name);
             fetch('/api/delete-prefab', {
@@ -103,8 +82,7 @@ export class PrefabListPanel {
               body: JSON.stringify({ filename: `${name}.json` }),
             }).catch(console.error);
           }
-        });
-        row.appendChild(deleteBtn);
+        }));
 
         this.listContainer.appendChild(row);
       }
@@ -137,6 +115,22 @@ export class PrefabListPanel {
       }
     });
     this.listContainer.appendChild(addBtn);
+  }
+
+  private rowButton(text: string, title: string, onClick: () => void): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.textContent = text;
+    btn.title = title;
+    btn.style.cssText = `
+      background: #333; color: #ccc; border: none; cursor: pointer;
+      font-size: 12px; line-height: 1; padding: 1px 5px;
+      border-radius: 3px;
+    `;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onClick();
+    });
+    return btn;
   }
 
   private startInlineRename(target: HTMLSpanElement, currentName: string): void {

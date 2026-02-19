@@ -110,14 +110,12 @@ export class TileEditor {
 
     // Undo/Redo keyboard shortcuts
     document.addEventListener('keydown', (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
       const key = e.key.toLowerCase();
-      if ((e.ctrlKey || e.metaKey) && key === 'z' && !e.shiftKey) {
+      if (key === 'z') {
         e.preventDefault();
-        this.state.undo();
-      } else if ((e.ctrlKey || e.metaKey) && key === 'z' && e.shiftKey) {
-        e.preventDefault();
-        this.state.redo();
-      } else if ((e.ctrlKey || e.metaKey) && key === 'y') {
+        if (e.shiftKey) this.state.redo(); else this.state.undo();
+      } else if (key === 'y') {
         e.preventDefault();
         this.state.redo();
       }

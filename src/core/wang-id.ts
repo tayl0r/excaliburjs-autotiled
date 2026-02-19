@@ -119,19 +119,16 @@ export class WangId {
     return this.colors.join(',');
   }
 
-  /** Create a WangId with all corners set to the given color (for corner type) */
   static allCorners(color: number): WangId {
     return new WangId([0, color, 0, color, 0, color, 0, color]);
   }
 
-  /** Create a WangId with all edges set to the given color (for edge type) */
   static allEdges(color: number): WangId {
     return new WangId([color, 0, color, 0, color, 0, color, 0]);
   }
 
-  /** Create a WangId with all 8 positions set to the given color */
   static all(color: number): WangId {
-    return new WangId([color, color, color, color, color, color, color, color]);
+    return new WangId(new Array<number>(WANG_INDEX_COUNT).fill(color));
   }
 }
 

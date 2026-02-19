@@ -1,5 +1,5 @@
 import { PrefabEditorState } from './prefab-state.js';
-import { colRowFromTileId, tileIdFromColRow } from '../utils/tile-math.js';
+import { colRowFromTileId, tileIdFromColRow, computeTileBounds } from '../utils/tile-math.js';
 
 export class TilesetViewerPanel {
   readonly element: HTMLDivElement;
@@ -72,19 +72,10 @@ export class TilesetViewerPanel {
   }
 
   private updateStatusBar(): void {
-    const ts = this.state.activeTileset;
-    const name = ts.tilesetImage.replace(/\.\w+$/, '');
+    const name = this.state.activeTileset.tilesetImage.replace(/\.\w+$/, '');
     const sel = this.state.selectedTileIds;
     if (sel.length > 0) {
-      // Compute selection dimensions
-      let minCol = Infinity, maxCol = -1, minRow = Infinity, maxRow = -1;
-      for (const id of sel) {
-        const [c, r] = colRowFromTileId(id, this.state.columns);
-        if (c < minCol) minCol = c;
-        if (c > maxCol) maxCol = c;
-        if (r < minRow) minRow = r;
-        if (r > maxRow) maxRow = r;
-      }
+      const { minCol, maxCol, minRow, maxRow } = computeTileBounds(sel, this.state.columns);
       const w = maxCol - minCol + 1;
       const h = maxRow - minRow + 1;
       this.statusBar.textContent = `tileset: ${name}  |  selected: ${sel.length} tiles (${w}x${h})`;
@@ -228,11 +219,14 @@ export class TilesetViewerPanel {
     }
 
     // Selection highlights
-    for (const selId of this.state.selectedTileIds) {
-      const [sc, sr] = colRowFromTileId(selId, columns);
+    const selectedIds = this.state.selectedTileIds;
+    if (selectedIds.length > 0) {
       this.ctx.strokeStyle = '#ffdd00';
       this.ctx.lineWidth = 2;
-      this.ctx.strokeRect(sc * tw + 1, sr * th + 1, tw - 2, th - 2);
+      for (const selId of selectedIds) {
+        const [sc, sr] = colRowFromTileId(selId, columns);
+        this.ctx.strokeRect(sc * tw + 1, sr * th + 1, tw - 2, th - 2);
+      }
     }
   }
 }

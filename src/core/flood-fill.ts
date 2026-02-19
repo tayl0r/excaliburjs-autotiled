@@ -3,7 +3,7 @@ import type { WangSet } from './wang-set.js';
 import { insertIntermediates, recomputeTiles } from './terrain-painter.js';
 
 /** 4-directional offsets for flood fill connectivity */
-const FOUR_DIRECTIONS: [number, number][] = [
+const FOUR_DIRECTIONS: ReadonlyArray<[number, number]> = [
   [0, -1], [1, 0], [0, 1], [-1, 0],
 ];
 
@@ -28,9 +28,12 @@ export function floodFillTerrain(
 
   // 1. BFS to find all connected cells with oldColor (4-directional)
   const filled: Array<[number, number]> = [];
+  const filledKeys = new Set<string>();
   const visited = new Set<string>();
+  const startKey = `${startX},${startY}`;
   const queue: [number, number][] = [[startX, startY]];
-  visited.add(`${startX},${startY}`);
+  visited.add(startKey);
+  filledKeys.add(startKey);
 
   while (queue.length > 0) {
     const [cx, cy] = queue.shift()!;
@@ -46,6 +49,7 @@ export function floodFillTerrain(
       visited.add(key);
 
       if (map.colorAt(nx, ny) === oldColor) {
+        filledKeys.add(key);
         queue.push([nx, ny]);
       }
     }
@@ -57,7 +61,6 @@ export function floodFillTerrain(
   }
 
   // 3. Find boundary cells (filled cells adjacent to non-filled cells)
-  const filledKeys = new Set(filled.map(([x, y]) => `${x},${y}`));
   const boundary = filled.filter(([fx, fy]) =>
     FOUR_DIRECTIONS.some(([dx, dy]) => {
       const nx = fx + dx;

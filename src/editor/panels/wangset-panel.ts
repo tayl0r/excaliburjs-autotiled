@@ -1,5 +1,6 @@
 import { EditorState } from '../editor-state.js';
 import { checkCompleteness } from '../completeness-checker.js';
+import { startInlineEdit } from '../inline-edit.js';
 import { wangColorHex } from '../../core/wang-color.js';
 import type { WangSetData } from '../../core/metadata-schema.js';
 
@@ -204,40 +205,6 @@ export class WangSetPanel {
     this.listContainer.appendChild(hint);
   }
 
-  /**
-   * Replace an element with an inline input. Handles Enter to commit,
-   * Escape to cancel, and blur to commit. Calls render() after either path.
-   */
-  private startInlineEdit(
-    target: HTMLElement,
-    input: HTMLInputElement,
-    onCommit: (input: HTMLInputElement) => void,
-  ): void {
-    let committed = false;
-    const commit = () => {
-      if (committed) return;
-      committed = true;
-      onCommit(input);
-      this.render();
-    };
-
-    input.addEventListener('keydown', (e) => {
-      e.stopPropagation();
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        commit();
-      } else if (e.key === 'Escape') {
-        committed = true;
-        this.render();
-      }
-    });
-    input.addEventListener('blur', commit);
-
-    target.replaceWith(input);
-    input.focus();
-    input.select();
-  }
-
   private createTextInput(value: string): HTMLInputElement {
     const input = document.createElement('input');
     input.type = 'text';
@@ -251,24 +218,24 @@ export class WangSetPanel {
 
   private startInlineRenameWangSet(span: HTMLSpanElement, wsIndex: number): void {
     const input = this.createTextInput(this.state.metadata.wangsets[wsIndex].name);
-    this.startInlineEdit(span, input, () => {
+    startInlineEdit(span, input, () => {
       const newName = input.value.trim();
       if (newName && newName !== this.state.metadata.wangsets[wsIndex]?.name) {
         this.state.renameWangSet(wsIndex, newName);
       }
-    });
+    }, () => this.render());
   }
 
   private startInlineRenameColor(span: HTMLSpanElement, colorIndex: number): void {
     const ws = this.state.activeWangSet;
     if (!ws) return;
     const input = this.createTextInput(ws.colors[colorIndex].name);
-    this.startInlineEdit(span, input, () => {
+    startInlineEdit(span, input, () => {
       const newName = input.value.trim();
       if (newName && newName !== ws.colors[colorIndex]?.name) {
         this.state.updateColor(colorIndex, { name: newName });
       }
-    });
+    }, () => this.render());
   }
 
   private startInlineProbabilityEdit(badge: HTMLSpanElement, colorIndex: number): void {
@@ -284,12 +251,12 @@ export class WangSetPanel {
       width: 48px; background: #1e1e3a; color: #e0e0e0; border: 1px solid #6666cc;
       font-size: 11px; padding: 1px 4px; border-radius: 2px; outline: none;
     `;
-    this.startInlineEdit(badge, input, () => {
+    startInlineEdit(badge, input, () => {
       const val = parseFloat(input.value);
       if (!isNaN(val) && val >= 0 && val <= 1) {
         this.state.updateColor(colorIndex, { probability: val });
       }
-    });
+    }, () => this.render());
   }
 
   /**
@@ -551,15 +518,11 @@ export class WangSetPanel {
         font-size: 11px; color: #e0e0e0;
       `;
 
+      const labels = ['TL', 'TR', 'BR', 'BL'] as const;
       for (const mc of result.missing) {
-        const [tl, tr, br, bl] = mc.corners;
         const entry = document.createElement('div');
         entry.style.cssText = 'padding: 1px 0; color: #ccc;';
-        const tlName = this.colorIdToName(ws, tl);
-        const trName = this.colorIdToName(ws, tr);
-        const brName = this.colorIdToName(ws, br);
-        const blName = this.colorIdToName(ws, bl);
-        entry.textContent = `TL=${tlName}, TR=${trName}, BR=${brName}, BL=${blName}`;
+        entry.textContent = mc.corners.map((id, i) => `${labels[i]}=${this.colorIdToName(ws, id)}`).join(', ');
         detailPanel.appendChild(entry);
       }
 

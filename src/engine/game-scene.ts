@@ -98,14 +98,13 @@ export class GameScene extends ex.Scene {
     this.inputHandler.setOnToolModeChange((mode) => this.updateToolbarSelection(mode));
     this.createHUD(wangSet);
 
+    const keyCommands: Record<string, () => void> = { s: () => this.saveMap(), o: () => this.openMap() };
     document.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const action = keyCommands[e.key];
+      if (action) {
         e.preventDefault();
-        this.saveMap();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
-        e.preventDefault();
-        this.openMap();
+        action();
       }
     });
   }
@@ -215,17 +214,14 @@ export class GameScene extends ex.Scene {
       this.toolButtons.set(tool.mode, btn);
     }
 
-    // Separator
     const sep = document.createElement('div');
     sep.style.cssText = 'width: 1px; height: 20px; background: rgba(255,255,255,0.2); margin: 0 6px;';
     this.toolbar.appendChild(sep);
 
-    // Save button
     const saveBtn = this.createToolbarButton('Save', '\u2318S');
     saveBtn.addEventListener('click', () => this.saveMap());
     this.toolbar.appendChild(saveBtn);
 
-    // Open button
     const openBtn = this.createToolbarButton('Open', '\u2318O');
     openBtn.addEventListener('click', () => this.openMap());
     this.toolbar.appendChild(openBtn);
@@ -252,13 +248,9 @@ export class GameScene extends ex.Scene {
 
   private updateToolbarSelection(activeMode: ToolMode): void {
     for (const [mode, btn] of this.toolButtons) {
-      if (mode === activeMode) {
-        btn.style.background = 'rgba(255,255,255,0.15)';
-        btn.style.color = '#fff';
-      } else {
-        btn.style.background = 'transparent';
-        btn.style.color = '#ccc';
-      }
+      const isActive = mode === activeMode;
+      btn.style.background = isActive ? 'rgba(255,255,255,0.15)' : 'transparent';
+      btn.style.color = isActive ? '#fff' : '#ccc';
     }
   }
 
@@ -324,7 +316,6 @@ export class GameScene extends ex.Scene {
     if (!resp.ok) throw new Error(`Map not found: ${filename}`);
     const saved: SavedMap = await resp.json();
 
-    // Find the WangSet by name
     const wangSet = this.findWangSetByName(saved.wangSetName);
     if (!wangSet) {
       throw new Error(`WangSet "${saved.wangSetName}" not found in project metadata`);
@@ -338,10 +329,7 @@ export class GameScene extends ex.Scene {
   }
 
   private findWangSetByName(name: string): WangSet | undefined {
-    // The TilesetManager builds WangSets from metadata — use primaryWangSet if name matches
-    const primary = this.tilesetManager.primaryWangSet;
-    if (primary && primary.name === name) return primary;
-    return undefined;
+    return this.tilesetManager.wangSets.find(ws => ws.name === name);
   }
 
   onDeactivate(): void {

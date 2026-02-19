@@ -7,6 +7,10 @@ interface AnimationState {
   direction: 1 | -1; // for ping-pong
 }
 
+function animKey(tilesetIndex: number, tileId: number): string {
+  return `${tilesetIndex}:${tileId}`;
+}
+
 export class AnimationController {
   private animations: Map<string, AnimationState> = new Map();
 
@@ -14,8 +18,7 @@ export class AnimationController {
   addTileAnimation(tileId: number, tilesetIndex: number, animation: TileAnimation): void {
     if (animation.frames.length === 0) return;
 
-    const key = `${tilesetIndex}:${tileId}`;
-    this.animations.set(key, {
+    this.animations.set(animKey(tilesetIndex, tileId), {
       animation,
       elapsed: 0,
       currentFrame: 0,
@@ -81,7 +84,7 @@ export class AnimationController {
 
   /** Look up the animation key for the given tile, if one is registered */
   getAnimationKey(tilesetIndex: number, tileId: number): string | undefined {
-    const key = `${tilesetIndex}:${tileId}`;
+    const key = animKey(tilesetIndex, tileId);
     return this.animations.has(key) ? key : undefined;
   }
 }

@@ -1,3 +1,4 @@
+import type { WangTileData } from '../../core/metadata-schema.js';
 import { EditorState, TileFilter } from '../editor-state.js';
 import { colRowFromTileId, tileIdFromColRow } from '../../utils/tile-math.js';
 import { templateSlotWangId } from '../template-utils.js';
@@ -230,6 +231,14 @@ export class TilesetPanel {
     return tileId;
   }
 
+  /** Get wangtiles from active WangSet filtered to active tileset */
+  private activeWangTiles(): WangTileData[] {
+    const ws = this.state.activeWangSet;
+    if (!ws) return [];
+    const tsi = this.state.activeTilesetIndex;
+    return ws.wangtiles.filter(wt => (wt.tileset ?? 0) === tsi);
+  }
+
   render(): void {
     const { tileWidth, tileHeight, columns, tileCount } = this.state;
     const zoom = this.state.zoom;
@@ -271,9 +280,7 @@ export class TilesetPanel {
 
     // Draw filter dimming overlay
     if (this.state.tileFilter !== 'all') {
-      const ws = this.state.activeWangSet;
-      const activeTsi = this.state.activeTilesetIndex;
-      const taggedTileIds = new Set(ws?.wangtiles.filter(wt => (wt.tileset ?? 0) === activeTsi).map(wt => wt.tileid) ?? []);
+      const taggedTileIds = new Set(this.activeWangTiles().map(wt => wt.tileid));
 
       for (let id = 0; id < tileCount; id++) {
         const isTagged = taggedTileIds.has(id);
@@ -319,18 +326,14 @@ export class TilesetPanel {
   }
 
   private drawActiveColorOutlines(tw: number, th: number): void {
-    const ws = this.state.activeWangSet;
     const colorId = this.state.activeColorId;
-    if (!ws || colorId <= 0) return;
+    if (colorId <= 0) return;
 
     const { columns } = this.state;
-
     this.ctx.strokeStyle = 'rgba(100, 180, 255, 0.7)';
     this.ctx.lineWidth = 2;
 
-    const activeTsi = this.state.activeTilesetIndex;
-    for (const wt of ws.wangtiles) {
-      if ((wt.tileset ?? 0) !== activeTsi) continue;
+    for (const wt of this.activeWangTiles()) {
       if (!wt.wangid.includes(colorId)) continue;
       const [col, row] = colRowFromTileId(wt.tileid, columns);
       this.ctx.strokeRect(col * tw + 1, row * th + 1, tw - 2, th - 2);
@@ -343,9 +346,7 @@ export class TilesetPanel {
 
     const { columns } = this.state;
 
-    const activeTsi = this.state.activeTilesetIndex;
-    for (const wt of ws.wangtiles) {
-      if ((wt.tileset ?? 0) !== activeTsi) continue;
+    for (const wt of this.activeWangTiles()) {
       const [col, row] = colRowFromTileId(wt.tileid, columns);
       const x = col * tw;
       const y = row * th;
@@ -358,35 +359,21 @@ export class TilesetPanel {
         [5, 0, 1],  // BottomLeft
       ];
 
+      const size = Math.max(4, tw * 0.25);
       for (const [wangIdx, cx, cy] of cornerPositions) {
         const colorId = wt.wangid[wangIdx];
-        if (colorId === 0) continue;
-
-        if (colorId > ws.colors.length) continue;
+        if (colorId === 0 || colorId > ws.colors.length) continue;
 
         const cornerX = x + cx * tw;
         const cornerY = y + cy * th;
-        const size = Math.max(4, tw * 0.25);
+        const dx = cx === 0 ? size : -size;
+        const dy = cy === 0 ? size : -size;
 
         this.ctx.fillStyle = wangColorHex(colorId) + 'aa';
         this.ctx.beginPath();
-        if (cx === 0 && cy === 0) {
-          this.ctx.moveTo(cornerX, cornerY);
-          this.ctx.lineTo(cornerX + size, cornerY);
-          this.ctx.lineTo(cornerX, cornerY + size);
-        } else if (cx === 1 && cy === 0) {
-          this.ctx.moveTo(cornerX, cornerY);
-          this.ctx.lineTo(cornerX - size, cornerY);
-          this.ctx.lineTo(cornerX, cornerY + size);
-        } else if (cx === 1 && cy === 1) {
-          this.ctx.moveTo(cornerX, cornerY);
-          this.ctx.lineTo(cornerX - size, cornerY);
-          this.ctx.lineTo(cornerX, cornerY - size);
-        } else {
-          this.ctx.moveTo(cornerX, cornerY);
-          this.ctx.lineTo(cornerX + size, cornerY);
-          this.ctx.lineTo(cornerX, cornerY - size);
-        }
+        this.ctx.moveTo(cornerX, cornerY);
+        this.ctx.lineTo(cornerX + dx, cornerY);
+        this.ctx.lineTo(cornerX, cornerY + dy);
         this.ctx.closePath();
         this.ctx.fill();
       }
@@ -394,14 +381,9 @@ export class TilesetPanel {
   }
 
   private drawAnimatedTileBadges(tw: number, th: number): void {
-    const ws = this.state.activeWangSet;
-    if (!ws) return;
-
     const { columns } = this.state;
-    const activeTsi = this.state.activeTilesetIndex;
 
-    for (const wt of ws.wangtiles) {
-      if ((wt.tileset ?? 0) !== activeTsi) continue;
+    for (const wt of this.activeWangTiles()) {
       if (!wt.animation) continue;
 
       const [col, row] = colRowFromTileId(wt.tileid, columns);

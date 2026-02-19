@@ -1,9 +1,17 @@
 import { EditorState } from '../editor-state.js';
+import { startInlineEdit } from '../inline-edit.js';
 import type { TileAnimation } from '../../core/metadata-schema.js';
 import { colRowFromTileId } from '../../utils/tile-math.js';
 import { wangColorHex } from '../../core/wang-color.js';
 
 const EMPTY_WANGID = [0, 0, 0, 0, 0, 0, 0, 0];
+
+/** Check if a WangId zone index is active for the given WangSet type */
+function isZoneActive(wangIdx: number, type: 'corner' | 'edge' | 'mixed'): boolean {
+  if (type === 'mixed') return true;
+  const isCorner = wangIdx % 2 === 1;
+  return type === 'corner' ? isCorner : !isCorner;
+}
 
 /**
  * Tile inspector panel with WangId zone editor and inline per-tile animation editor.
@@ -651,10 +659,7 @@ export class InspectorPanel {
         `;
         cell.textContent = 'tile';
       } else {
-        const isCorner = wangIdx % 2 === 1;
-        const isActive = (type === 'corner' && isCorner)
-          || (type === 'edge' && !isCorner)
-          || type === 'mixed';
+        const isActive = isZoneActive(wangIdx, type);
 
         const colorId = wangid[wangIdx];
         const bgColor = colorId > 0 ? wangColorHex(colorId) : '#222';
@@ -724,35 +729,6 @@ export class InspectorPanel {
     this.probabilityContainer.appendChild(badge);
   }
 
-  /**
-   * Replace an element with an inline input. Handles Enter to commit,
-   * Escape to cancel, and blur to commit. Calls render() after either path.
-   */
-  private startInlineEdit(
-    target: HTMLElement,
-    input: HTMLInputElement,
-    onCommit: (input: HTMLInputElement) => void,
-  ): void {
-    let committed = false;
-    const commit = () => {
-      if (committed) return;
-      committed = true;
-      onCommit(input);
-      this.render();
-    };
-
-    input.addEventListener('keydown', (e) => {
-      e.stopPropagation();
-      if (e.key === 'Enter') { e.preventDefault(); commit(); }
-      else if (e.key === 'Escape') { committed = true; this.render(); }
-    });
-    input.addEventListener('blur', commit);
-
-    target.replaceWith(input);
-    input.focus();
-    input.select();
-  }
-
   private startTileProbabilityEdit(badge: HTMLSpanElement, tileId: number): void {
     const wt = this.state.getWangTile(tileId);
     if (!wt) return;
@@ -767,7 +743,7 @@ export class InspectorPanel {
       font-size: 11px; padding: 1px 4px; border-radius: 2px; outline: none;
     `;
 
-    this.startInlineEdit(badge, input, () => {
+    startInlineEdit(badge, input, () => {
       const val = parseFloat(input.value);
       if (!isNaN(val) && val >= 0) {
         if (this.state.selectedTileIds.size > 1) {
@@ -776,61 +752,52 @@ export class InspectorPanel {
           this.state.setTileProbability(tileId, val);
         }
       }
-    });
+    }, () => this.render());
+  }
+
+  /** Apply a wangid mutation function to all selected tiles */
+  private applyToSelection(mutate: (base: number[]) => number[]): void {
+    if (this.state.selectedTileIds.size > 1) {
+      const entries: Array<{ tileId: number; wangid: number[] }> = [];
+      for (const selId of this.state.selectedTileIds) {
+        const selWt = this.state.getWangTile(selId);
+        entries.push({ tileId: selId, wangid: mutate(selWt ? selWt.wangid : EMPTY_WANGID) });
+      }
+      this.state.setWangIdMulti(entries);
+    } else {
+      const tileId = this.state.selectedTileId;
+      const wt = this.state.getWangTile(tileId);
+      this.state.setWangId(tileId, mutate(wt ? wt.wangid : EMPTY_WANGID));
+    }
   }
 
   private paintAllZones(): void {
-    const tileId = this.state.selectedTileId;
-    if (tileId < 0) return;
+    if (this.state.selectedTileId < 0) return;
     const ws = this.state.activeWangSet;
     if (!ws) return;
 
     const type = ws.type;
     const colorId = this.state.activeColorId;
 
-    const fillWangid = (base: number[]): number[] => {
+    this.applyToSelection(base => {
       const wangid = [...base];
       for (let i = 0; i < 8; i++) {
-        const isCorner = i % 2 === 1;
-        if ((type === 'corner' && isCorner) || (type === 'edge' && !isCorner) || type === 'mixed') {
-          wangid[i] = colorId;
-        }
+        if (isZoneActive(i, type)) wangid[i] = colorId;
       }
       return wangid;
-    };
-
-    if (this.state.selectedTileIds.size > 1) {
-      const entries: Array<{ tileId: number; wangid: number[] }> = [];
-      for (const selId of this.state.selectedTileIds) {
-        const selWt = this.state.getWangTile(selId);
-        entries.push({ tileId: selId, wangid: fillWangid(selWt ? selWt.wangid : EMPTY_WANGID) });
-      }
-      this.state.setWangIdMulti(entries);
-    } else {
-      const wt = this.state.getWangTile(tileId);
-      this.state.setWangId(tileId, fillWangid(wt ? wt.wangid : EMPTY_WANGID));
-    }
+    });
   }
 
   private paintZone(tileId: number, wangIdx: number): void {
     const wt = this.state.getWangTile(tileId);
-    const wangid = wt ? [...wt.wangid] : [...EMPTY_WANGID];
-
+    const current = wt ? wt.wangid[wangIdx] : 0;
     const colorId = this.state.activeColorId;
-    const newColor = wangid[wangIdx] === colorId ? 0 : colorId;
-    wangid[wangIdx] = newColor;
+    const newColor = current === colorId ? 0 : colorId;
 
-    if (this.state.selectedTileIds.size > 1) {
-      const entries: Array<{ tileId: number; wangid: number[] }> = [];
-      for (const selId of this.state.selectedTileIds) {
-        const selWt = this.state.getWangTile(selId);
-        const selWangid = selWt ? [...selWt.wangid] : [...EMPTY_WANGID];
-        selWangid[wangIdx] = newColor;
-        entries.push({ tileId: selId, wangid: selWangid });
-      }
-      this.state.setWangIdMulti(entries);
-    } else {
-      this.state.setWangId(tileId, wangid);
-    }
+    this.applyToSelection(base => {
+      const wangid = [...base];
+      wangid[wangIdx] = newColor;
+      return wangid;
+    });
   }
 }

@@ -94,7 +94,9 @@ export function recomputeTiles(
   // Expand affected region: all color-changed cells + ±1 ring for tile corner propagation
   const affectedSet = new Set<string>();
   for (const key of colorChanged) {
-    const [cx, cy] = key.split(',').map(Number);
+    const comma = key.indexOf(',');
+    const cx = +key.slice(0, comma);
+    const cy = +key.slice(comma + 1);
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         const nx = cx + dx;
@@ -109,8 +111,8 @@ export function recomputeTiles(
   // Sort affected positions center-outward (Manhattan distance from center)
   const affected: Array<[number, number]> = [];
   for (const key of affectedSet) {
-    const [ax, ay] = key.split(',').map(Number);
-    affected.push([ax, ay]);
+    const comma = key.indexOf(',');
+    affected.push([+key.slice(0, comma), +key.slice(comma + 1)]);
   }
   affected.sort(
     (a, b) =>
@@ -163,6 +165,14 @@ export function resolveAllTiles(map: AutotileMap, wangSet: WangSet): void {
   }
 }
 
+/** Corner vertex mapping: [wangIndex, dx, dy] */
+const CORNER_VERTICES: ReadonlyArray<[number, number, number]> = [
+  [7, 0, 0],   // TL = self
+  [1, 1, 0],   // TR = right
+  [3, 1, 1],   // BR = bottom-right
+  [5, 0, 1],   // BL = bottom
+];
+
 /**
  * Compute the desired WangId for tile at (x,y) directly from painted terrain colors.
  *
@@ -186,14 +196,6 @@ function desiredWangIdFromColors(
   const selfColor = map.colorAt(x, y);
 
   if (type === 'corner') {
-    // Corner vertex mapping: [wangIndex, dx, dy]
-    const CORNER_VERTICES: [number, number, number][] = [
-      [7, 0, 0],   // TL = self
-      [1, 1, 0],   // TR = right
-      [3, 1, 1],   // BR = bottom-right
-      [5, 0, 1],   // BL = bottom
-    ];
-
     for (const [index, dx, dy] of CORNER_VERTICES) {
       const nx = x + dx;
       const ny = y + dy;

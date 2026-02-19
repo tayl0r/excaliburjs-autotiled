@@ -355,9 +355,14 @@ export class EditorState {
 
   // --- Metadata mutation ---
 
+  /** Check if a WangTile belongs to the active tileset */
+  private isActiveTileset(wt: WangTileData): boolean {
+    return (wt.tileset ?? 0) === this._activeTilesetIndex;
+  }
+
   /** Find a WangTile entry matching tileId in the active WangSet and tileset */
   private findWangTile(ws: WangSetData, tileId: number): WangTileData | undefined {
-    return ws.wangtiles.find(wt => wt.tileid === tileId && (wt.tileset ?? 0) === this._activeTilesetIndex);
+    return ws.wangtiles.find(wt => wt.tileid === tileId && this.isActiveTileset(wt));
   }
 
   /** Upsert a WangId for a tile in the given WangSet (does not save snapshot) */
@@ -390,13 +395,11 @@ export class EditorState {
   removeWangTile(tileId: number): void {
     const ws = this.activeWangSet;
     if (!ws) return;
-
-    const idx = ws.wangtiles.findIndex(wt => wt.tileid === tileId && (wt.tileset ?? 0) === this._activeTilesetIndex);
-    if (idx >= 0) {
-      this.saveSnapshot();
-      ws.wangtiles.splice(idx, 1);
-      this.emit('metadataChanged');
-    }
+    const wt = this.findWangTile(ws, tileId);
+    if (!wt) return;
+    this.saveSnapshot();
+    ws.wangtiles.splice(ws.wangtiles.indexOf(wt), 1);
+    this.emit('metadataChanged');
   }
 
   /** Set probability for a tile in the active WangSet. No-op if tile not tagged. */
@@ -440,15 +443,11 @@ export class EditorState {
   removeWangTileMulti(tileIds: number[]): void {
     const ws = this.activeWangSet;
     if (!ws || tileIds.length === 0) return;
-    const indices = tileIds
-      .map(id => ws.wangtiles.findIndex(wt => wt.tileid === id && (wt.tileset ?? 0) === this._activeTilesetIndex))
-      .filter(idx => idx >= 0)
-      .sort((a, b) => b - a);
-    if (indices.length === 0) return;
+    const idSet = new Set(tileIds);
+    const filtered = ws.wangtiles.filter(wt => !(idSet.has(wt.tileid) && this.isActiveTileset(wt)));
+    if (filtered.length === ws.wangtiles.length) return;
     this.saveSnapshot();
-    for (const idx of indices) {
-      ws.wangtiles.splice(idx, 1);
-    }
+    ws.wangtiles = filtered;
     this.emit('metadataChanged');
   }
 
@@ -532,7 +531,7 @@ export class EditorState {
 
     // Clamp active color
     if (this._activeColorId > ws.colors.length) {
-      this._activeColorId = ws.colors.length === 0 ? 0 : ws.colors.length;
+      this._activeColorId = ws.colors.length;
       this.emit('activeColorChanged');
     }
 
@@ -667,10 +666,12 @@ export class EditorState {
   // --- Pub/Sub ---
 
   on(event: EditorEvent, listener: Listener): void {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, new Set());
+    let set = this.listeners.get(event);
+    if (!set) {
+      set = new Set();
+      this.listeners.set(event, set);
     }
-    this.listeners.get(event)!.add(listener);
+    set.add(listener);
   }
 
   off(event: EditorEvent, listener: Listener): void {

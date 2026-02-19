@@ -1,8 +1,37 @@
+import type { PrefabTool } from './prefab-state.js';
 import type { SavedPrefab } from '../core/prefab-schema.js';
 import { PrefabEditorState } from './prefab-state.js';
 import { PrefabListPanel } from './prefab-list-panel.js';
 import { PrefabCanvasPanel } from './prefab-canvas.js';
 import { TilesetViewerPanel } from './tileset-viewer.js';
+
+const BTN_STYLE = `
+  background: #333; color: #ccc; border: 1px solid #555;
+  padding: 3px 10px; border-radius: 3px; cursor: pointer;
+  font-size: 12px; font-family: inherit;
+`;
+const ACTIVE_BTN_STYLE = `
+  background: #6666cc; color: #fff; border: 1px solid #8888ee;
+  padding: 3px 10px; border-radius: 3px; cursor: pointer;
+  font-size: 12px; font-family: inherit;
+`;
+
+const TOOL_BUTTONS: Array<{ tool: PrefabTool; label: string }> = [
+  { tool: 'erase', label: 'Eraser (E)' },
+  { tool: 'move', label: 'Move (M)' },
+  { tool: 'copy', label: 'Copy (C)' },
+  { tool: 'anchor', label: 'Set Anchor' },
+];
+
+function applyTabStyle(btn: HTMLButtonElement, isActive: boolean): void {
+  btn.style.cssText = `
+    padding: 5px 14px; border: none; cursor: pointer;
+    font-size: 11px; font-family: inherit;
+    background: ${isActive ? '#1e1e3a' : 'transparent'};
+    color: ${isActive ? '#e0e0e0' : '#666'};
+    border-bottom: 2px solid ${isActive ? '#6666cc' : 'transparent'};
+  `;
+}
 
 export class PrefabEditor {
   private state: PrefabEditorState;
@@ -12,7 +41,7 @@ export class PrefabEditor {
   private tilesetPanel: TilesetViewerPanel;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private saveIndicator: HTMLDivElement;
-  private toolButtons = new Map<string, HTMLButtonElement>();
+  private toolButtons = new Map<PrefabTool, HTMLButtonElement>();
 
   constructor(state: PrefabEditorState, images: HTMLImageElement[]) {
     this.state = state;
@@ -158,82 +187,27 @@ export class PrefabEditor {
   }
 
   private buildToolButtons(container: HTMLDivElement): void {
-    const btnStyle = `
-      background: #333; color: #ccc; border: 1px solid #555;
-      padding: 3px 10px; border-radius: 3px; cursor: pointer;
-      font-size: 12px; font-family: inherit;
-    `;
-
-    const eraserBtn = document.createElement('button');
-    eraserBtn.textContent = 'Eraser (E)';
-    eraserBtn.style.cssText = btnStyle;
-    eraserBtn.addEventListener('click', () => {
-      this.state.setTool(this.state.tool === 'erase' ? 'paint' : 'erase');
-    });
-    this.toolButtons.set('erase', eraserBtn);
-    container.appendChild(eraserBtn);
-
-    const moveBtn = document.createElement('button');
-    moveBtn.textContent = 'Move (M)';
-    moveBtn.style.cssText = btnStyle;
-    moveBtn.addEventListener('click', () => {
-      this.state.setTool(this.state.tool === 'move' ? 'paint' : 'move');
-    });
-    this.toolButtons.set('move', moveBtn);
-    container.appendChild(moveBtn);
-
-    const copyBtn = document.createElement('button');
-    copyBtn.textContent = 'Copy (C)';
-    copyBtn.style.cssText = btnStyle;
-    copyBtn.addEventListener('click', () => {
-      this.state.setTool(this.state.tool === 'copy' ? 'paint' : 'copy');
-    });
-    this.toolButtons.set('copy', copyBtn);
-    container.appendChild(copyBtn);
-
-    const anchorBtn = document.createElement('button');
-    anchorBtn.textContent = 'Set Anchor';
-    anchorBtn.style.cssText = btnStyle;
-    anchorBtn.addEventListener('click', () => {
-      this.state.setTool(this.state.tool === 'anchor' ? 'paint' : 'anchor');
-    });
-    this.toolButtons.set('anchor', anchorBtn);
-    container.appendChild(anchorBtn);
+    for (const { tool, label } of TOOL_BUTTONS) {
+      const btn = document.createElement('button');
+      btn.textContent = label;
+      btn.style.cssText = BTN_STYLE;
+      btn.addEventListener('click', () => {
+        this.state.setTool(this.state.tool === tool ? 'paint' : tool);
+      });
+      this.toolButtons.set(tool, btn);
+      container.appendChild(btn);
+    }
 
     const expandBtn = document.createElement('button');
     expandBtn.textContent = '+ Expand Canvas';
-    expandBtn.style.cssText = btnStyle;
+    expandBtn.style.cssText = BTN_STYLE;
     expandBtn.addEventListener('click', () => this.state.expandCanvas());
     container.appendChild(expandBtn);
   }
 
   private updateToolButtonStyles(): void {
-    const btnStyle = `
-      background: #333; color: #ccc; border: 1px solid #555;
-      padding: 3px 10px; border-radius: 3px; cursor: pointer;
-      font-size: 12px; font-family: inherit;
-    `;
-    const activeBtnStyle = `
-      background: #6666cc; color: #fff; border: 1px solid #8888ee;
-      padding: 3px 10px; border-radius: 3px; cursor: pointer;
-      font-size: 12px; font-family: inherit;
-    `;
-
-    const eraserBtn = this.toolButtons.get('erase');
-    if (eraserBtn) {
-      eraserBtn.style.cssText = this.state.tool === 'erase' ? activeBtnStyle : btnStyle;
-    }
-    const moveBtn = this.toolButtons.get('move');
-    if (moveBtn) {
-      moveBtn.style.cssText = this.state.tool === 'move' ? activeBtnStyle : btnStyle;
-    }
-    const copyBtn = this.toolButtons.get('copy');
-    if (copyBtn) {
-      copyBtn.style.cssText = this.state.tool === 'copy' ? activeBtnStyle : btnStyle;
-    }
-    const anchorBtn = this.toolButtons.get('anchor');
-    if (anchorBtn) {
-      anchorBtn.style.cssText = this.state.tool === 'anchor' ? activeBtnStyle : btnStyle;
+    for (const [tool, btn] of this.toolButtons) {
+      btn.style.cssText = this.state.tool === tool ? ACTIVE_BTN_STYLE : BTN_STYLE;
     }
   }
 
@@ -243,17 +217,9 @@ export class PrefabEditor {
 
     const tilesets = this.state.metadata.tilesets;
     for (let i = 0; i < tilesets.length; i++) {
-      const ts = tilesets[i];
       const btn = document.createElement('button');
-      btn.textContent = ts.tilesetImage.replace(/\.\w+$/, '');
-      const isActive = i === this.state.activeTilesetIndex;
-      btn.style.cssText = `
-        padding: 5px 14px; border: none; cursor: pointer;
-        font-size: 11px; font-family: inherit;
-        background: ${isActive ? '#1e1e3a' : 'transparent'};
-        color: ${isActive ? '#e0e0e0' : '#666'};
-        border-bottom: 2px solid ${isActive ? '#6666cc' : 'transparent'};
-      `;
+      btn.textContent = tilesets[i].tilesetImage.replace(/\.\w+$/, '');
+      applyTabStyle(btn, i === this.state.activeTilesetIndex);
       btn.addEventListener('click', () => this.state.setActiveTileset(i));
       tabContainer.appendChild(btn);
     }
@@ -261,14 +227,7 @@ export class PrefabEditor {
     this.state.on('activeTilesetChanged', () => {
       const buttons = tabContainer.querySelectorAll('button');
       buttons.forEach((btn, idx) => {
-        const isActive = idx === this.state.activeTilesetIndex;
-        (btn as HTMLButtonElement).style.cssText = `
-          padding: 5px 14px; border: none; cursor: pointer;
-          font-size: 11px; font-family: inherit;
-          background: ${isActive ? '#1e1e3a' : 'transparent'};
-          color: ${isActive ? '#e0e0e0' : '#666'};
-          border-bottom: 2px solid ${isActive ? '#6666cc' : 'transparent'};
-        `;
+        applyTabStyle(btn as HTMLButtonElement, idx === this.state.activeTilesetIndex);
       });
     });
 

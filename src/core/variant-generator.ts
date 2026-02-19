@@ -1,7 +1,5 @@
 import type { WangSet, WangVariant } from './wang-set.js';
-import { WangId } from './wang-id.js';
-import { createCell } from './cell.js';
-import type { Cell } from './cell.js';
+import { type Cell, createCell } from './cell.js';
 import type { TransformationConfig } from './metadata-schema.js';
 
 /**
@@ -18,8 +16,7 @@ export function generateAllVariants(
   for (const { tilesetIndex, tileId, wangId: baseWangId } of mappings) {
     const baseCell = createCell(tileId, false, false, false, tilesetIndex);
 
-    // Start with the original
-    const orientations: Array<{ wangId: WangId; cell: Cell }> = [
+    const orientations: WangVariant[] = [
       { wangId: baseWangId, cell: baseCell },
     ];
 
@@ -34,7 +31,7 @@ export function generateAllVariants(
 
     // Add horizontal flips of all current orientations
     if (config.allowFlipH) {
-      const toAdd: Array<{ wangId: WangId; cell: Cell }> = [];
+      const toAdd: WangVariant[] = [];
       for (const { wangId, cell } of orientations) {
         toAdd.push({
           wangId: wangId.flippedHorizontally(),
@@ -46,7 +43,7 @@ export function generateAllVariants(
 
     // Add vertical flips of all current orientations
     if (config.allowFlipV) {
-      const toAdd: Array<{ wangId: WangId; cell: Cell }> = [];
+      const toAdd: WangVariant[] = [];
       for (const { wangId, cell } of orientations) {
         toAdd.push({
           wangId: wangId.flippedVertically(),
@@ -74,12 +71,7 @@ export function generateAllVariants(
 function rotateCellCW(cell: Cell, n: number): Cell {
   let { tileId, flipH, flipV, flipD, tilesetIndex } = cell;
   for (let i = 0; i < n; i++) {
-    const newFlipH = flipV;
-    const newFlipV = !flipH;
-    const newFlipD = !flipD;
-    flipH = newFlipH;
-    flipV = newFlipV;
-    flipD = newFlipD;
+    [flipH, flipV, flipD] = [flipV, !flipH, !flipD];
   }
   return createCell(tileId, flipH, flipV, flipD, tilesetIndex);
 }

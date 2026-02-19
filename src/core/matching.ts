@@ -21,10 +21,7 @@ export function wangIdFromSurroundings(
     const nx = x + dx;
     const ny = y + dy;
 
-    if (!map.inBounds(nx, ny)) {
-      colors[index] = 0; // Out of bounds = wildcard
-      continue;
-    }
+    if (!map.inBounds(nx, ny)) continue;
 
     const neighborCell = map.cellAt(nx, ny);
     if (neighborCell.tileId < 0) {
@@ -39,10 +36,7 @@ export function wangIdFromSurroundings(
     }
 
     const neighborWangId = wangSet.wangIdOf(neighborCell.tilesetIndex, neighborCell.tileId);
-    if (!neighborWangId) {
-      colors[index] = 0; // Unknown tile, wildcard
-      continue;
-    }
+    if (!neighborWangId) continue;
 
     // The color on our side = the opposite side of the neighbor
     const oppositeIdx = WangId.oppositeIndex(index);

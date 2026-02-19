@@ -312,6 +312,29 @@ Verification: `tsc --noEmit` clean, 194 tests passing.
 
 ---
 
+## 2026-02-18: Editor Simplification & Refinement (Round 3)
+
+Focused code review of `src/editor/` and `src/editor/panels/`. No behavioral changes.
+
+| Area | Change | Files |
+|------|--------|-------|
+| Deduplication | Extracted `startInlineEdit()` into shared `inline-edit.ts` module, removing identical implementations from `WangSetPanel` and `InspectorPanel` | New `src/editor/inline-edit.ts`; `wangset-panel.ts`, `inspector-panel.ts` |
+| State cleanup | Added `isActiveTileset()` helper to `EditorState`, eliminating 3 repeated `(wt.tileset ?? 0) === this._activeTilesetIndex` expressions | `editor-state.ts` |
+| State cleanup | Simplified `removeWangTile()` to reuse `findWangTile()` instead of duplicating search logic | `editor-state.ts` |
+| State cleanup | Simplified `removeWangTileMulti()` to use `filter()` with `Set` lookup instead of index-based splice loop | `editor-state.ts` |
+| State cleanup | Simplified `removeColor()` active color clamping (redundant ternary) | `editor-state.ts` |
+| Rendering cleanup | Extracted `activeWangTiles()` helper in `TilesetPanel`, replacing 4 repeated tileset-filter loops | `tileset-panel.ts` |
+| Rendering cleanup | Simplified 4 triangle-drawing branches in `drawWangOverlays()` to single parametric draw using `dx`/`dy` | `tileset-panel.ts` |
+| Inspector cleanup | Extracted `isZoneActive()` function to deduplicate WangSet type zone check in `drawGrid()` and `paintAllZones()` | `inspector-panel.ts` |
+| Inspector cleanup | Extracted `applyToSelection()` helper to deduplicate single/multi-select dispatch in `paintZone()` and `paintAllZones()` | `inspector-panel.ts` |
+| Overlay cleanup | Stored spacer element as field instead of fragile style-based querySelector lookup | `overlay-manager.ts` |
+| Keyboard shortcuts | Simplified undo/redo handler by extracting shared meta-key check | `tile-editor.ts` |
+| Missing list display | Simplified corner label formatting with `map`/`join` | `wangset-panel.ts` |
+
+Verification: `tsc --noEmit` clean, 194 tests passing.
+
+---
+
 ## 2026-02-18: Prefab Editor Tool
 
 New third tool — a prefab editor at `/tools/prefab-editor/` for composing reusable tile arrangements ("prefabs") by selecting tiles from tilesets and stamping them onto a grid canvas.

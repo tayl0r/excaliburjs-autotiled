@@ -1,4 +1,4 @@
-import type { PrefabTile } from '../core/prefab-schema.js';
+import type { PrefabTile, SavedPrefab } from '../core/prefab-schema.js';
 import { PrefabEditorState } from './prefab-state.js';
 import { colRowFromTileId } from '../utils/tile-math.js';
 
@@ -230,16 +230,7 @@ export class PrefabCanvasPanel {
       if (this.state.tool === 'copy' && this.copySelecting) {
         this.copySelecting = false;
         const prefab = this.state.activePrefab;
-        if (prefab) {
-          const minX = Math.min(this.selectStartX, this.selectEndX);
-          const maxX = Math.max(this.selectStartX, this.selectEndX);
-          const minY = Math.min(this.selectStartY, this.selectEndY);
-          const maxY = Math.max(this.selectStartY, this.selectEndY);
-          const tiles = prefab.tiles.filter(
-            t => t.x >= minX && t.x <= maxX && t.y >= minY && t.y <= maxY,
-          );
-          this.state.setCopiedStamp(tiles);
-        }
+        if (prefab) this.state.setCopiedStamp(this.tilesInSelectionRect(prefab));
         this.render();
         return;
       }
@@ -247,17 +238,9 @@ export class PrefabCanvasPanel {
       const pos = this.gridPosAtMouse(e);
 
       if (this.movePhase === 'selecting') {
-        // Find all prefab tiles within the selection rectangle
         const prefab = this.state.activePrefab;
         if (prefab && pos) {
-          const minX = Math.min(this.selectStartX, this.selectEndX);
-          const maxX = Math.max(this.selectStartX, this.selectEndX);
-          const minY = Math.min(this.selectStartY, this.selectEndY);
-          const maxY = Math.max(this.selectStartY, this.selectEndY);
-
-          this.moveSelectedTiles = prefab.tiles.filter(
-            t => t.x >= minX && t.x <= maxX && t.y >= minY && t.y <= maxY,
-          );
+          this.moveSelectedTiles = this.tilesInSelectionRect(prefab);
           this.movePhase = this.moveSelectedTiles.length > 0 ? 'selected' : 'idle';
         } else {
           this.movePhase = 'idle';
@@ -268,7 +251,6 @@ export class PrefabCanvasPanel {
         const dy = this.dragCurrentY - this.dragStartY;
         if (dx !== 0 || dy !== 0) {
           this.state.moveTiles(this.moveSelectedTiles, dx, dy);
-          // Update selected tiles to reflect new positions
           this.moveSelectedTiles = this.moveSelectedTiles.map(t => ({
             ...t, x: t.x + dx, y: t.y + dy,
           }));
@@ -354,13 +336,45 @@ export class PrefabCanvasPanel {
     return tiles;
   }
 
+  private drawTile(tile: PrefabTile, destX: number, destY: number, tw: number, th: number): void {
+    const img = this.images[tile.tilesetIndex];
+    if (!img) return;
+    const ts = this.state.metadata.tilesets[tile.tilesetIndex];
+    if (!ts) return;
+    const sx = (tile.tileId % ts.columns) * ts.tileWidth;
+    const sy = Math.floor(tile.tileId / ts.columns) * ts.tileHeight;
+    this.ctx.drawImage(img, sx, sy, ts.tileWidth, ts.tileHeight, destX, destY, tw, th);
+  }
+
+  private drawSelectionRect(tw: number, th: number, fillColor: string, strokeColor: string): void {
+    const minX = Math.min(this.selectStartX, this.selectEndX);
+    const maxX = Math.max(this.selectStartX, this.selectEndX);
+    const minY = Math.min(this.selectStartY, this.selectEndY);
+    const maxY = Math.max(this.selectStartY, this.selectEndY);
+    const w = (maxX - minX + 1) * tw;
+    const h = (maxY - minY + 1) * th;
+    this.ctx.fillStyle = fillColor;
+    this.ctx.fillRect(minX * tw, minY * th, w, h);
+    this.ctx.strokeStyle = strokeColor;
+    this.ctx.lineWidth = 2;
+    this.ctx.strokeRect(minX * tw + 1, minY * th + 1, w - 2, h - 2);
+  }
+
+  private tilesInSelectionRect(prefab: SavedPrefab): PrefabTile[] {
+    const minX = Math.min(this.selectStartX, this.selectEndX);
+    const maxX = Math.max(this.selectStartX, this.selectEndX);
+    const minY = Math.min(this.selectStartY, this.selectEndY);
+    const maxY = Math.max(this.selectStartY, this.selectEndY);
+    return prefab.tiles.filter(
+      t => t.x >= minX && t.x <= maxX && t.y >= minY && t.y <= maxY,
+    );
+  }
+
   render(): void {
     const prefab = this.state.activePrefab;
     const zoom = this.state.prefabZoom;
-    const tileWidth = this.state.tileWidth;
-    const tileHeight = this.state.tileHeight;
-    const tw = tileWidth * zoom;
-    const th = tileHeight * zoom;
+    const tw = this.state.tileWidth * zoom;
+    const th = this.state.tileHeight * zoom;
     const canvasW = this.state.canvasWidth;
     const canvasH = this.state.canvasHeight;
 
@@ -399,52 +413,25 @@ export class PrefabCanvasPanel {
 
     // Draw placed tiles
     for (const tile of prefab.tiles) {
-      const img = this.images[tile.tilesetIndex];
-      if (!img) continue;
-      const ts = this.state.metadata.tilesets[tile.tilesetIndex];
-      if (!ts) continue;
-
-      const sx = (tile.tileId % ts.columns) * ts.tileWidth;
-      const sy = Math.floor(tile.tileId / ts.columns) * ts.tileHeight;
-      this.ctx.drawImage(
-        img,
-        sx, sy, ts.tileWidth, ts.tileHeight,
-        tile.x * tw, tile.y * th, tw, th,
-      );
+      this.drawTile(tile, tile.x * tw, tile.y * th, tw, th);
     }
 
     // Draw anchor highlight
     this.ctx.strokeStyle = '#ff4444';
     this.ctx.lineWidth = 3;
-    this.ctx.strokeRect(
-      prefab.anchorX * tw + 1,
-      prefab.anchorY * th + 1,
-      tw - 2, th - 2,
-    );
-    // Small "A" label on anchor
+    this.ctx.strokeRect(prefab.anchorX * tw + 1, prefab.anchorY * th + 1, tw - 2, th - 2);
     this.ctx.fillStyle = 'rgba(255, 68, 68, 0.7)';
     this.ctx.font = 'bold 10px monospace';
     this.ctx.textBaseline = 'top';
     this.ctx.fillText('A', prefab.anchorX * tw + 3, prefab.anchorY * th + 2);
 
-    // Draw stamp preview on hover (tool=paint, tiles selected)
+    // Draw stamp preview on hover
     if (this.hoverGridX >= 0 && this.state.tool === 'paint') {
       const stamps = this.computeStampTiles(this.hoverGridX, this.hoverGridY);
       if (stamps.length > 0) {
         this.ctx.globalAlpha = 0.4;
         for (const tile of stamps) {
-          const img = this.images[tile.tilesetIndex];
-          if (!img) continue;
-          const ts = this.state.metadata.tilesets[tile.tilesetIndex];
-          if (!ts) continue;
-
-          const sx = (tile.tileId % ts.columns) * ts.tileWidth;
-          const sy = Math.floor(tile.tileId / ts.columns) * ts.tileHeight;
-          this.ctx.drawImage(
-            img,
-            sx, sy, ts.tileWidth, ts.tileHeight,
-            tile.x * tw, tile.y * th, tw, th,
-          );
+          this.drawTile(tile, tile.x * tw, tile.y * th, tw, th);
         }
         this.ctx.globalAlpha = 1.0;
       }
@@ -452,34 +439,16 @@ export class PrefabCanvasPanel {
 
     // Copy tool selection rectangle
     if (this.state.tool === 'copy' && this.copySelecting) {
-      const minX = Math.min(this.selectStartX, this.selectEndX);
-      const maxX = Math.max(this.selectStartX, this.selectEndX);
-      const minY = Math.min(this.selectStartY, this.selectEndY);
-      const maxY = Math.max(this.selectStartY, this.selectEndY);
-      this.ctx.fillStyle = 'rgba(100, 255, 100, 0.15)';
-      this.ctx.fillRect(minX * tw, minY * th, (maxX - minX + 1) * tw, (maxY - minY + 1) * th);
-      this.ctx.strokeStyle = 'rgba(100, 255, 100, 0.6)';
-      this.ctx.lineWidth = 2;
-      this.ctx.strokeRect(minX * tw + 1, minY * th + 1, (maxX - minX + 1) * tw - 2, (maxY - minY + 1) * th - 2);
+      this.drawSelectionRect(tw, th, 'rgba(100, 255, 100, 0.15)', 'rgba(100, 255, 100, 0.6)');
     }
 
     // Move tool overlays
     if (this.state.tool === 'move') {
       if (this.movePhase === 'selecting') {
-        // Draw rubber-band selection rectangle
-        const minX = Math.min(this.selectStartX, this.selectEndX);
-        const maxX = Math.max(this.selectStartX, this.selectEndX);
-        const minY = Math.min(this.selectStartY, this.selectEndY);
-        const maxY = Math.max(this.selectStartY, this.selectEndY);
-        this.ctx.fillStyle = 'rgba(100, 100, 255, 0.15)';
-        this.ctx.fillRect(minX * tw, minY * th, (maxX - minX + 1) * tw, (maxY - minY + 1) * th);
-        this.ctx.strokeStyle = 'rgba(100, 100, 255, 0.6)';
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(minX * tw + 1, minY * th + 1, (maxX - minX + 1) * tw - 2, (maxY - minY + 1) * th - 2);
+        this.drawSelectionRect(tw, th, 'rgba(100, 100, 255, 0.15)', 'rgba(100, 100, 255, 0.6)');
       }
 
       if (this.movePhase === 'selected' || this.movePhase === 'dragging') {
-        // Highlight selected tiles
         this.ctx.strokeStyle = 'rgba(100, 200, 255, 0.8)';
         this.ctx.lineWidth = 2;
         for (const t of this.moveSelectedTiles) {
@@ -491,30 +460,17 @@ export class PrefabCanvasPanel {
         const dx = this.dragCurrentX - this.dragStartX;
         const dy = this.dragCurrentY - this.dragStartY;
 
-        // Dim original positions
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         for (const t of this.moveSelectedTiles) {
           this.ctx.fillRect(t.x * tw, t.y * th, tw, th);
         }
 
-        // Draw ghost tiles at offset position
         this.ctx.globalAlpha = 0.4;
         for (const t of this.moveSelectedTiles) {
-          const img = this.images[t.tilesetIndex];
-          if (!img) continue;
-          const ts = this.state.metadata.tilesets[t.tilesetIndex];
-          if (!ts) continue;
-          const sx = (t.tileId % ts.columns) * ts.tileWidth;
-          const sy = Math.floor(t.tileId / ts.columns) * ts.tileHeight;
-          this.ctx.drawImage(
-            img,
-            sx, sy, ts.tileWidth, ts.tileHeight,
-            (t.x + dx) * tw, (t.y + dy) * th, tw, th,
-          );
+          this.drawTile(t, (t.x + dx) * tw, (t.y + dy) * th, tw, th);
         }
         this.ctx.globalAlpha = 1.0;
 
-        // Outline ghost positions
         this.ctx.strokeStyle = 'rgba(100, 200, 255, 0.6)';
         this.ctx.lineWidth = 2;
         for (const t of this.moveSelectedTiles) {
@@ -525,16 +481,13 @@ export class PrefabCanvasPanel {
 
     // Draw cursor highlight on hover
     if (this.hoverGridX >= 0) {
-      const cursorColor = this.state.tool === 'erase' ? 'rgba(255,100,100,0.6)' :
-                          this.state.tool === 'anchor' ? 'rgba(255,200,50,0.6)' :
-                          'rgba(255,255,255,0.4)';
+      const tool = this.state.tool;
+      let cursorColor = 'rgba(255,255,255,0.4)';
+      if (tool === 'erase') cursorColor = 'rgba(255,100,100,0.6)';
+      else if (tool === 'anchor') cursorColor = 'rgba(255,200,50,0.6)';
       this.ctx.strokeStyle = cursorColor;
       this.ctx.lineWidth = 2;
-      this.ctx.strokeRect(
-        this.hoverGridX * tw + 1,
-        this.hoverGridY * th + 1,
-        tw - 2, th - 2,
-      );
+      this.ctx.strokeRect(this.hoverGridX * tw + 1, this.hoverGridY * th + 1, tw - 2, th - 2);
     }
   }
 }

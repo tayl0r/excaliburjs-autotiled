@@ -15,6 +15,10 @@ export type PrefabEvent =
 
 const CANVAS_EXPAND_STEP = 10;
 
+function ceilToStep(value: number, step: number): number {
+  return Math.ceil(value / step) * step;
+}
+
 type Listener = () => void;
 
 export class PrefabEditorState {
@@ -54,19 +58,18 @@ export class PrefabEditorState {
   get canvasWidth(): number { return this._canvasWidth; }
   get canvasHeight(): number { return this._canvasHeight; }
 
-  /** Prefab dimensions: rightmost - leftmost + 1, bottommost - topmost + 1 */
-  get prefabWidth(): number {
+  get prefabWidth(): number { return this.prefabExtent('x'); }
+  get prefabHeight(): number { return this.prefabExtent('y'); }
+
+  private prefabExtent(axis: 'x' | 'y'): number {
     const prefab = this.activePrefab;
     if (!prefab || prefab.tiles.length === 0) return 0;
     let min = Infinity, max = -Infinity;
-    for (const t of prefab.tiles) { if (t.x < min) min = t.x; if (t.x > max) max = t.x; }
-    return max - min + 1;
-  }
-  get prefabHeight(): number {
-    const prefab = this.activePrefab;
-    if (!prefab || prefab.tiles.length === 0) return 0;
-    let min = Infinity, max = -Infinity;
-    for (const t of prefab.tiles) { if (t.y < min) min = t.y; if (t.y > max) max = t.y; }
+    for (const t of prefab.tiles) {
+      const v = t[axis];
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
     return max - min + 1;
   }
 
@@ -167,8 +170,8 @@ export class PrefabEditorState {
       if (t.x + 1 > maxX) maxX = t.x + 1;
       if (t.y + 1 > maxY) maxY = t.y + 1;
     }
-    while (this._canvasWidth < maxX) this._canvasWidth += CANVAS_EXPAND_STEP;
-    while (this._canvasHeight < maxY) this._canvasHeight += CANVAS_EXPAND_STEP;
+    this._canvasWidth = Math.max(this._canvasWidth, ceilToStep(maxX, CANVAS_EXPAND_STEP));
+    this._canvasHeight = Math.max(this._canvasHeight, ceilToStep(maxY, CANVAS_EXPAND_STEP));
   }
 
   // --- Undo/Redo ---
@@ -277,12 +280,7 @@ export class PrefabEditorState {
 
   selectTile(id: number): void {
     this._selectedTileIds = [id];
-    this._copiedStamp = [];
-    if (this._tool !== 'paint') {
-      this._tool = 'paint';
-      this.emit('toolChanged');
-    }
-    this.emit('tileSelectionChanged');
+    this.commitTileSelection();
   }
 
   selectTileRange(from: number, to: number): void {
@@ -305,12 +303,7 @@ export class PrefabEditorState {
       }
     }
     this._selectedTileIds = ids;
-    this._copiedStamp = [];
-    if (this._tool !== 'paint') {
-      this._tool = 'paint';
-      this.emit('toolChanged');
-    }
-    this.emit('tileSelectionChanged');
+    this.commitTileSelection();
   }
 
   toggleTileSelection(id: number): void {
@@ -320,6 +313,10 @@ export class PrefabEditorState {
     } else {
       this._selectedTileIds = [...this._selectedTileIds, id];
     }
+    this.commitTileSelection();
+  }
+
+  private commitTileSelection(): void {
     this._copiedStamp = [];
     if (this._tool !== 'paint') {
       this._tool = 'paint';

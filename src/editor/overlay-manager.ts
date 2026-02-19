@@ -5,6 +5,7 @@
 export class OverlayManager {
   private overlay: HTMLDivElement;
   private topBar!: HTMLDivElement;
+  private topBarSpacer!: HTMLDivElement;
   private leftSidebar!: HTMLDivElement;
   private centerPanel!: HTMLDivElement;
   private rightPanel!: HTMLDivElement;
@@ -59,9 +60,9 @@ export class OverlayManager {
     this.topBar.appendChild(title);
 
     // Spacer
-    const spacer = document.createElement('div');
-    spacer.style.flex = '1';
-    this.topBar.appendChild(spacer);
+    this.topBarSpacer = document.createElement('div');
+    this.topBarSpacer.style.flex = '1';
+    this.topBar.appendChild(this.topBarSpacer);
 
     // Left sidebar (WangSet panel)
     this.leftSidebar = document.createElement('div');
@@ -98,8 +99,7 @@ export class OverlayManager {
 
   /** Mount an element into the top bar (inserted before the spacer) */
   mountTopBar(element: HTMLElement): void {
-    const spacer = this.topBar.querySelector('[style*="flex: 1"]') ?? this.topBar.lastChild;
-    this.topBar.insertBefore(element, spacer);
+    this.topBar.insertBefore(element, this.topBarSpacer);
   }
 
   /** Mount an element into the left sidebar */

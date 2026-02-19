@@ -2,12 +2,13 @@ import * as ex from 'excalibur';
 import type { ProjectMetadata } from './core/metadata-schema.js';
 import { TilesetManager } from './engine/tileset-manager.js';
 import { GameScene } from './engine/game-scene.js';
+import { tilesetImageUrl } from './utils/asset-paths.js';
 
 const resp = await fetch('/assets/metadata/project.autotile.json');
 const projectMetadata: ProjectMetadata = await resp.json();
 
 const tilesetImages = projectMetadata.tilesets.map(
-  (ts) => new ex.ImageSource(`/assets/TimeFantasy_TILES_6.24.17/TILESETS/${ts.tilesetImage}`),
+  (ts) => new ex.ImageSource(tilesetImageUrl(ts)),
 );
 
 const tilesetManager = new TilesetManager(tilesetImages, projectMetadata);
@@ -30,7 +31,6 @@ game.addScene('game', gameScene);
 game.start('game', { loader }).then(async () => {
   console.log('[map-painter] Loaded project metadata:', JSON.parse(JSON.stringify(projectMetadata)));
 
-  // Auto-load map from URL hash
   const hash = window.location.hash;
   const mapMatch = hash.match(/^#map=(.+)$/);
   if (mapMatch) {
