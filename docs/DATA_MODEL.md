@@ -101,7 +101,7 @@ The central config file. Defines which tilesets exist and how their tiles relate
 
 Tiles are identified by a zero-based integer index. Tile 0 is the top-left of the spritesheet. IDs increment left-to-right, top-to-bottom. To find a tile's pixel position:
 
-```
+```javascript
 column = tileId % columns
 row    = floor(tileId / columns)
 pixelX = column * tileWidth
@@ -194,10 +194,10 @@ Maps store **only terrain colors**, not tile IDs. When a map is loaded, the auto
 
 Color values are 1-indexed WangSet color IDs. The array reads left-to-right, top-to-bottom:
 
-```
-colors[0]       = cell (0, 0) top-left
-colors[width-1] = cell (width-1, 0) top-right
-colors[width]   = cell (0, 1) second row, first column
+```javascript
+colors[0]       = cell (0, 0) // top-left
+colors[width-1] = cell (width-1, 0) // top-right
+colors[width]   = cell (0, 1) // second row, first column
 ```
 
 Maps are loaded via URL hash: `/tools/map-painter/#map=test1` loads `assets/maps/test1.json`.
@@ -228,7 +228,7 @@ Prefabs can contain tiles from multiple tilesets (each tile has its own `tileset
 
 ## How They Connect
 
-```
+```text
 project.autotile.json
   ├── tilesets[]        ← tileset PNGs in the TILESETS directory
   │     indexes used by:  maps (indirectly via WangSets), prefabs (tilesetIndex)
@@ -255,7 +255,7 @@ These are the in-memory representations used by the autotile engine. They are bu
 
 A single placed tile on the map. This is what the autotile engine resolves each grid position to.
 
-```
+```typescript
 Cell {
   tileId: number          // Which tile from the spritesheet (-1 = empty)
   tilesetIndex: number    // Which tileset
@@ -271,7 +271,7 @@ The flip flags allow a single tile to serve multiple terrain transitions. For ex
 
 The map grid. Holds two parallel flat arrays (row-major):
 
-```
+```typescript
 SimpleAutotileMap {
   width, height: number
   colors: number[]        // What the user painted (terrain color IDs)
@@ -288,7 +288,7 @@ When the user paints a color, the engine updates `colors[]`, then runs the match
 
 An 8-element number array describing what terrain colors surround a tile. See [WangId (the 8-element array)](#wangid-the-8-element-array) above for the index layout.
 
-```
+```typescript
 WangId {
   colors: number[8]      // Color IDs at each position around the tile
 }
@@ -298,7 +298,7 @@ WangId {
 
 The central runtime structure for autotiling. Built from the JSON wangset data plus precomputed caches.
 
-```
+```typescript
 WangSet {
   name: string
   type: 'corner' | 'edge' | 'mixed'
@@ -326,7 +326,7 @@ WangSet {
 
 A terrain type within a WangSet.
 
-```
+```typescript
 WangColor {
   id: number              // 1-based (0 = wildcard/unspecified)
   name: string            // Display name ("Grass", "Dirt", etc.)
@@ -341,7 +341,7 @@ WangColor {
 
 A single usable tile in the matching system. May be a base tile or a transformed (rotated/flipped) copy.
 
-```
+```typescript
 WangVariant {
   wangId: WangId          // What terrain configuration this tile represents
   cell: Cell              // The tile + flip flags to render it
