@@ -1,6 +1,6 @@
-import { WangId } from './wang-id.js';
-import type { WangColor } from './wang-color.js';
 import { type Cell, cellSpriteKey } from './cell.js';
+import type { WangColor } from './wang-color.js';
+import { WangId } from './wang-id.js';
 
 export type WangSetType = 'corner' | 'edge' | 'mixed';
 
@@ -66,8 +66,8 @@ export class WangSet {
   /** Get all base tile mappings as an array of {tilesetIndex, tileId, wangId} */
   getTileMappings(): Array<{ tilesetIndex: number; tileId: number; wangId: WangId }> {
     return [...this.tileMapping].map(([key, wangId]) => {
-      const [tilesetIndex, tileId] = key.split(':').map(Number);
-      return { tilesetIndex, tileId, wangId };
+      const colon = key.indexOf(':');
+      return { tilesetIndex: +key.slice(0, colon), tileId: +key.slice(colon + 1), wangId };
     });
   }
 

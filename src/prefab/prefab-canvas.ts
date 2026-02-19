@@ -53,12 +53,13 @@ export class PrefabCanvasPanel {
 
     this.setupEvents();
 
-    this.state.on('activePrefabChanged', () => { this.updateStatusBar(); this.render(); });
-    this.state.on('prefabDataChanged', () => { this.updateStatusBar(); this.render(); });
+    const refresh = () => { this.updateStatusBar(); this.render(); };
+    this.state.on('activePrefabChanged', refresh);
+    this.state.on('prefabDataChanged', refresh);
     this.state.on('tileSelectionChanged', () => this.render());
     this.state.on('toolChanged', () => this.render());
-    this.state.on('zoomChanged', () => { this.updateStatusBar(); this.render(); });
-    this.state.on('activeLayerChanged', () => { this.updateStatusBar(); this.render(); });
+    this.state.on('zoomChanged', refresh);
+    this.state.on('activeLayerChanged', refresh);
     this.state.on('visibilityChanged', () => this.render());
 
     this.updateStatusBar();
@@ -103,38 +104,31 @@ export class PrefabCanvasPanel {
     });
 
     this.canvas.addEventListener('mousedown', (e) => {
+      const pos = this.gridPosAtMouse(e);
+      if (!pos) return;
+      const { gx, gy } = pos;
+
       if (this.state.tool === 'paint') {
-        const pos = this.gridPosAtMouse(e);
-        if (!pos) return;
         this.painting = true;
-        const stamps = this.computeStampTiles(pos.gx, pos.gy);
-        if (stamps.length > 0) {
-          this.state.placeTiles(stamps);
-        }
+        const stamps = this.computeStampTiles(gx, gy);
+        if (stamps.length > 0) this.state.placeTiles(stamps);
         return;
       }
       if (this.state.tool === 'erase') {
-        const pos = this.gridPosAtMouse(e);
-        if (!pos) return;
         this.erasing = true;
-        this.state.eraseTile(pos.gx, pos.gy);
+        this.state.eraseTile(gx, gy);
         return;
       }
       if (this.state.tool === 'copy') {
-        const pos = this.gridPosAtMouse(e);
-        if (!pos) return;
         this.copySelecting = true;
-        this.selectStartX = pos.gx;
-        this.selectStartY = pos.gy;
-        this.selectEndX = pos.gx;
-        this.selectEndY = pos.gy;
+        this.selectStartX = gx;
+        this.selectStartY = gy;
+        this.selectEndX = gx;
+        this.selectEndY = gy;
         this.render();
         return;
       }
       if (this.state.tool !== 'move') return;
-      const pos = this.gridPosAtMouse(e);
-      if (!pos) return;
-      const { gx, gy } = pos;
 
       if (this.movePhase === 'selected' && this.isTileSelected(gx, gy)) {
         // Start dragging selected tiles
@@ -157,27 +151,22 @@ export class PrefabCanvasPanel {
 
     this.canvas.addEventListener('mousemove', (e) => {
       const pos = this.gridPosAtMouse(e);
+      const moved = pos && (pos.gx !== this.hoverGridX || pos.gy !== this.hoverGridY);
 
-      if (this.painting && this.state.tool === 'paint' && pos) {
-        if (pos.gx !== this.hoverGridX || pos.gy !== this.hoverGridY) {
-          this.hoverGridX = pos.gx;
-          this.hoverGridY = pos.gy;
-          const stamps = this.computeStampTiles(pos.gx, pos.gy);
-          if (stamps.length > 0) {
-            this.state.placeTiles(stamps);
-          }
-          this.render();
-        }
+      if (this.painting && this.state.tool === 'paint' && pos && moved) {
+        this.hoverGridX = pos.gx;
+        this.hoverGridY = pos.gy;
+        const stamps = this.computeStampTiles(pos.gx, pos.gy);
+        if (stamps.length > 0) this.state.placeTiles(stamps);
+        this.render();
         return;
       }
 
-      if (this.erasing && this.state.tool === 'erase' && pos) {
-        if (pos.gx !== this.hoverGridX || pos.gy !== this.hoverGridY) {
-          this.hoverGridX = pos.gx;
-          this.hoverGridY = pos.gy;
-          this.state.eraseTile(pos.gx, pos.gy);
-          this.render();
-        }
+      if (this.erasing && this.state.tool === 'erase' && pos && moved) {
+        this.hoverGridX = pos.gx;
+        this.hoverGridY = pos.gy;
+        this.state.eraseTile(pos.gx, pos.gy);
+        this.render();
         return;
       }
 
@@ -188,14 +177,14 @@ export class PrefabCanvasPanel {
         return;
       }
 
-      if (this.state.tool === 'move') {
-        if (this.movePhase === 'selecting' && pos) {
+      if (this.state.tool === 'move' && pos) {
+        if (this.movePhase === 'selecting') {
           this.selectEndX = pos.gx;
           this.selectEndY = pos.gy;
           this.render();
           return;
         }
-        if (this.movePhase === 'dragging' && pos) {
+        if (this.movePhase === 'dragging') {
           this.dragCurrentX = pos.gx;
           this.dragCurrentY = pos.gy;
           this.render();
@@ -203,13 +192,11 @@ export class PrefabCanvasPanel {
         }
       }
 
-      if (pos) {
-        if (pos.gx !== this.hoverGridX || pos.gy !== this.hoverGridY) {
-          this.hoverGridX = pos.gx;
-          this.hoverGridY = pos.gy;
-          this.render();
-        }
-      } else if (this.hoverGridX !== -1) {
+      if (pos && moved) {
+        this.hoverGridX = pos.gx;
+        this.hoverGridY = pos.gy;
+        this.render();
+      } else if (!pos && this.hoverGridX !== -1) {
         this.hoverGridX = -1;
         this.hoverGridY = -1;
         this.render();
@@ -377,25 +364,15 @@ export class PrefabCanvasPanel {
       return;
     }
 
-    // Draw placed tiles across all layers with visibility
     const activeLayer = this.state.activeLayer;
     const visibility = this.state.visibilityMode;
 
     for (let i = 0; i < NUM_PREFAB_LAYERS; i++) {
       const layer = prefab.layers[i];
       if (!layer || layer.length === 0) continue;
+      if (i !== activeLayer && visibility === 'hidden') continue;
 
-      if (i === activeLayer) {
-        // Active layer always at full opacity
-        this.ctx.globalAlpha = 1.0;
-      } else if (visibility === 'hidden') {
-        continue; // Skip non-active layers
-      } else if (visibility === 'highlight') {
-        this.ctx.globalAlpha = 0.25;
-      } else {
-        this.ctx.globalAlpha = 1.0;
-      }
-
+      this.ctx.globalAlpha = (i !== activeLayer && visibility === 'highlight') ? 0.25 : 1.0;
       for (const tile of layer) {
         this.drawTile(tile, tile.x * tw, tile.y * th, tw, th);
       }
@@ -411,16 +388,13 @@ export class PrefabCanvasPanel {
     this.ctx.textBaseline = 'top';
     this.ctx.fillText('A', prefab.anchorX * tw + 3, prefab.anchorY * th + 2);
 
-    // Draw stamp preview on hover
     if (this.hoverGridX >= 0 && this.state.tool === 'paint') {
       const stamps = this.computeStampTiles(this.hoverGridX, this.hoverGridY);
-      if (stamps.length > 0) {
-        this.ctx.globalAlpha = 0.4;
-        for (const tile of stamps) {
-          this.drawTile(tile, tile.x * tw, tile.y * th, tw, th);
-        }
-        this.ctx.globalAlpha = 1.0;
+      this.ctx.globalAlpha = 0.4;
+      for (const tile of stamps) {
+        this.drawTile(tile, tile.x * tw, tile.y * th, tw, th);
       }
+      this.ctx.globalAlpha = 1.0;
     }
 
     // Copy tool selection rectangle

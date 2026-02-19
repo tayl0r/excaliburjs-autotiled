@@ -16,11 +16,12 @@ export class RegionAssignPanel {
     this.state = state;
     this.element = document.createElement('div');
 
-    this.state.on('selectedTileChanged', () => this.render());
-    this.state.on('metadataChanged', () => this.render());
-    this.state.on('activeWangSetChanged', () => this.render());
-    this.state.on('clipboardChanged', () => this.render());
-    this.state.on('templateModeChanged', () => this.render());
+    const rerender = () => this.render();
+    this.state.on('selectedTileChanged', rerender);
+    this.state.on('metadataChanged', rerender);
+    this.state.on('activeWangSetChanged', rerender);
+    this.state.on('clipboardChanged', rerender);
+    this.state.on('templateModeChanged', rerender);
 
     this.render();
   }
@@ -166,9 +167,7 @@ export class RegionAssignPanel {
 
     const copyBtn = panelButton('Copy');
     copyBtn.style.cssText += 'padding: 6px 12px; font-size: 12px; flex: 1;';
-    copyBtn.addEventListener('click', () => {
-      this.state.copyWangRegion();
-    });
+    copyBtn.addEventListener('click', () => this.state.copyWangRegion());
     copyPasteRow.appendChild(copyBtn);
 
     const pasteBtn = panelButton(clip ? `Paste (${clip.width}\u00D7${clip.height})` : 'Paste');

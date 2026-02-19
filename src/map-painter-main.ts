@@ -16,13 +16,18 @@ const tilesetManager = new TilesetManager(tilesetImages, projectMetadata);
 const gameScene = new GameScene(tilesetManager);
 
 const game = new ex.Engine({
-  width: 960,
-  height: 960,
+  width: window.innerWidth,
+  height: window.innerHeight,
   fixedUpdateFps: 60,
   pixelArt: true,
   pixelRatio: 1,
   backgroundColor: ex.Color.fromHex('#1a1a2e'),
   antialiasing: false,
+});
+
+window.addEventListener('resize', () => {
+  game.screen.resolution = { width: window.innerWidth, height: window.innerHeight };
+  game.screen.applyResolutionAndViewport();
 });
 
 const loader = new ex.Loader(tilesetImages);

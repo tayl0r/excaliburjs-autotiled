@@ -6,16 +6,9 @@ import { PrefabListPanel } from './prefab-list-panel.js';
 import { PrefabCanvasPanel } from './prefab-canvas.js';
 import { TilesetViewerPanel } from './tileset-viewer.js';
 
-const BTN_STYLE = `
-  background: #333; color: #ccc; border: 1px solid #555;
-  padding: 3px 10px; border-radius: 3px; cursor: pointer;
-  font-size: 12px; font-family: inherit;
-`;
-const ACTIVE_BTN_STYLE = `
-  background: #6666cc; color: #fff; border: 1px solid #8888ee;
-  padding: 3px 10px; border-radius: 3px; cursor: pointer;
-  font-size: 12px; font-family: inherit;
-`;
+const BTN_BASE = 'padding: 3px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; font-family: inherit;';
+const BTN_STYLE = `background: #333; color: #ccc; border: 1px solid #555; ${BTN_BASE}`;
+const ACTIVE_BTN_STYLE = `background: #6666cc; color: #fff; border: 1px solid #8888ee; ${BTN_BASE}`;
 
 const TOOL_BUTTONS: Array<{ tool: PrefabTool; label: string }> = [
   { tool: 'erase', label: 'Eraser (E)' },
@@ -93,35 +86,35 @@ export class PrefabEditor {
     this.state.setTool(this.state.tool === tool ? 'paint' : tool);
   }
 
+  private static readonly TOOL_KEYS: Record<string, PrefabTool> = {
+    e: 'erase', m: 'move', c: 'copy',
+  };
+
   private handleKeydown(e: KeyboardEvent): void {
     if (e.target instanceof HTMLInputElement) return;
     const key = e.key.toLowerCase();
     const mod = e.ctrlKey || e.metaKey;
 
-    if (mod && key === 'z' && !e.shiftKey) {
+    if (mod && key === 'z') {
       e.preventDefault();
-      this.state.undo();
-    } else if (mod && key === 'z' && e.shiftKey) {
+      e.shiftKey ? this.state.redo() : this.state.undo();
+      return;
+    }
+    if (mod && key === 'y') {
       e.preventDefault();
       this.state.redo();
-    } else if (mod && key === 'y') {
-      e.preventDefault();
-      this.state.redo();
-    } else if (key === 'e') {
-      this.toggleTool('erase');
-    } else if (key === 'm') {
-      this.toggleTool('move');
-    } else if (key === 'c' && !mod) {
-      this.toggleTool('copy');
-    } else if (key === 'v' && !mod) {
-      this.state.cycleVisibility();
-    } else if (key === 'escape') {
-      this.state.resetTool();
-    } else {
-      const num = parseInt(key, 10);
-      if (num >= 1 && num <= NUM_PREFAB_LAYERS) {
-        this.state.setActiveLayer(num - 1);
-      }
+      return;
+    }
+    if (mod) return;
+
+    const toolForKey = PrefabEditor.TOOL_KEYS[key];
+    if (toolForKey) { this.toggleTool(toolForKey); return; }
+    if (key === 'v') { this.state.cycleVisibility(); return; }
+    if (key === 'escape') { this.state.resetTool(); return; }
+
+    const num = parseInt(key, 10);
+    if (num >= 1 && num <= NUM_PREFAB_LAYERS) {
+      this.state.setActiveLayer(num - 1);
     }
   }
 
@@ -148,31 +141,21 @@ export class PrefabEditor {
       gap: 0;
     `;
 
-    const topBarStyle = `
-      background: #16213e;
-      display: flex;
-      align-items: center;
-      padding: 0 12px;
-      border-bottom: 1px solid #333;
-      gap: 8px;
-    `;
+    const topBar = 'background: #16213e; display: flex; align-items: center; padding: 0 12px; border-bottom: 1px solid #333; gap: 8px;';
 
-    // Top-left: title
     const topLeft = document.createElement('div');
-    topLeft.style.cssText = topBarStyle + 'border-right: 1px solid #333;';
+    topLeft.style.cssText = topBar + 'border-right: 1px solid #333;';
     const title = document.createElement('span');
     title.textContent = 'Prefab Editor';
     title.style.cssText = 'font-weight: 600; font-size: 14px;';
     topLeft.appendChild(title);
 
-    // Top-center: tool buttons (above prefab panel)
     const topCenter = document.createElement('div');
-    topCenter.style.cssText = topBarStyle + 'justify-content: center;';
+    topCenter.style.cssText = topBar + 'justify-content: center;';
     this.buildToolButtons(topCenter);
 
-    // Top-right: tileset tabs (above tileset panel)
     const topRight = document.createElement('div');
-    topRight.style.cssText = topBarStyle + 'border-left: 1px solid #333; justify-content: center;';
+    topRight.style.cssText = topBar + 'border-left: 1px solid #333; justify-content: center;';
     this.buildTilesetTabs(topRight);
 
     // Layer bar (row 2, spans all 3 columns)
@@ -198,23 +181,14 @@ export class PrefabEditor {
     `;
     leftSidebar.appendChild(this.listPanel.element);
 
-    // Center (prefab canvas)
+    const panelBase = 'background: #12122a; overflow: auto; position: relative;';
+
     const centerPanel = document.createElement('div');
-    centerPanel.style.cssText = `
-      background: #12122a;
-      overflow: auto;
-      position: relative;
-    `;
+    centerPanel.style.cssText = panelBase;
     centerPanel.appendChild(this.canvasPanel.element);
 
-    // Right (tileset viewer)
     const rightPanel = document.createElement('div');
-    rightPanel.style.cssText = `
-      background: #12122a;
-      overflow: auto;
-      position: relative;
-      border-left: 1px solid #333;
-    `;
+    rightPanel.style.cssText = panelBase + 'border-left: 1px solid #333;';
     rightPanel.appendChild(this.tilesetPanel.element);
 
     grid.appendChild(topLeft);

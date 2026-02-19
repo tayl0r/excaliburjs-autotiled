@@ -70,13 +70,15 @@ export class TileEditor {
     // Undo/Redo keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if (!(e.ctrlKey || e.metaKey)) return;
-      const key = e.key.toLowerCase();
-      if (key === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) this.state.redo(); else this.state.undo();
-      } else if (key === 'y') {
-        e.preventDefault();
-        this.state.redo();
+      switch (e.key.toLowerCase()) {
+        case 'z':
+          e.preventDefault();
+          if (e.shiftKey) this.state.redo(); else this.state.undo();
+          break;
+        case 'y':
+          e.preventDefault();
+          this.state.redo();
+          break;
       }
     });
 
@@ -159,9 +161,7 @@ export class TileEditor {
 
   /** Schedule a save after 5 seconds of inactivity */
   private scheduleSave(): void {
-    if (this.saveTimer) {
-      clearTimeout(this.saveTimer);
-    }
+    if (this.saveTimer) clearTimeout(this.saveTimer);
     this.showIndicator('Unsaved changes...');
     this.saveTimer = setTimeout(() => this.save(), 5000);
   }
@@ -186,15 +186,12 @@ export class TileEditor {
         throw new Error(text);
       }
 
-      const meta = this.state.metadata;
-      const totalTiles = meta.wangsets.reduce((s, ws) => s + ws.wangtiles.length, 0);
-      const totalColors = meta.wangsets.reduce((s, ws) => s + ws.colors.length, 0);
+      const { wangsets } = this.state.metadata;
+      const totalTiles = wangsets.reduce((s, ws) => s + ws.wangtiles.length, 0);
+      const totalColors = wangsets.reduce((s, ws) => s + ws.colors.length, 0);
       console.log(
-        `[editor] Saved ${this.filename}:`,
-        `${meta.wangsets.length} WangSet(s),`,
-        `${totalColors} colors,`,
-        `${totalTiles} tagged tiles`,
-        JSON.parse(JSON.stringify(meta))
+        `[editor] Saved ${this.filename}: ${wangsets.length} WangSet(s), ${totalColors} colors, ${totalTiles} tagged tiles`,
+        structuredClone(this.state.metadata),
       );
 
       this.showIndicator('Saved', 2000);

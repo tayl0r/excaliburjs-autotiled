@@ -316,6 +316,30 @@
         "y": 8,
         "tileId": 1602,
         "tilesetIndex": 5
+      },
+      {
+        "x": 10,
+        "y": 9,
+        "tileId": 978,
+        "tilesetIndex": 5
+      },
+      {
+        "x": 11,
+        "y": 9,
+        "tileId": 979,
+        "tilesetIndex": 5
+      },
+      {
+        "x": 10,
+        "y": 10,
+        "tileId": 1047,
+        "tilesetIndex": 5
+      },
+      {
+        "x": 11,
+        "y": 10,
+        "tileId": 1048,
+        "tilesetIndex": 5
       }
     ],
     [],

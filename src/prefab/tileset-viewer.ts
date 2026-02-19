@@ -43,9 +43,11 @@ export class TilesetViewerPanel {
     document.body.appendChild(this.tooltip);
 
     this.setupEvents();
-    this.state.on('tileSelectionChanged', () => { this.updateStatusBar(); this.render(); });
+
+    const refresh = () => { this.updateStatusBar(); this.render(); };
+    this.state.on('tileSelectionChanged', refresh);
     this.state.on('zoomChanged', () => this.render());
-    this.state.on('activeTilesetChanged', () => { this.updateStatusBar(); this.render(); });
+    this.state.on('activeTilesetChanged', refresh);
 
     this.updateStatusBar();
     this.render();
@@ -113,14 +115,12 @@ export class TilesetViewerPanel {
       }
     });
 
-    this.canvas.addEventListener('mouseup', () => {
-      this.dragStartTileId = -1;
-      this.isDragging = false;
-    });
+    const resetDrag = () => { this.dragStartTileId = -1; this.isDragging = false; };
+
+    this.canvas.addEventListener('mouseup', resetDrag);
 
     this.canvas.addEventListener('mouseleave', () => {
-      this.dragStartTileId = -1;
-      this.isDragging = false;
+      resetDrag();
       this.hoveredTileId = -1;
       this.tooltip.style.display = 'none';
       this.render();

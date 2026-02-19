@@ -27,10 +27,7 @@ export const INPUT_STYLE = `
   font-size: 11px; padding: 2px 4px; border-radius: 3px;
 `;
 
-export const SELECT_STYLE = `
-  background: #1e1e3a; color: #e0e0e0; border: 1px solid #555;
-  font-size: 11px; padding: 2px 4px; border-radius: 3px;
-`;
+export const SELECT_STYLE = INPUT_STYLE;
 
 export const INLINE_EDIT_STYLE = `
   flex: 1; background: #1e1e3a; color: #e0e0e0; border: 1px solid #6666cc;

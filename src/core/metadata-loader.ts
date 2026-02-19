@@ -1,7 +1,7 @@
-import { ProjectMetadata, WangSetData, TransformationConfig, DEFAULT_TRANSFORMATIONS } from './metadata-schema.js';
-import { WangSet } from './wang-set.js';
+import { type ProjectMetadata, type WangSetData, type TransformationConfig, DEFAULT_TRANSFORMATIONS } from './metadata-schema.js';
 import type { WangColor } from './wang-color.js';
 import { WangId } from './wang-id.js';
+import { WangSet } from './wang-set.js';
 
 /** Load and parse metadata from a ProjectMetadata JSON object */
 export function loadMetadata(json: ProjectMetadata): {

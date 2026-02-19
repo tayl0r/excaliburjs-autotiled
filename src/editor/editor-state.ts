@@ -563,11 +563,8 @@ export class EditorState {
 
   /** Apply or clear animation on a WangTile (does not save snapshot) */
   private applyAnimation(wt: WangTileData, animation: TileAnimation | undefined): void {
-    if (animation === undefined) {
-      delete wt.animation;
-    } else {
-      wt.animation = animation;
-    }
+    if (animation === undefined) delete wt.animation;
+    else wt.animation = animation;
   }
 
   /** Set or clear animation on a WangTile (undoable) */
@@ -591,7 +588,7 @@ export class EditorState {
     if (targets.length === 0) return;
     this.saveSnapshot();
     for (const wt of targets) {
-      this.applyAnimation(wt, animation ? JSON.parse(JSON.stringify(animation)) : undefined);
+      this.applyAnimation(wt, animation ? structuredClone(animation) : undefined);
     }
     this.emit('metadataChanged');
   }
@@ -601,7 +598,7 @@ export class EditorState {
     const wt = this.getWangTile(this._selectedTileId);
     if (!wt?.animation) return;
     this._animationClipboard = {
-      animation: JSON.parse(JSON.stringify(wt.animation)),
+      animation: structuredClone(wt.animation),
       offset: this.inferAnimationOffset(wt.animation),
     };
     this.emit('clipboardChanged');
@@ -613,9 +610,8 @@ export class EditorState {
     const ws = this.activeWangSet;
     if (!ws) return;
     const { animation, offset } = this._animationClipboard;
-    const tileIds = this._selectedTileIds.size > 0
-      ? [...this._selectedTileIds]
-      : this._selectedTileId >= 0 ? [this._selectedTileId] : [];
+    const tileIds = [...this._selectedTileIds];
+    if (tileIds.length === 0 && this._selectedTileId >= 0) tileIds.push(this._selectedTileId);
     if (tileIds.length === 0) return;
 
     const targets = tileIds
@@ -666,12 +662,10 @@ export class EditorState {
   // --- Pub/Sub ---
 
   on(event: EditorEvent, listener: Listener): void {
-    let set = this.listeners.get(event);
-    if (!set) {
-      set = new Set();
-      this.listeners.set(event, set);
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
     }
-    set.add(listener);
+    this.listeners.get(event)!.add(listener);
   }
 
   off(event: EditorEvent, listener: Listener): void {
@@ -679,11 +673,6 @@ export class EditorState {
   }
 
   private emit(event: EditorEvent): void {
-    const listeners = this.listeners.get(event);
-    if (listeners) {
-      for (const fn of listeners) {
-        fn();
-      }
-    }
+    this.listeners.get(event)?.forEach(fn => fn());
   }
 }

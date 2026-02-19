@@ -1,7 +1,8 @@
 import type { AutotileMap } from './autotile-map.js';
-import type { WangSet } from './wang-set.js';
-import { WangId, NEIGHBOR_OFFSETS } from './wang-id.js';
+import { EMPTY_CELL } from './cell.js';
 import { findBestMatch } from './matching.js';
+import { WangId, NEIGHBOR_OFFSETS } from './wang-id.js';
+import type { WangSet } from './wang-set.js';
 
 /** Parse a "x,y" coordinate key into [x, y]. */
 function parseCoordKey(key: string): [number, number] {
@@ -27,6 +28,13 @@ export function applyTerrainPaint(
 ): Array<[number, number]> {
   // 1. Set the painted color
   map.setColorAt(x, y, color);
+
+  // Erase: clear the cell and recompute neighbors only
+  if (color === 0) {
+    map.setCellAt(x, y, EMPTY_CELL);
+    const colorChanged = new Set<string>([`${x},${y}`]);
+    return recomputeTiles(map, wangSet, colorChanged, x, y);
+  }
 
   // 2. Auto-insert intermediates from the single painted cell
   const colorChanged = insertIntermediates(map, wangSet, [[x, y]]);
@@ -137,10 +145,7 @@ export function recomputeTiles(
     }
 
     const cell = findBestMatch(wangSet, desired, wangSet.type);
-
-    if (cell) {
-      map.setCellAt(ax, ay, cell);
-    }
+    if (cell) map.setCellAt(ax, ay, cell);
   }
 
   return affected;
@@ -158,9 +163,7 @@ export function resolveAllTiles(map: AutotileMap, wangSet: WangSet): void {
 
       const desired = desiredWangIdFromColors(map, x, y, wangSet.type);
       const cell = findBestMatch(wangSet, desired, wangSet.type);
-      if (cell) {
-        map.setCellAt(x, y, cell);
-      }
+      if (cell) map.setCellAt(x, y, cell);
     }
   }
 }
@@ -199,18 +202,19 @@ function desiredWangIdFromColors(
     for (const [index, dx, dy] of CORNER_VERTICES) {
       const nx = x + dx;
       const ny = y + dy;
-      colors[index] = map.inBounds(nx, ny) ? map.colorAt(nx, ny) : selfColor;
+      const c = map.inBounds(nx, ny) ? map.colorAt(nx, ny) : 0;
+      colors[index] = c === 0 ? selfColor : c;
     }
   } else {
     // Edge/mixed: use painted colors of direct neighbors
     for (let i = 0; i < 8; i++) {
-      const isCorner = i % 2 === 1;
-      if (type === 'edge' && isCorner) continue;
+      if (type === 'edge' && i % 2 === 1) continue;
 
       const [dx, dy] = NEIGHBOR_OFFSETS[i];
       const nx = x + dx;
       const ny = y + dy;
-      colors[i] = map.inBounds(nx, ny) ? map.colorAt(nx, ny) : selfColor;
+      const c = map.inBounds(nx, ny) ? map.colorAt(nx, ny) : 0;
+      colors[i] = c === 0 ? selfColor : c;
     }
   }
 

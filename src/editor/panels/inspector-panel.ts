@@ -47,11 +47,12 @@ export class InspectorPanel {
     this.element = document.createElement('div');
     this.buildUI();
 
-    this.state.on('selectedTileChanged', () => this.render());
-    this.state.on('activeColorChanged', () => this.render());
-    this.state.on('metadataChanged', () => this.render());
-    this.state.on('activeWangSetChanged', () => this.render());
-    this.state.on('clipboardChanged', () => this.render());
+    const rerender = () => this.render();
+    this.state.on('selectedTileChanged', rerender);
+    this.state.on('activeColorChanged', rerender);
+    this.state.on('metadataChanged', rerender);
+    this.state.on('activeWangSetChanged', rerender);
+    this.state.on('clipboardChanged', rerender);
 
     this.render();
   }
@@ -164,7 +165,6 @@ export class InspectorPanel {
   }
 
   render(): void {
-    this.cleanUpAnimPreview();
     this.renderWangIdSection();
   }
 
@@ -371,14 +371,12 @@ export class InspectorPanel {
   ): HTMLDivElement {
     const slotWrapper = document.createElement('div');
     slotWrapper.style.cssText = 'position: relative;';
-
-    const isLocked = frameIdx === 0;
     const canvas = document.createElement('canvas');
     canvas.width = 48;
     canvas.height = 48;
     canvas.style.cssText = `
       image-rendering: pixelated;
-      border: 2px solid ${isLocked ? '#6666cc' : '#444'};
+      border: 2px solid ${frameIdx === 0 ? '#6666cc' : '#444'};
       border-radius: 3px;
       background: #111;
     `;
@@ -458,9 +456,7 @@ export class InspectorPanel {
     // Copy animation button
     const copyBtn = panelButton('Copy Animation');
     copyBtn.style.cssText += 'padding: 6px 10px; width: 100%;';
-    copyBtn.addEventListener('click', () => {
-      this.state.copyTileAnimation();
-    });
+    copyBtn.addEventListener('click', () => this.state.copyTileAnimation());
     btnRow.appendChild(copyBtn);
 
     // Paste animation button (only when clipboard has data)
@@ -470,9 +466,7 @@ export class InspectorPanel {
         cursor: pointer; font-size: 11px; padding: 6px 10px;
         border-radius: 3px; width: 100%;
       `);
-      pasteBtn.addEventListener('click', () => {
-        this.state.pasteTileAnimation();
-      });
+      pasteBtn.addEventListener('click', () => this.state.pasteTileAnimation());
       btnRow.appendChild(pasteBtn);
     }
 
@@ -486,9 +480,7 @@ export class InspectorPanel {
         cursor: pointer; font-size: 11px; padding: 6px 10px;
         border-radius: 3px; width: 100%;
       `);
-      applyBtn.addEventListener('click', () => {
-        this.state.applyAnimationToColorTiles(colorId);
-      });
+      applyBtn.addEventListener('click', () => this.state.applyAnimationToColorTiles(colorId));
       btnRow.appendChild(applyBtn);
     }
 
@@ -565,10 +557,9 @@ export class InspectorPanel {
   }
 
   private cleanUpAnimPreview(): void {
-    if (this.animPreviewTimer !== null) {
-      clearInterval(this.animPreviewTimer);
-      this.animPreviewTimer = null;
-    }
+    if (this.animPreviewTimer === null) return;
+    clearInterval(this.animPreviewTimer);
+    this.animPreviewTimer = null;
   }
 
   /** Draw a tile thumbnail on a canvas at its full size */

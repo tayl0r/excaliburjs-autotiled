@@ -1,8 +1,8 @@
+import type { AutotileMap } from './autotile-map.js';
+import type { Cell } from './cell.js';
+import { RandomPicker } from './random-picker.js';
 import { WangId, NEIGHBOR_OFFSETS, isActiveIndex } from './wang-id.js';
 import type { WangSet } from './wang-set.js';
-import type { Cell } from './cell.js';
-import type { AutotileMap } from './autotile-map.js';
-import { RandomPicker } from './random-picker.js';
 
 /**
  * Build a desired WangId from the 8 neighbors of position (x, y).
@@ -25,20 +25,14 @@ export function wangIdFromSurroundings(
 
     const neighborCell = map.cellAt(nx, ny);
     if (neighborCell.tileId < 0) {
-      // No tile placed yet — assume all edges/corners match the painted color
-      const neighborColor = map.colorAt(nx, ny);
-      if (neighborColor > 0) {
-        colors[index] = neighborColor;
-      }
+      colors[index] = map.colorAt(nx, ny);
       continue;
     }
 
     const neighborWangId = wangSet.wangIdOf(neighborCell.tilesetIndex, neighborCell.tileId);
     if (!neighborWangId) continue;
 
-    // The color on our side = the opposite side of the neighbor
-    const oppositeIdx = WangId.oppositeIndex(index);
-    colors[index] = neighborWangId.indexColor(oppositeIdx);
+    colors[index] = neighborWangId.indexColor(WangId.oppositeIndex(index));
   }
 
   return new WangId(colors);
@@ -57,9 +51,8 @@ export function findBestMatch(
 ): Cell | undefined {
   let lowestPenalty = Infinity;
   const candidates = new RandomPicker<Cell>();
-  const variants = wangSet.allVariants();
 
-  for (const { wangId, cell } of variants) {
+  for (const { wangId, cell } of wangSet.allVariants()) {
     let totalPenalty = 0;
     let valid = true;
 

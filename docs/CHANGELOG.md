@@ -543,3 +543,59 @@ Focused simplification of `src/prefab/`. Extracted shared canvas helpers and dec
 | List panel | Reused `startInlineEdit()` pattern, extracted server API methods | `prefab-list-panel.ts` |
 
 Verification: `tsc --noEmit` clean, 207 tests passing.
+
+---
+
+## 2026-02-19: Pan/Zoom + Resizable Maps for Map Painter
+
+Added camera pan/zoom controls, 64x64 default map size, and directional resize buttons to the map painter.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Pure resize functions | Done | `src/core/map-resize.ts` — `resizeColorArray()` (expand/shrink with offset), `shiftPlacedPrefab()` |
+| Resize tests | Done | `tests/core/map-resize.test.ts` — 13 tests (expand/shrink all 4 directions, fill color, identity, prefab shift) |
+| Mutable map dimensions | Done | `GameScene` uses instance fields `mapCols`/`mapRows` instead of hardcoded constants; default 64x64 |
+| Pan/zoom | Done | Scroll to pan, Ctrl/Cmd+Scroll to zoom (0.5x–6x), Home key resets camera; default zoom 1.5 |
+| Tilemap rebuild | Done | `rebuildTilemaps()` destroys and recreates all 14 tilemaps (9 map + 5 preview) at new dimensions |
+| Directional resize | Done | `resizeMap(direction, delta)` — expand/shrink by 10 tiles per direction, minimum 10x10 |
+| Map sidebar section | Done | At bottom of sidebar: Increase/Decrease tab toggle, diamond N/W/E/S buttons, size label in header |
+| Load at saved size | Done | `loadMapByFilename()` rebuilds tilemaps if saved dimensions differ from current |
+
+### Architecture
+
+- **Resize flow**: Extract colors → rebuild tilemaps → resize colors with `resizeColorArray()` → load colors → shift prefabs → adjust camera
+- **Pan/zoom**: Wheel listener on `engine.canvas` with `passive: false`. Pan modifies `camera.pos`, zoom modifies `camera.zoom`.
+- **Excalibur constraint**: `TileMap` cannot resize after creation, so resize destroys all tilemaps and recreates them.
+
+Verification: `tsc --noEmit` clean, 220 tests passing.
+
+---
+
+## 2026-02-19: Remove V1 Migration Code
+
+Removed all v1→v2 migration code for maps and prefabs. Only v2 format is supported.
+
+| Removed | Files |
+|---------|-------|
+| `SavedMapV1` interface, `migrateMapV1toV2()` | `src/core/map-schema.ts` |
+| `SavedPrefabV1` interface, `migratePrefabV1toV2()` | `src/core/prefab-schema.ts` |
+| V1 migration tests (7 tests) | `tests/core/layer-migration.test.ts` |
+| `SavedPrefabV1` type reference | `src/prefab-editor-main.ts` |
+
+`parseSavedMap()` and `parseSavedPrefab()` remain as v2 normalizers (pad layers, default `placedPrefabs`).
+
+Verification: `tsc --noEmit` clean, 213 tests passing.
+
+---
+
+## 2026-02-19: Erase Color + Brush Sizes
+
+Added erase as a color option and configurable brush sizes to the map painter.
+
+| Change | Details |
+|--------|---------|
+| Erase color | "Erase" entry (color 0) shown first in Colors section, `E` keyboard shortcut, switches to brush tool |
+| Brush sizes | 1x1, 3x3, 10x10 size buttons in Tools section, applies to both brush and erase |
+| InputHandler | `BrushSize` type, `setBrushSize()`, NxN painting loop centered on cursor tile; OOB tiles safely ignored by `setColorAt` bounds check |
+
+Verification: `tsc --noEmit` clean, 213 tests passing.

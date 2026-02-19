@@ -3,20 +3,37 @@ import type { WangSet } from '../core/wang-set.js';
 import { type SavedMap, type PlacedPrefab, parseSavedMap } from '../core/map-schema.js';
 import type { SavedPrefab, PrefabTile } from '../core/prefab-schema.js';
 import { NUM_MAP_LAYERS, NUM_EDITABLE_LAYERS, NUM_PREFAB_LAYERS, type LayerVisibility } from '../core/layers.js';
-import { createCell } from '../core/cell.js';
-import type { Cell } from '../core/cell.js';
+import { type Cell, createCell } from '../core/cell.js';
+import { resizeColorArray, shiftPlacedPrefab } from '../core/map-resize.js';
 import { TilesetManager } from './tileset-manager.js';
 import { SpriteResolver } from './sprite-resolver.js';
 import { AutotileTilemap } from './autotile-tilemap.js';
-import { InputHandler, type ToolMode } from './input-handler.js';
+import { InputHandler, type ToolMode, type BrushSize } from './input-handler.js';
 
-const MAP_COLS = 20;
-const MAP_ROWS = 20;
+const DEFAULT_COLS = 64;
+const DEFAULT_ROWS = 64;
+const DEFAULT_ZOOM = 2.61;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 6;
+const PAN_SPEED = 1.5;
+const MIN_MAP_SIZE = 10;
+const RESIZE_STEP = 10;
+
+const MODIFIER_KEYS: readonly ex.Keys[] = [
+  ex.Keys.ShiftLeft, ex.Keys.ShiftRight,
+  ex.Keys.AltLeft, ex.Keys.AltRight,
+  ex.Keys.ControlLeft, ex.Keys.ControlRight,
+  ex.Keys.MetaLeft, ex.Keys.MetaRight,
+];
+
+type ResizeDirection = 'north' | 'south' | 'east' | 'west';
 
 const PAINT_TOOLS: ReadonlyArray<{ mode: ToolMode; label: string; shortcut: string; key: ex.Keys }> = [
   { mode: 'brush', label: 'Brush', shortcut: 'B', key: ex.Keys.B },
   { mode: 'fill', label: 'Fill', shortcut: 'G', key: ex.Keys.G },
 ];
+
+const BRUSH_SIZES: readonly BrushSize[] = [1, 3, 10];
 
 const SIDEBAR_WIDTH = 240;
 
@@ -28,12 +45,43 @@ const VISIBILITY_LABELS: Record<LayerVisibility, string> = {
 
 const VISIBILITY_ORDER: LayerVisibility[] = ['all', 'highlight', 'hidden'];
 
+const INACTIVE_OPACITY: Record<LayerVisibility, number> = {
+  all: 1.0,
+  highlight: 0.25,
+  hidden: 0,
+};
+
 // Sidebar styling constants
 const SIDEBAR_BG = '#1e1e2e';
 const SIDEBAR_BORDER = '#333';
 const SIDEBAR_TEXT = '#ccc';
 const SIDEBAR_SECTION_HEADER = '#888';
 const SIDEBAR_BTN_ACTIVE = 'rgba(255,255,255,0.15)';
+
+const LIST_BUTTON_STYLE = `
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: ${SIDEBAR_TEXT};
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+`;
+
+const KBD_STYLE = `
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  color: #888;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  padding: 1px 5px;
+`;
 
 interface CellSnapshot {
   layer: number;
@@ -66,15 +114,26 @@ export class GameScene extends ex.Scene {
   private currentWangSet!: WangSet;
   private activeLayerIndex = 0;
   private visibilityMode: LayerVisibility = 'all';
+  private mapCols = DEFAULT_COLS;
+  private mapRows = DEFAULT_ROWS;
 
   // Sidebar
   private sidebar!: HTMLDivElement;
   private expandBtn!: HTMLButtonElement;
   private sidebarCollapsed = false;
   private toolButtons!: Map<ToolMode, HTMLButtonElement>;
+  private brushSizeButtons!: Map<BrushSize, HTMLButtonElement>;
   private layerButtons: HTMLButtonElement[] = [];
   private visibilityButton!: HTMLButtonElement;
   private colorButtons: HTMLButtonElement[] = [];
+
+  // Cached for tilemap rebuilds
+  private spriteResolver!: SpriteResolver;
+
+  // Map section
+  private mapSizeLabel!: HTMLSpanElement;
+  private zoomLabel!: HTMLSpanElement;
+  private resizeMode: 'increase' | 'decrease' = 'increase';
 
   // Autosave
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -106,42 +165,14 @@ export class GameScene extends ex.Scene {
     }
 
     const wangSet = this.currentWangSet;
-    const ts = this.tilesetManager.primaryTileset;
-    const spriteResolver = new SpriteResolver(this.tilesetManager.spriteSheets);
+    this.spriteResolver = new SpriteResolver(this.tilesetManager.spriteSheets);
 
-    const addLayer = (zIndex: number, defaultColor: number): AutotileTilemap => {
-      const layer = new AutotileTilemap(
-        MAP_COLS, MAP_ROWS, ts.tileWidth, ts.tileHeight,
-        wangSet, spriteResolver, defaultColor,
-      );
-      layer.tileMap.z = zIndex;
-      this.add(layer.tileMap);
-      return layer;
-    };
-
-    for (let i = 0; i < NUM_MAP_LAYERS; i++) {
-      this.layers.push(addLayer(i, i === 0 ? 1 : 0));
-    }
-
-    for (let i = 0; i < NUM_PREFAB_LAYERS; i++) {
-      const preview = addLayer(100 + i, 0);
-      preview.setOpacity(0.4);
-      this.previewLayers.push(preview);
-    }
+    this.buildTilemaps(wangSet, this.spriteResolver);
 
     // Initialize layer 0 with base terrain
     this.layers[0].initializeAll(1);
-
-    // Set up animations on all layers
-    for (const layer of this.layers) {
-      layer.setAnimationsFromWangSets(this.tilesetManager.metadata.wangsets);
-    }
-
-    this.camera.pos = ex.vec(
-      (MAP_COLS * ts.tileWidth) / 2,
-      (MAP_ROWS * ts.tileHeight) / 2,
-    );
-    this.camera.zoom = 3;
+    this.initLayerAnimations();
+    this.resetCamera();
 
     this.inputHandler = new InputHandler(engine, this.layers[0]);
     this.inputHandler.initialize();
@@ -149,6 +180,21 @@ export class GameScene extends ex.Scene {
     this.inputHandler.setOnCursorMove((pos) => this.updatePrefabPreview(pos));
     this.inputHandler.setOnPrefabPlace((tx, ty) => this.placePrefab(tx, ty));
     this.inputHandler.setOnMapChanged(() => this.scheduleAutosave());
+
+    // Pan/zoom via wheel on canvas
+    engine.canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        // Zoom
+        const factor = Math.pow(1.01, -e.deltaY);
+        this.camera.zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, this.camera.zoom * factor));
+        this.updateZoomLabel();
+      } else {
+        // Pan
+        const scale = PAN_SPEED / this.camera.zoom;
+        this.camera.pos = this.camera.pos.add(ex.vec(e.deltaX * scale, e.deltaY * scale));
+      }
+    }, { passive: false });
 
     engine.input.keyboard.on('press', (evt) => {
       const tool = PAINT_TOOLS.find(t => t.key === evt.key);
@@ -162,9 +208,16 @@ export class GameScene extends ex.Scene {
         this.setActiveLayer(layerNum - 1);
       }
 
+      if (evt.key === ex.Keys.E) {
+        this.inputHandler.setActiveColor(0);
+        this.selectTool('brush');
+        this.updateColorSelection(0);
+      }
+      if (evt.key === ex.Keys.Z) this.cycleBrushSize();
       if (evt.key === ex.Keys.V) this.cycleVisibility();
       if (evt.key === ex.Keys.Tab) this.toggleSidebar();
       if (evt.key === ex.Keys.Escape) this.cancelPrefab();
+      if (evt.key === ex.Keys.Home) this.resetCamera();
     });
 
     this.createSidebar(wangSet);
@@ -196,9 +249,7 @@ export class GameScene extends ex.Scene {
   }
 
   private applyVisibility(): void {
-    const inactiveOpacity = this.visibilityMode === 'all' ? 1.0
-      : this.visibilityMode === 'highlight' ? 0.25
-      : 0;
+    const inactiveOpacity = INACTIVE_OPACITY[this.visibilityMode];
     for (let i = 0; i < NUM_MAP_LAYERS; i++) {
       this.layers[i].setOpacity(i === this.activeLayerIndex ? 1.0 : inactiveOpacity);
     }
@@ -239,6 +290,7 @@ export class GameScene extends ex.Scene {
     this.sidebar.appendChild(this.buildLayerSection());
     this.sidebar.appendChild(this.buildColorSection(wangSet));
     this.sidebar.appendChild(this.buildPrefabSection());
+    this.sidebar.appendChild(this.buildMapSection());
 
     document.body.appendChild(this.sidebar);
 
@@ -284,7 +336,15 @@ export class GameScene extends ex.Scene {
     const collapseBtn = document.createElement('button');
     collapseBtn.textContent = '\u25C0';
     collapseBtn.title = 'Collapse sidebar (Tab)';
-    collapseBtn.style.cssText = this.sidebarBtnStyle();
+    collapseBtn.style.cssText = `
+      border: none;
+      background: transparent;
+      color: ${SIDEBAR_TEXT};
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 6px;
+      border-radius: 3px;
+    `;
     collapseBtn.addEventListener('click', () => this.toggleSidebar());
 
     header.appendChild(title);
@@ -352,18 +412,44 @@ export class GameScene extends ex.Scene {
 
   private buildToolSection(): HTMLDivElement {
     const content = document.createElement('div');
-    content.style.cssText = 'display: flex; gap: 4px; padding: 0 12px 6px;';
+    content.style.cssText = 'padding: 0 12px 6px; display: flex; flex-direction: column; gap: 4px;';
+
+    const toolRow = document.createElement('div');
+    toolRow.style.cssText = 'display: flex; gap: 4px;';
 
     this.toolButtons = new Map();
     for (const tool of PAINT_TOOLS) {
       const btn = this.makeSidebarButton(tool.label, tool.shortcut);
       btn.addEventListener('click', () => this.selectTool(tool.mode));
-      content.appendChild(btn);
+      toolRow.appendChild(btn);
       this.toolButtons.set(tool.mode, btn);
     }
+    content.appendChild(toolRow);
+
+    // Brush size row
+    const sizeRow = document.createElement('div');
+    sizeRow.style.cssText = 'display: flex; gap: 4px; align-items: center;';
+
+    const sizeLabel = document.createElement('span');
+    sizeLabel.textContent = 'Size (Z):';
+    sizeLabel.style.cssText = `color: ${SIDEBAR_SECTION_HEADER}; font-size: 11px;`;
+    sizeRow.appendChild(sizeLabel);
+
+    this.brushSizeButtons = new Map();
+    for (const size of BRUSH_SIZES) {
+      const btn = this.makeSmallButton(`${size}x${size}`);
+      btn.addEventListener('click', () => {
+        this.inputHandler.setBrushSize(size);
+        this.updateBrushSizeSelection(size);
+      });
+      sizeRow.appendChild(btn);
+      this.brushSizeButtons.set(size, btn);
+    }
+    content.appendChild(sizeRow);
 
     const section = this.buildSidebarSection('Tools', content);
     this.updateToolSelection(this.inputHandler.getToolMode());
+    this.updateBrushSizeSelection(this.inputHandler.brushSize);
     return section;
   }
 
@@ -408,24 +494,33 @@ export class GameScene extends ex.Scene {
     content.style.cssText = 'padding: 0 12px 6px; display: flex; flex-direction: column; gap: 2px;';
 
     this.colorButtons = [];
-    for (const color of wangSet.colors) {
+
+    const makeColorBtn = (colorId: number): HTMLButtonElement => {
       const btn = document.createElement('button');
-      btn.dataset.colorId = String(color.id);
-      btn.style.cssText = `
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 4px 8px;
-        border: none;
-        border-radius: 4px;
-        background: transparent;
-        color: ${SIDEBAR_TEXT};
-        font-family: system-ui, sans-serif;
-        font-size: 13px;
-        cursor: pointer;
-        width: 100%;
-        text-align: left;
-      `;
+      btn.dataset.colorId = String(colorId);
+      btn.style.cssText = LIST_BUTTON_STYLE;
+      btn.addEventListener('click', () => {
+        this.inputHandler.setActiveColor(colorId);
+        this.selectTool('brush');
+        this.updateColorSelection(colorId);
+      });
+      return btn;
+    };
+
+    // Erase entry (color 0) at the top
+    const eraseBtn = makeColorBtn(0);
+    const eraseLabel = document.createElement('span');
+    eraseLabel.textContent = 'Erase';
+    const eraseKbd = document.createElement('kbd');
+    eraseKbd.textContent = 'E';
+    eraseKbd.style.cssText = `${KBD_STYLE} margin-left: auto;`;
+    eraseBtn.appendChild(eraseLabel);
+    eraseBtn.appendChild(eraseKbd);
+    content.appendChild(eraseBtn);
+    this.colorButtons.push(eraseBtn);
+
+    for (const color of wangSet.colors) {
+      const btn = makeColorBtn(color.id);
 
       const tsi = color.tilesetIndex;
       const tilesetImage = this.tilesetManager.getImage(tsi);
@@ -448,12 +543,6 @@ export class GameScene extends ex.Scene {
       const label = document.createElement('span');
       label.textContent = color.name;
       btn.appendChild(label);
-
-      btn.addEventListener('click', () => {
-        this.inputHandler.setActiveColor(color.id);
-        this.selectTool('brush');
-        this.updateColorSelection(color.id);
-      });
 
       content.appendChild(btn);
       this.colorButtons.push(btn);
@@ -486,19 +575,7 @@ export class GameScene extends ex.Scene {
     for (const prefab of this.prefabs) {
       const btn = document.createElement('button');
       btn.textContent = prefab.name;
-      btn.style.cssText = `
-        display: block;
-        width: 100%;
-        padding: 4px 8px;
-        border: none;
-        border-radius: 4px;
-        background: transparent;
-        color: ${SIDEBAR_TEXT};
-        font-family: system-ui, sans-serif;
-        font-size: 13px;
-        cursor: pointer;
-        text-align: left;
-      `;
+      btn.style.cssText = LIST_BUTTON_STYLE;
       btn.addEventListener('click', () => this.selectPrefab(prefab));
       this.prefabListContainer.appendChild(btn);
       this.prefabButtons.push(btn);
@@ -515,6 +592,13 @@ export class GameScene extends ex.Scene {
     }
     this.inputHandler.setToolMode(mode);
     this.updateToolSelection(mode);
+  }
+
+  private cycleBrushSize(): void {
+    const idx = BRUSH_SIZES.indexOf(this.inputHandler.brushSize);
+    const next = BRUSH_SIZES[(idx + 1) % BRUSH_SIZES.length];
+    this.inputHandler.setBrushSize(next);
+    this.updateBrushSizeSelection(next);
   }
 
   private selectPrefab(prefab: SavedPrefab): void {
@@ -557,6 +641,13 @@ export class GameScene extends ex.Scene {
     if (!this.toolButtons) return;
     for (const [mode, btn] of this.toolButtons) {
       setButtonActive(btn, mode === activeMode);
+    }
+  }
+
+  private updateBrushSizeSelection(activeSize: BrushSize): void {
+    if (!this.brushSizeButtons) return;
+    for (const [size, btn] of this.brushSizeButtons) {
+      setButtonActive(btn, size === activeSize);
     }
   }
 
@@ -604,7 +695,7 @@ export class GameScene extends ex.Scene {
       for (const tile of prefabTiles) {
         const mapX = baseX + tile.x;
         const mapY = baseY + tile.y;
-        if (mapX < 0 || mapX >= MAP_COLS || mapY < 0 || mapY >= MAP_ROWS) continue;
+        if (mapX < 0 || mapX >= this.mapCols || mapY < 0 || mapY >= this.mapRows) continue;
         fn(mapX, mapY, targetLayer, tile);
       }
     }
@@ -704,11 +795,27 @@ export class GameScene extends ex.Scene {
     this.scheduleAutosave();
   }
 
-  // --- Animations ---
+  // --- Animations & Rendering ---
 
-  onPreUpdate(_engine: ex.Engine, delta: number): void {
+  onPreUpdate(engine: ex.Engine, delta: number): void {
     for (const layer of this.layers) {
       layer.updateAnimations(delta);
+    }
+
+    // WASD panning (skip when modifier keys are held for shortcuts like Cmd+S)
+    const kb = engine.input.keyboard;
+    const hasModifier = MODIFIER_KEYS.some(k => kb.isHeld(k));
+    if (!hasModifier) {
+      const panSpeed = 1200 * delta / 1000 / this.camera.zoom;
+      let dx = 0;
+      let dy = 0;
+      if (kb.isHeld(ex.Keys.W)) dy -= panSpeed;
+      if (kb.isHeld(ex.Keys.S)) dy += panSpeed;
+      if (kb.isHeld(ex.Keys.A)) dx -= panSpeed;
+      if (kb.isHeld(ex.Keys.D)) dx += panSpeed;
+      if (dx !== 0 || dy !== 0) {
+        this.camera.pos = this.camera.pos.add(ex.vec(dx, dy));
+      }
     }
   }
 
@@ -758,8 +865,8 @@ export class GameScene extends ex.Scene {
       version: 2,
       name: this.currentMapName!,
       wangSetName: this.currentWangSet.name,
-      width: MAP_COLS,
-      height: MAP_ROWS,
+      width: this.mapCols,
+      height: this.mapRows,
       layers: this.layers.map(l => l.autoMap.getColors()),
       placedPrefabs: this.placedPrefabs.length > 0 ? this.placedPrefabs : undefined,
     };
@@ -850,6 +957,11 @@ export class GameScene extends ex.Scene {
       throw new Error(`WangSet "${saved.wangSetName}" not found in project metadata`);
     }
 
+    // Rebuild tilemaps if dimensions differ
+    if (saved.width !== this.mapCols || saved.height !== this.mapRows) {
+      this.rebuildTilemaps(saved.width, saved.height);
+    }
+
     // Load each layer's colors
     for (let i = 0; i < NUM_MAP_LAYERS; i++) {
       this.layers[i].loadColors(saved.layers[i], wangSet);
@@ -873,6 +985,8 @@ export class GameScene extends ex.Scene {
 
     this.currentMapName = saved.name;
     this.currentWangSet = wangSet;
+    this.updateMapSizeLabel();
+    this.resetCamera();
     this.updateHash();
     console.log(`[map] Loaded: ${saved.name}`);
   }
@@ -886,6 +1000,235 @@ export class GameScene extends ex.Scene {
     if (this.currentMapName) parts.push(`map=${encodeURIComponent(this.currentMapName)}`);
     if (this.activeLayerIndex > 0) parts.push(`layer=${this.activeLayerIndex + 1}`);
     window.location.hash = parts.join('&');
+  }
+
+  // --- Tilemap lifecycle ---
+
+  private initLayerAnimations(): void {
+    for (const layer of this.layers) {
+      layer.setAnimationsFromWangSets(this.tilesetManager.metadata.wangsets);
+    }
+  }
+
+  /** Build all tilemaps from scratch (initial creation) */
+  private buildTilemaps(wangSet: WangSet, spriteResolver: SpriteResolver): void {
+    const ts = this.tilesetManager.primaryTileset;
+
+    const addLayer = (zIndex: number, defaultColor: number): AutotileTilemap => {
+      const layer = new AutotileTilemap(
+        this.mapCols, this.mapRows, ts.tileWidth, ts.tileHeight,
+        wangSet, spriteResolver, defaultColor,
+      );
+      layer.tileMap.z = zIndex;
+      this.add(layer.tileMap);
+      return layer;
+    };
+
+    for (let i = 0; i < NUM_MAP_LAYERS; i++) {
+      this.layers.push(addLayer(i, i === 0 ? 1 : 0));
+    }
+
+    for (let i = 0; i < NUM_PREFAB_LAYERS; i++) {
+      const preview = addLayer(100 + i, 0);
+      preview.setOpacity(0.4);
+      this.previewLayers.push(preview);
+    }
+  }
+
+  /** Destroy and recreate all tilemaps at new dimensions */
+  private rebuildTilemaps(newCols: number, newRows: number): void {
+    // Remove all existing tilemaps from the scene
+    for (const layer of this.layers) this.remove(layer.tileMap);
+    for (const layer of this.previewLayers) this.remove(layer.tileMap);
+    this.layers = [];
+    this.previewLayers = [];
+
+    this.mapCols = newCols;
+    this.mapRows = newRows;
+
+    this.buildTilemaps(this.currentWangSet, this.spriteResolver);
+    this.initLayerAnimations();
+
+    // Point input handler at the active layer
+    this.inputHandler.setTilemap(this.layers[this.activeLayerIndex]);
+    this.applyVisibility();
+  }
+
+  /** Center camera on the map at default zoom */
+  private resetCamera(): void {
+    const ts = this.tilesetManager.primaryTileset;
+    this.camera.pos = ex.vec(
+      (this.mapCols * ts.tileWidth) / 2,
+      (this.mapRows * ts.tileHeight) / 2,
+    );
+    this.camera.zoom = DEFAULT_ZOOM;
+    this.updateZoomLabel();
+  }
+
+  // --- Map resize ---
+
+  private resizeMap(direction: ResizeDirection, delta: number): void {
+    let newCols = this.mapCols;
+    let newRows = this.mapRows;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    switch (direction) {
+      case 'north':
+        newRows += delta;
+        offsetY = delta;
+        break;
+      case 'south':
+        newRows += delta;
+        break;
+      case 'west':
+        newCols += delta;
+        offsetX = delta;
+        break;
+      case 'east':
+        newCols += delta;
+        break;
+    }
+
+    // Enforce minimum size
+    if (newCols < MIN_MAP_SIZE || newRows < MIN_MAP_SIZE) return;
+
+    // Save current colors for all layers
+    const savedColors = this.layers.map(l => l.autoMap.getColors());
+    const oldCols = this.mapCols;
+    const oldRows = this.mapRows;
+
+    // Rebuild tilemaps at new dimensions
+    this.rebuildTilemaps(newCols, newRows);
+
+    // Resize and load each layer's colors
+    for (let i = 0; i < NUM_MAP_LAYERS; i++) {
+      const resized = resizeColorArray(savedColors[i], {
+        oldWidth: oldCols,
+        oldHeight: oldRows,
+        newWidth: newCols,
+        newHeight: newRows,
+        offsetX,
+        offsetY,
+      }, i === 0 ? 1 : 0);
+      this.layers[i].loadColors(resized, this.currentWangSet);
+    }
+
+    // Shift placed prefabs
+    this.placedPrefabs = this.placedPrefabs.map(p => shiftPlacedPrefab(p, offsetX, offsetY));
+
+    // Clear undo/redo (cell snapshots are invalidated)
+    this.prefabUndoStack = [];
+    this.prefabRedoStack = [];
+
+    // Shift camera to maintain view
+    const ts = this.tilesetManager.primaryTileset;
+    this.camera.pos = this.camera.pos.add(ex.vec(
+      offsetX * ts.tileWidth,
+      offsetY * ts.tileHeight,
+    ));
+
+    this.updateMapSizeLabel();
+    this.scheduleAutosave();
+  }
+
+  // --- Map section UI ---
+
+  private buildMapSection(): HTMLDivElement {
+    const content = document.createElement('div');
+    content.style.cssText = 'padding: 0 12px 8px; display: flex; flex-direction: column; gap: 6px;';
+
+    // Increase / Decrease tab bar
+    const tabBar = document.createElement('div');
+    tabBar.style.cssText = 'display: flex; gap: 2px;';
+
+    const increaseTab = this.makeSmallButton('+10 tiles');
+    const decreaseTab = this.makeSmallButton('-10 tiles');
+
+    const updateTabs = (): void => {
+      setButtonActive(increaseTab, this.resizeMode === 'increase');
+      setButtonActive(decreaseTab, this.resizeMode === 'decrease');
+    };
+
+    increaseTab.addEventListener('click', () => { this.resizeMode = 'increase'; updateTabs(); });
+    decreaseTab.addEventListener('click', () => { this.resizeMode = 'decrease'; updateTabs(); });
+    tabBar.appendChild(increaseTab);
+    tabBar.appendChild(decreaseTab);
+    updateTabs();
+    content.appendChild(tabBar);
+
+    // Diamond layout: 3 rows — [N] centered, [W] [E] centered, [S] centered
+    const diamond = document.createElement('div');
+    diamond.style.cssText = 'display: flex; flex-direction: column; align-items: center; gap: 3px;';
+
+    const makeDirectionBtn = (dir: ResizeDirection, label: string): HTMLButtonElement => {
+      const btn = this.makeSmallButton(label);
+      btn.style.width = '36px';
+      btn.style.textAlign = 'center';
+      btn.addEventListener('click', () => {
+        const delta = this.resizeMode === 'increase' ? RESIZE_STEP : -RESIZE_STEP;
+        this.resizeMap(dir, delta);
+      });
+      return btn;
+    };
+
+    diamond.appendChild(makeDirectionBtn('north', 'N'));
+
+    const middleRow = document.createElement('div');
+    middleRow.style.cssText = 'display: flex; gap: 24px;';
+    middleRow.appendChild(makeDirectionBtn('west', 'W'));
+    middleRow.appendChild(makeDirectionBtn('east', 'E'));
+    diamond.appendChild(middleRow);
+
+    diamond.appendChild(makeDirectionBtn('south', 'S'));
+
+    content.appendChild(diamond);
+
+    // Zoom level display
+    this.zoomLabel = document.createElement('span');
+    this.zoomLabel.style.cssText = `font-size: 11px; color: ${SIDEBAR_TEXT}; text-align: center;`;
+    this.updateZoomLabel();
+    content.appendChild(this.zoomLabel);
+
+    this.mapSizeLabel = document.createElement('span');
+    this.mapSizeLabel.style.cssText = `font-size: 12px; color: ${SIDEBAR_TEXT};`;
+    this.updateMapSizeLabel();
+
+    // Use the header right-side slot for the size label
+    const section = this.buildSidebarSection('Map', content);
+    const headerRow = section.querySelector('div')!;
+    headerRow.appendChild(this.mapSizeLabel);
+
+    return section;
+  }
+
+  private updateMapSizeLabel(): void {
+    if (this.mapSizeLabel) {
+      this.mapSizeLabel.textContent = `${this.mapCols} \u00d7 ${this.mapRows}`;
+    }
+  }
+
+  private updateZoomLabel(): void {
+    if (this.zoomLabel) {
+      const pct = Math.round(this.camera.zoom * 100);
+      this.zoomLabel.textContent = `Zoom: ${pct}%`;
+    }
+  }
+
+  private makeSmallButton(label: string): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.style.cssText = `
+      padding: 2px 8px;
+      border: 1px solid ${SIDEBAR_BORDER};
+      border-radius: 3px;
+      background: transparent;
+      color: ${SIDEBAR_TEXT};
+      font-family: system-ui, sans-serif;
+      font-size: 11px;
+      cursor: pointer;
+    `;
+    return btn;
   }
 
   // --- Shared helpers ---
@@ -912,30 +1255,11 @@ export class GameScene extends ex.Scene {
 
     const kbd = document.createElement('kbd');
     kbd.textContent = shortcut;
-    kbd.style.cssText = `
-      font-family: system-ui, sans-serif;
-      font-size: 11px;
-      color: #888;
-      background: rgba(255,255,255,0.1);
-      border-radius: 3px;
-      padding: 1px 5px;
-    `;
+    kbd.style.cssText = KBD_STYLE;
 
     btn.appendChild(labelSpan);
     btn.appendChild(kbd);
     return btn;
-  }
-
-  private sidebarBtnStyle(): string {
-    return `
-      border: none;
-      background: transparent;
-      color: ${SIDEBAR_TEXT};
-      cursor: pointer;
-      font-size: 14px;
-      padding: 2px 6px;
-      border-radius: 3px;
-    `;
   }
 
   onDeactivate(): void {

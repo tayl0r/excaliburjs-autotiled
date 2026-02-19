@@ -99,13 +99,14 @@ export class TilesetPanel {
     document.body.appendChild(this.tooltip);
 
     this.setupEvents();
-    this.state.on('selectedTileChanged', () => this.render());
-    this.state.on('metadataChanged', () => this.render());
-    this.state.on('zoomChanged', () => this.render());
-    this.state.on('activeWangSetChanged', () => this.render());
-    this.state.on('activeColorChanged', () => this.render());
-    this.state.on('templateSlotChanged', () => this.render());
-    this.state.on('templateModeChanged', () => this.render());
+    const rerender = () => this.render();
+    this.state.on('selectedTileChanged', rerender);
+    this.state.on('metadataChanged', rerender);
+    this.state.on('zoomChanged', rerender);
+    this.state.on('activeWangSetChanged', rerender);
+    this.state.on('activeColorChanged', rerender);
+    this.state.on('templateSlotChanged', rerender);
+    this.state.on('templateModeChanged', rerender);
     this.state.on('activeTilesetChanged', () => {
       this.updateTilesetTabStyles();
       this.render();
@@ -253,20 +254,18 @@ export class TilesetPanel {
     // Draw grid lines
     this.ctx.strokeStyle = 'rgba(255,255,255,0.1)';
     this.ctx.lineWidth = 1;
+    this.ctx.beginPath();
     for (let c = 0; c <= columns; c++) {
-      const x = c * tw;
-      this.ctx.beginPath();
-      this.ctx.moveTo(x + 0.5, 0);
-      this.ctx.lineTo(x + 0.5, ch);
-      this.ctx.stroke();
+      const x = c * tw + 0.5;
+      this.ctx.moveTo(x, 0);
+      this.ctx.lineTo(x, ch);
     }
     for (let r = 0; r <= rows; r++) {
-      const y = r * th;
-      this.ctx.beginPath();
-      this.ctx.moveTo(0, y + 0.5);
-      this.ctx.lineTo(cw, y + 0.5);
-      this.ctx.stroke();
+      const y = r * th + 0.5;
+      this.ctx.moveTo(0, y);
+      this.ctx.lineTo(cw, y);
     }
+    this.ctx.stroke();
 
     // Draw WangId overlays for tagged tiles
     this.drawWangOverlays(tw, th);

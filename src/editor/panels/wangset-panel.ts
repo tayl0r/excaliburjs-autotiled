@@ -33,13 +33,14 @@ export class WangSetPanel {
     this.listContainer = document.createElement('div');
     this.element.appendChild(this.listContainer);
 
+    const rerender = () => this.render();
     this.state.on('activeWangSetChanged', () => {
       this.missingExpanded = false;
       this.render();
     });
-    this.state.on('activeColorChanged', () => this.render());
-    this.state.on('metadataChanged', () => this.render());
-    this.state.on('selectedTileChanged', () => this.render());
+    this.state.on('activeColorChanged', rerender);
+    this.state.on('metadataChanged', rerender);
+    this.state.on('selectedTileChanged', rerender);
 
     this.render();
   }
@@ -174,10 +175,7 @@ export class WangSetPanel {
   }
 
   private createSetRepTileButton(): HTMLButtonElement {
-    const activeColor = this.state.activeColorId;
-    const hasSelection = this.state.selectedTileId >= 0;
-    const hasActiveColor = activeColor >= 1;
-    const enabled = hasSelection && hasActiveColor;
+    const enabled = this.state.selectedTileId >= 0 && this.state.activeColorId >= 1;
 
     const btn = panelButton('Set Rep Tile');
     btn.disabled = !enabled;
@@ -389,10 +387,7 @@ export class WangSetPanel {
 
     // Impact display
     const { wangsets } = this.state.metadata;
-    let baseTiles = 0;
-    for (const ws of wangsets) {
-      baseTiles += ws.wangtiles.length;
-    }
+    const baseTiles = wangsets.reduce((sum, ws) => sum + ws.wangtiles.length, 0);
 
     let multiplier = 1;
     if (config.allowFlipH) multiplier *= 2;
@@ -480,7 +475,6 @@ export class WangSetPanel {
   }
 
   private colorIdToName(ws: WangSetData, colorId: number): string {
-    const color = ws.colors[colorId - 1];
-    return color ? color.name : `Color ${colorId}`;
+    return ws.colors[colorId - 1]?.name ?? `Color ${colorId}`;
   }
 }

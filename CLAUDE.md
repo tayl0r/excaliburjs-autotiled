@@ -44,6 +44,10 @@ After finishing any feature, bugfix, or implementation task, update `docs/CHANGE
 
 When a new plan is added to `docs/plans/`, add a corresponding section to the CHANGELOG. The CHANGELOG references every spec and plan file in `docs/` — if those files are added, removed, or restructured, update the CHANGELOG to match.
 
+## Asset Migrations
+
+When removing or changing on-disk data formats (e.g. removing v1 migration code), always migrate existing asset files in `assets/` to the new format and save them to disk. Never leave stale assets that the code can no longer read.
+
 ## Git Workflow
 
 Do not use git worktrees in this project. Work on the main branch or simple feature branches only.

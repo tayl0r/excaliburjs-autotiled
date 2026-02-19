@@ -7,15 +7,6 @@ export interface PlacedPrefab {
   layer: number;      // base map layer (0-indexed)
 }
 
-export interface SavedMapV1 {
-  version: 1;
-  name: string;
-  wangSetName: string;
-  width: number;
-  height: number;
-  colors: number[];  // flat row-major, length = width * height
-}
-
 export interface SavedMap {
   version: 2;
   name: string;
@@ -26,35 +17,12 @@ export interface SavedMap {
   placedPrefabs?: PlacedPrefab[];
 }
 
-export function migrateMapV1toV2(v1: SavedMapV1): SavedMap {
-  const size = v1.width * v1.height;
-  const layers: number[][] = Array.from(
-    { length: NUM_MAP_LAYERS },
-    (_, i) => i === 0 ? v1.colors.slice() : new Array(size).fill(0),
-  );
-  return {
-    version: 2,
-    name: v1.name,
-    wangSetName: v1.wangSetName,
-    width: v1.width,
-    height: v1.height,
-    layers,
-    placedPrefabs: [],
-  };
-}
-
-export function parseSavedMap(raw: SavedMapV1 | SavedMap): SavedMap {
-  if (!('version' in raw) || raw.version === 1) {
-    return migrateMapV1toV2(raw as SavedMapV1);
+/** Normalize a v2 SavedMap: pad layers, default placedPrefabs */
+export function parseSavedMap(raw: SavedMap): SavedMap {
+  const size = raw.width * raw.height;
+  while (raw.layers.length < NUM_MAP_LAYERS) {
+    raw.layers.push(new Array(size).fill(0));
   }
-  const map = raw as SavedMap;
-  // Pad layers to NUM_MAP_LAYERS if shorter
-  const size = map.width * map.height;
-  while (map.layers.length < NUM_MAP_LAYERS) {
-    map.layers.push(new Array(size).fill(0));
-  }
-  if (!map.placedPrefabs) {
-    map.placedPrefabs = [];
-  }
-  return map;
+  raw.placedPrefabs ??= [];
+  return raw;
 }

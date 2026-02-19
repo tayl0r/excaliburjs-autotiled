@@ -95,12 +95,16 @@ export class PrefabEditorState {
   get canvasHeight(): number { return this._canvasHeight; }
 
   get prefabWidth(): number {
-    const bounds = this.activePrefab ? allLayerBounds(this.activePrefab.layers) : null;
-    return bounds ? bounds.maxX - bounds.minX + 1 : 0;
+    return this.prefabBounds?.w ?? 0;
   }
   get prefabHeight(): number {
+    return this.prefabBounds?.h ?? 0;
+  }
+
+  private get prefabBounds(): { w: number; h: number } | null {
     const bounds = this.activePrefab ? allLayerBounds(this.activePrefab.layers) : null;
-    return bounds ? bounds.maxY - bounds.minY + 1 : 0;
+    if (!bounds) return null;
+    return { w: bounds.maxX - bounds.minX + 1, h: bounds.maxY - bounds.minY + 1 };
   }
 
   get activeLayer(): number { return this._activeLayer; }
@@ -234,19 +238,13 @@ export class PrefabEditorState {
     if (prefab) this.undoManager.pushSnapshot(prefab);
   }
 
-  undo(): void {
-    const prefab = this.activePrefab;
-    if (!prefab) return;
-    const snapshot = this.undoManager.undo(prefab);
-    if (!snapshot) return;
-    this._prefabs.set(snapshot.name, snapshot);
-    this.emit('prefabDataChanged');
-  }
+  undo(): void { this.applySnapshot(this.undoManager.undo.bind(this.undoManager)); }
+  redo(): void { this.applySnapshot(this.undoManager.redo.bind(this.undoManager)); }
 
-  redo(): void {
+  private applySnapshot(op: (current: SavedPrefab) => SavedPrefab | null): void {
     const prefab = this.activePrefab;
     if (!prefab) return;
-    const snapshot = this.undoManager.redo(prefab);
+    const snapshot = op(prefab);
     if (!snapshot) return;
     this._prefabs.set(snapshot.name, snapshot);
     this.emit('prefabDataChanged');
@@ -419,10 +417,12 @@ export class PrefabEditorState {
   // --- Pub/Sub ---
 
   on(event: PrefabEvent, listener: Listener): void {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, new Set());
+    let set = this.listeners.get(event);
+    if (!set) {
+      set = new Set();
+      this.listeners.set(event, set);
     }
-    this.listeners.get(event)!.add(listener);
+    set.add(listener);
   }
 
   off(event: PrefabEvent, listener: Listener): void {

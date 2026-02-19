@@ -1,6 +1,6 @@
-import type { WangSet, WangVariant } from './wang-set.js';
 import { type Cell, createCell } from './cell.js';
 import type { TransformationConfig } from './metadata-schema.js';
+import type { WangSet, WangVariant } from './wang-set.js';
 
 /**
  * Generate all tile variants (base + transformed) for a WangSet.
@@ -77,15 +77,13 @@ function rotateCellCW(cell: Cell, n: number): Cell {
 }
 
 function flipCellH(cell: Cell): Cell {
-  if (cell.flipD) {
-    return createCell(cell.tileId, cell.flipH, !cell.flipV, cell.flipD, cell.tilesetIndex);
-  }
-  return createCell(cell.tileId, !cell.flipH, cell.flipV, cell.flipD, cell.tilesetIndex);
+  const flipH = cell.flipD ? cell.flipH : !cell.flipH;
+  const flipV = cell.flipD ? !cell.flipV : cell.flipV;
+  return createCell(cell.tileId, flipH, flipV, cell.flipD, cell.tilesetIndex);
 }
 
 function flipCellV(cell: Cell): Cell {
-  if (cell.flipD) {
-    return createCell(cell.tileId, !cell.flipH, cell.flipV, cell.flipD, cell.tilesetIndex);
-  }
-  return createCell(cell.tileId, cell.flipH, !cell.flipV, cell.flipD, cell.tilesetIndex);
+  const flipH = cell.flipD ? !cell.flipH : cell.flipH;
+  const flipV = cell.flipD ? cell.flipV : !cell.flipV;
+  return createCell(cell.tileId, flipH, flipV, cell.flipD, cell.tilesetIndex);
 }

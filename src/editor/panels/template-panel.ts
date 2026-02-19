@@ -2,7 +2,7 @@ import { EditorState } from '../editor-state.js';
 import { TEMPLATE_SLOTS, templateSlotWangId } from '../template-utils.js';
 import { colRowFromTileId } from '../../utils/tile-math.js';
 import { wangColorHex } from '../../core/wang-color.js';
-import { sectionHeader, panelButton, selectInput, DANGER_BTN_STYLE, SELECT_STYLE } from '../dom-helpers.js';
+import { sectionHeader, panelButton, DANGER_BTN_STYLE, SELECT_STYLE } from '../dom-helpers.js';
 import type { WangSetData } from '../../core/metadata-schema.js';
 
 /**
@@ -29,10 +29,11 @@ export class TemplatePanel {
     this.element = document.createElement('div');
     this.buildUI();
 
-    this.state.on('templateSlotChanged', () => this.render());
-    this.state.on('metadataChanged', () => this.render());
-    this.state.on('activeWangSetChanged', () => this.render());
-    this.state.on('templateModeChanged', () => this.render());
+    const rerender = () => this.render();
+    this.state.on('templateSlotChanged', rerender);
+    this.state.on('metadataChanged', rerender);
+    this.state.on('activeWangSetChanged', rerender);
+    this.state.on('templateModeChanged', rerender);
 
     this.render();
   }
@@ -44,31 +45,21 @@ export class TemplatePanel {
     const colorRow = document.createElement('div');
     colorRow.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
 
-    // Color A
-    const colorALabel = document.createElement('label');
-    colorALabel.textContent = 'A:';
-    colorALabel.style.cssText = 'font-size: 11px; color: #aaa;';
-    colorRow.appendChild(colorALabel);
+    const createColorPicker = (label: string, setter: (v: number) => void): HTMLSelectElement => {
+      const lbl = document.createElement('label');
+      lbl.textContent = label;
+      lbl.style.cssText = 'font-size: 11px; color: #aaa;';
+      colorRow.appendChild(lbl);
 
-    this.colorASelect = document.createElement('select');
-    this.colorASelect.style.cssText = SELECT_STYLE + '; flex: 1; cursor: pointer;';
-    this.colorASelect.addEventListener('change', () => {
-      this.state.setTemplateColorA(parseInt(this.colorASelect.value, 10));
-    });
-    colorRow.appendChild(this.colorASelect);
+      const select = document.createElement('select');
+      select.style.cssText = SELECT_STYLE + '; flex: 1; cursor: pointer;';
+      select.addEventListener('change', () => setter(parseInt(select.value, 10)));
+      colorRow.appendChild(select);
+      return select;
+    };
 
-    // Color B
-    const colorBLabel = document.createElement('label');
-    colorBLabel.textContent = 'B:';
-    colorBLabel.style.cssText = 'font-size: 11px; color: #aaa;';
-    colorRow.appendChild(colorBLabel);
-
-    this.colorBSelect = document.createElement('select');
-    this.colorBSelect.style.cssText = SELECT_STYLE + '; flex: 1; cursor: pointer;';
-    this.colorBSelect.addEventListener('change', () => {
-      this.state.setTemplateColorB(parseInt(this.colorBSelect.value, 10));
-    });
-    colorRow.appendChild(this.colorBSelect);
+    this.colorASelect = createColorPicker('A:', v => this.state.setTemplateColorA(v));
+    this.colorBSelect = createColorPicker('B:', v => this.state.setTemplateColorB(v));
 
     this.element.appendChild(colorRow);
 
@@ -105,19 +96,14 @@ export class TemplatePanel {
     const prevA = this.state.templateColorA;
     const prevB = this.state.templateColorB;
 
-    const options = colors.map((c, i) => ({
-      value: String(i + 1),
-      text: c.name,
-    }));
-
     for (const select of [this.colorASelect, this.colorBSelect]) {
       select.replaceChildren();
-      for (const item of options) {
+      colors.forEach((c, i) => {
         const opt = document.createElement('option');
-        opt.value = item.value;
-        opt.textContent = item.text;
+        opt.value = String(i + 1);
+        opt.textContent = c.name;
         select.appendChild(opt);
-      }
+      });
     }
 
     // Clamp selections to valid range
@@ -176,9 +162,7 @@ export class TemplatePanel {
         this.drawTilePreview(cell, tileId);
       }
 
-      cell.addEventListener('click', () => {
-        this.state.setActiveTemplateSlot(slotIndex);
-      });
+      cell.addEventListener('click', () => this.state.setActiveTemplateSlot(slotIndex));
 
       cell.addEventListener('contextmenu', (e) => {
         e.preventDefault();

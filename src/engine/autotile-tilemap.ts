@@ -46,7 +46,11 @@ export class AutotileTilemap {
   /** Refresh the visual tile at (x, y) from the autoMap */
   refreshTile(x: number, y: number): void {
     const cell = this.autoMap.cellAt(x, y);
-    if (cell.tileId < 0) return;
+    if (cell.tileId < 0) {
+      const tile = this.tileMap.getTile(x, y);
+      if (tile) tile.clearGraphics();
+      return;
+    }
     this.renderCell(x, y, cell);
   }
 

@@ -2,6 +2,7 @@ import * as ex from 'excalibur';
 import { AutotileTilemap } from './autotile-tilemap.js';
 
 export type ToolMode = 'brush' | 'fill' | 'prefab';
+export type BrushSize = 1 | 3 | 10;
 
 export class InputHandler {
   private engine: ex.Engine;
@@ -9,8 +10,10 @@ export class InputHandler {
   private activeColor: number = 2; // Default to Dirt (color 2)
   private isPainting = false;
   private toolMode: ToolMode = 'brush';
+  private _brushSize: BrushSize = 1;
   private onColorChange?: (color: number) => void;
   private onToolModeChange?: (mode: ToolMode) => void;
+  private onBrushSizeChange?: (size: BrushSize) => void;
   private cursorTilePos: [number, number] | null = null;
   private onCursorMove?: (pos: [number, number] | null) => void;
   private onPrefabPlace?: (tileX: number, tileY: number) => void;
@@ -39,7 +42,7 @@ export class InputHandler {
         this.onMapChanged?.();
       } else {
         this.isPainting = true;
-        this.paintAt(evt.worldPos);
+        this.applyBrush(evt.worldPos);
       }
     });
 
@@ -51,7 +54,7 @@ export class InputHandler {
       if (changed) this.onCursorMove?.(newPos);
 
       if (this.isPainting && this.toolMode === 'brush') {
-        this.paintAt(evt.worldPos);
+        this.applyBrush(evt.worldPos);
       }
     });
 
@@ -103,6 +106,19 @@ export class InputHandler {
     this.onToolModeChange = callback;
   }
 
+  setBrushSize(size: BrushSize): void {
+    this._brushSize = size;
+    this.onBrushSizeChange?.(size);
+  }
+
+  get brushSize(): BrushSize {
+    return this._brushSize;
+  }
+
+  setOnBrushSizeChange(callback: (size: BrushSize) => void): void {
+    this.onBrushSizeChange = callback;
+  }
+
   setOnCursorMove(callback: (pos: [number, number] | null) => void): void {
     this.onCursorMove = callback;
   }
@@ -115,17 +131,24 @@ export class InputHandler {
     this.onMapChanged = callback;
   }
 
-  private paintAt(worldPos: ex.Vector): void {
-    this.applyAtTile(worldPos, (col, row) => this.tilemap.paintTerrain(col, row, this.activeColor));
+  /** Apply brush at the given world position using current brush size */
+  private applyBrush(worldPos: ex.Vector): void {
+    const tilePos = this.tilemap.worldToTile(worldPos.x, worldPos.y);
+    if (!tilePos) return;
+
+    const half = Math.floor(this._brushSize / 2);
+    const [cx, cy] = tilePos;
+
+    for (let dy = -half; dy <= half; dy++) {
+      for (let dx = -half; dx <= half; dx++) {
+        this.tilemap.paintTerrain(cx + dx, cy + dy, this.activeColor);
+      }
+    }
   }
 
   private fillAt(worldPos: ex.Vector): void {
-    this.applyAtTile(worldPos, (col, row) => this.tilemap.fillTerrain(col, row, this.activeColor));
-  }
-
-  private applyAtTile(worldPos: ex.Vector, fn: (col: number, row: number) => void): void {
     const tilePos = this.tilemap.worldToTile(worldPos.x, worldPos.y);
     if (!tilePos) return;
-    fn(tilePos[0], tilePos[1]);
+    this.tilemap.fillTerrain(tilePos[0], tilePos[1], this.activeColor);
   }
 }

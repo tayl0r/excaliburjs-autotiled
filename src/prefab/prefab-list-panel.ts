@@ -36,57 +36,49 @@ export class PrefabListPanel {
       empty.textContent = 'No prefabs yet.';
       empty.style.cssText = 'color: #666; font-style: italic; padding: 8px 0;';
       this.listContainer.appendChild(empty);
-    } else {
-      for (const [name, prefab] of prefabs) {
-        const row = document.createElement('div');
-        const isActive = name === this.state.activePrefabName;
-        row.style.cssText = `
-          display: flex; align-items: center; gap: 6px;
-          padding: 4px 6px; margin: 2px 0;
-          cursor: pointer; border-radius: 3px;
-          background: ${isActive ? '#3a3a6a' : 'transparent'};
-          border: 1px solid ${isActive ? '#6666cc' : 'transparent'};
-        `;
-        row.addEventListener('click', () => this.state.setActivePrefab(name));
-
-        // Name label (double-click to rename)
-        const label = document.createElement('span');
-        label.textContent = name;
-        label.style.cssText = 'flex: 1; font-size: 12px;';
-        label.addEventListener('dblclick', (e) => {
-          e.stopPropagation();
-          this.startInlineRename(label, name);
-        });
-        row.appendChild(label);
-
-        // Tile count badge (sum across all layers)
-        const tileCount = prefab.layers.reduce((sum, l) => sum + l.length, 0);
-        const badge = document.createElement('span');
-        badge.textContent = `${tileCount}`;
-        badge.style.cssText = `
-          font-size: 10px; color: #888;
-          background: #2a2a2a; padding: 0 4px;
-          border-radius: 2px; border: 1px solid #444;
-        `;
-        badge.title = `${tileCount} tiles`;
-        row.appendChild(badge);
-
-        row.appendChild(this.rowButton('\u2398', `Duplicate prefab "${name}"`, () => {
-          this.state.duplicatePrefab(name);
-        }));
-
-        row.appendChild(this.rowButton('\u00d7', `Delete prefab "${name}"`, () => {
-          if (confirm(`Delete prefab "${name}"?`)) {
-            this.state.deletePrefab(name);
-            this.deletePrefabFromServer(name);
-          }
-        }));
-
-        this.listContainer.appendChild(row);
-      }
     }
 
-    // "+ New Prefab" button
+    for (const [name, prefab] of prefabs) {
+      const isActive = name === this.state.activePrefabName;
+      const row = document.createElement('div');
+      row.style.cssText = `
+        display: flex; align-items: center; gap: 6px;
+        padding: 4px 6px; margin: 2px 0;
+        cursor: pointer; border-radius: 3px;
+        background: ${isActive ? '#3a3a6a' : 'transparent'};
+        border: 1px solid ${isActive ? '#6666cc' : 'transparent'};
+      `;
+      row.addEventListener('click', () => this.state.setActivePrefab(name));
+
+      const label = document.createElement('span');
+      label.textContent = name;
+      label.style.cssText = 'flex: 1; font-size: 12px;';
+      label.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        this.startInlineRename(label, name);
+      });
+      row.appendChild(label);
+
+      const tileCount = prefab.layers.reduce((sum, l) => sum + l.length, 0);
+      const badge = document.createElement('span');
+      badge.textContent = `${tileCount}`;
+      badge.style.cssText = 'font-size: 10px; color: #888; background: #2a2a2a; padding: 0 4px; border-radius: 2px; border: 1px solid #444;';
+      badge.title = `${tileCount} tiles`;
+      row.appendChild(badge);
+
+      row.appendChild(this.rowButton('\u2398', `Duplicate "${name}"`, () => {
+        this.state.duplicatePrefab(name);
+      }));
+      row.appendChild(this.rowButton('\u00d7', `Delete "${name}"`, () => {
+        if (confirm(`Delete prefab "${name}"?`)) {
+          this.state.deletePrefab(name);
+          this.deletePrefabFromServer(name);
+        }
+      }));
+
+      this.listContainer.appendChild(row);
+    }
+
     const addBtn = document.createElement('button');
     addBtn.textContent = '+ New Prefab';
     addBtn.style.cssText = `
@@ -97,13 +89,8 @@ export class PrefabListPanel {
     addBtn.addEventListener('click', () => {
       let n = this.state.prefabs.size + 1;
       let name = `Prefab ${n}`;
-      while (this.state.prefabs.has(name)) {
-        n++;
-        name = `Prefab ${n}`;
-      }
+      while (this.state.prefabs.has(name)) { n++; name = `Prefab ${n}`; }
       this.state.createPrefab(name);
-      // createPrefab triggers prefabListChanged -> render(), which rebuilds the DOM.
-      // Find the newly created label and start inline editing it.
       const labels = this.listContainer.querySelectorAll('span');
       for (const span of labels) {
         if (span.textContent === name) {
@@ -158,19 +145,19 @@ export class PrefabListPanel {
     );
   }
 
-  private savePrefabToServer(name: string, data: unknown): void {
-    fetch('/api/save-prefab', {
+  private postApi(endpoint: string, body: Record<string, unknown>): void {
+    fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename: `${name}.json`, data }),
+      body: JSON.stringify(body),
     }).catch(console.error);
   }
 
+  private savePrefabToServer(name: string, data: unknown): void {
+    this.postApi('/api/save-prefab', { filename: `${name}.json`, data });
+  }
+
   private deletePrefabFromServer(name: string): void {
-    fetch('/api/delete-prefab', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename: `${name}.json` }),
-    }).catch(console.error);
+    this.postApi('/api/delete-prefab', { filename: `${name}.json` });
   }
 }
