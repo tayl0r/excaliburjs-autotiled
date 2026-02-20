@@ -612,3 +612,19 @@ Added seeded 2D simplex noise implementation as a building block for procedural 
 | Simplex noise tests | Done | `tests/core/simplex-noise.test.ts` — 4 tests (range, determinism, seed divergence, spatial variation) |
 
 Verification: `tsc --noEmit` clean, 217 tests passing.
+
+---
+
+## 2026-02-19: Map Generator — Noise + Voronoi Generation with Biome Transitions
+
+Core map generation functions for procedural terrain. Two algorithms (noise-based and voronoi-based) produce base biome layouts from weighted biome configs, then `insertIntermediates` smooths biome borders using the WangSet's color distance graph.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `generateNoise()` | Done | `src/core/map-generator.ts` — multi-octave simplex noise thresholded into biomes by cumulative weight |
+| `generateVoronoi()` | Done | `src/core/map-generator.ts` — scatter seed points proportional to weights, nearest-neighbor assignment |
+| `generateMap()` | Done | `src/core/map-generator.ts` — base colors + `insertIntermediates()` for smooth biome border transitions |
+| Interfaces | Done | `BiomeConfig` (colorId + weight), `GeneratorSettings` (algorithm, dimensions, seed, biomes, scale, pointCount) |
+| Tests | Done | `tests/core/map-generator.test.ts` — 12 tests (length, valid IDs, determinism, seed divergence, weight ratios, all colors used, generateMap integration) |
+
+Verification: `tsc --noEmit` clean, 233 tests passing.
