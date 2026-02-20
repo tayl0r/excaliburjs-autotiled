@@ -599,3 +599,16 @@ Added erase as a color option and configurable brush sizes to the map painter.
 | InputHandler | `BrushSize` type, `setBrushSize()`, NxN painting loop centered on cursor tile; OOB tiles safely ignored by `setColorAt` bounds check |
 
 Verification: `tsc --noEmit` clean, 213 tests passing.
+
+---
+
+## 2026-02-19: Map Generator — 2D Simplex Noise
+
+Added seeded 2D simplex noise implementation as a building block for procedural map generation.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| SimplexNoise class | Done | `src/core/simplex-noise.ts` — standard 2D simplex (Perlin/Gustavson), Fisher-Yates shuffled permutation table from `SeededRandom`, output scaled by 70 to [-1, 1] |
+| Simplex noise tests | Done | `tests/core/simplex-noise.test.ts` — 4 tests (range, determinism, seed divergence, spatial variation) |
+
+Verification: `tsc --noEmit` clean, 217 tests passing.
