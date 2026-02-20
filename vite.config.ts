@@ -193,6 +193,7 @@ export default defineConfig({
         'tileset-editor': path.resolve(__dirname, 'tools/tileset-editor/index.html'),
         'map-painter': path.resolve(__dirname, 'tools/map-painter/index.html'),
         'prefab-editor': path.resolve(__dirname, 'tools/prefab-editor/index.html'),
+        'map-generator': path.resolve(__dirname, 'tools/map-generator/index.html'),
       },
     },
   },
