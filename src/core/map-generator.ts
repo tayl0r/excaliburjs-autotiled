@@ -1,7 +1,7 @@
 import { SeededRandom } from './seeded-random.js';
 import { SimplexNoise } from './simplex-noise.js';
 import { SimpleAutotileMap } from './autotile-map.js';
-import { insertIntermediates } from './terrain-painter.js';
+import { NEIGHBOR_OFFSETS } from './wang-id.js';
 import type { WangSet } from './wang-set.js';
 
 export interface BiomeConfig {
@@ -88,7 +88,12 @@ export function generateVoronoi(
   return colors;
 }
 
-/** Full generation: base colors + insertIntermediates for smooth biome borders. */
+/**
+ * Full generation: base colors + iterative border smoothing.
+ * Repeatedly scans for adjacent cell pairs with color distance > 1
+ * and replaces the neighbor with the next-hop intermediate color
+ * until all adjacent pairs are within distance 1.
+ */
 export function generateMap(settings: GeneratorSettings, wangSet: WangSet): number[] {
   const { algorithm, width, height, biomes, seed, scale, pointCount } = settings;
 
@@ -99,13 +104,36 @@ export function generateMap(settings: GeneratorSettings, wangSet: WangSet): numb
   const map = new SimpleAutotileMap(width, height, 0);
   map.importColors(baseColors);
 
-  const seeds: Array<[number, number]> = [];
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      if (map.colorAt(x, y) !== 0) seeds.push([x, y]);
-    }
-  }
-  insertIntermediates(map, wangSet, seeds);
+  smoothBorders(map, wangSet);
 
   return map.getColors();
+}
+
+/**
+ * Iteratively smooth biome borders until all adjacent cells have
+ * color distance <= 1. Each pass scans the grid and replaces neighbors
+ * that are too far apart with the next-hop intermediate color.
+ */
+function smoothBorders(map: SimpleAutotileMap, wangSet: WangSet): void {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) {
+        const myColor = map.colorAt(x, y);
+        if (myColor === 0) continue;
+        for (const [dx, dy] of NEIGHBOR_OFFSETS) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (!map.inBounds(nx, ny)) continue;
+          const nc = map.colorAt(nx, ny);
+          if (nc === 0) continue;
+          if (wangSet.colorDistance(myColor, nc) > 1) {
+            map.setColorAt(nx, ny, wangSet.nextHopColor(myColor, nc));
+            changed = true;
+          }
+        }
+      }
+    }
+  }
 }
