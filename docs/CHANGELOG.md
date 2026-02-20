@@ -628,3 +628,27 @@ Core map generation functions for procedural terrain. Two algorithms (noise-base
 | Tests | Done | `tests/core/map-generator.test.ts` — 12 tests (length, valid IDs, determinism, seed divergence, weight ratios, all colors used, generateMap integration) |
 
 Verification: `tsc --noEmit` clean, 233 tests passing.
+
+---
+
+## 2026-02-19: Map Generator UI
+
+Full generator tool page at `/tools/map-generator/` with settings panel and live canvas preview.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| GeneratorUI class | Done | `src/generator/generator-ui.ts` — standalone page with left settings panel (280px) + right preview canvas |
+| Algorithm toggle | Done | Noise / Voronoi buttons with conditional Scale (noise) and Point Count (voronoi) controls |
+| Biomes section | Done | Per-color checkbox + colored swatch + name + weight slider (1-100); first 3 checked by default |
+| Map size inputs | Done | Width/height number inputs, default 64, clamped 10-256 |
+| Seed control | Done | Number input + Randomize button |
+| Scale slider | Done | Range 0.01-0.2, default 0.05, shown only for noise algorithm |
+| Point count slider | Done | Range 5-100, default 30, shown only for voronoi algorithm |
+| Generate button | Done | Builds `GeneratorSettings`, calls `generateMap()`, renders preview with timing feedback |
+| Preview canvas | Done | Cell size auto-fitted to available space, colors from WangSet with `wangColorHex()` fallback |
+| Save flow | Done | Text input for name + Save button (disabled until generated), builds `SavedMap` v2, POSTs to `/api/save-map` |
+| Feedback overlay | Done | Fixed-position toast for success/error messages with fade-out |
+| Entry point update | Done | `src/map-generator-main.ts` — loads metadata, instantiates `GeneratorUI` |
+| Dark theme | Done | Matches project dark theme (`#1a1a2e` background, `#16213e` panels, `#6666cc` accent) |
+
+Verification: `tsc --noEmit` clean, 233 tests passing.
