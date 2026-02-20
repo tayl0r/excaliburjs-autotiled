@@ -14,14 +14,15 @@ Always run `tsc --noEmit` and `vitest run` before considering work complete.
 
 ## Architecture
 
-Multi-page app with three tools sharing a core autotile engine:
+Multi-page app with four tools sharing a core autotile engine:
 
-- **`src/core/`** — Pure logic, no DOM or Excalibur deps. Wang tiles, matching, terrain painting, color distance, flood fill.
+- **`src/core/`** — Pure logic, no DOM or Excalibur deps. Wang tiles, matching, terrain painting, color distance, flood fill, map generation (noise/voronoi).
 - **`src/engine/`** — Excalibur runtime. `AutotileTilemap` bridges core autotile logic to Excalibur's `TileMap`. `GameScene` is the map painter scene.
 - **`src/editor/`** — Standalone tileset metadata editor. `EditorState` is the central store with pub/sub events. Panels in `src/editor/panels/`.
 - **`src/prefab/`** — Prefab editor. `PrefabEditorState` manages prefab CRUD and tools (paint, erase, move, copy, anchor). `PrefabCanvas` handles rendering and mouse interaction. `PrefabEditor` builds the UI.
+- **`src/generator/`** — Map generator tool. `GeneratorUI` builds the settings + preview page for procedural terrain generation.
 - **`src/utils/`** — Shared helpers (asset path resolution, tileset image loading).
-- **Entry points:** `src/tileset-editor-main.ts` (`/tools/tileset-editor/`), `src/map-painter-main.ts` (`/tools/map-painter/`), `src/prefab-editor-main.ts` (`/tools/prefab-editor/`)
+- **Entry points:** `src/tileset-editor-main.ts` (`/tools/tileset-editor/`), `src/map-painter-main.ts` (`/tools/map-painter/`), `src/prefab-editor-main.ts` (`/tools/prefab-editor/`), `src/map-generator-main.ts` (`/tools/map-generator/`)
 - **Vite plugins** in `vite.config.ts` provide dev-server API endpoints for saving metadata, maps, and prefabs.
 
 ## Path Aliases
@@ -40,7 +41,10 @@ Tests use vitest. Files live in `tests/` mirroring `src/` structure (e.g. `tests
 
 ## After Completing Work
 
-After finishing any feature, bugfix, or implementation task, update `docs/CHANGELOG.md` to reflect the new status. Mark completed items as "Done" and add notes about what was implemented. This file tracks plan-vs-implementation status and must stay current.
+After finishing any feature, bugfix, or implementation task:
+
+- Update `docs/CHANGELOG.md` to reflect the new status. Mark completed items as "Done" and add notes about what was implemented. This file tracks plan-vs-implementation status and must stay current.
+- Update `docs/DATA_MODEL.md` if the work changed on-disk formats, added/removed fields, changed default values, or added new user-facing concepts/tools to any of the three editors.
 
 When a new plan is added to `docs/plans/`, add a corresponding section to the CHANGELOG. The CHANGELOG references every spec and plan file in `docs/` — if those files are added, removed, or restructured, update the CHANGELOG to match.
 

@@ -39,15 +39,20 @@ Used to paint terrain on a grid and place prefabs. Tiles are auto-resolved by th
 |------|---------|
 | **Brush** | Click/drag to paint the active color one tile at a time. Shortcut: **B**. |
 | **Fill (Flood Fill)** | Click to fill all connected same-color tiles with the active color. Shortcut: **G**. |
+| **Erase** | Paint with color 0 to clear tiles. Listed as the first color entry. Shortcut: **E**. |
+| **Brush Size** | Size of the paint/erase brush: 1×1, 3×3, or 10×10. Cycle with **Z**. |
 | **Active Color** | The currently selected terrain color. Shown in the sidebar Colors section. |
 | **Autotiling** | The automatic process of picking the correct tile sprite based on neighboring terrain colors. Happens in real-time as you paint. |
 | **Indirect Transition** | When two colors have no direct transition tile, the engine inserts intermediate colors (e.g. grass → dirt → sand). Powered by the distance/next-hop matrices. |
 | **Layer** | Maps have 9 layers (5 editable via UI, 4 overflow for prefab placement). Layer 1 is the base terrain. |
 | **Visibility Mode** | Controls how non-active layers render: **All** (full opacity), **Highlight** (active full, others 25%), **Solo** (only active layer visible). Shortcut: **V**. |
+| **Pan** | Scroll or **WASD** keys to move the camera. Modifier keys (Cmd/Ctrl/Alt/Shift) suppress WASD to avoid conflicts with shortcuts. |
+| **Zoom** | **Ctrl/Cmd + scroll** to zoom in/out (0.5×–6×). Current zoom level shown in the Map sidebar section. **Home** resets to default zoom and centers the camera. |
+| **Map Resize** | Expand or shrink the map by 10 tiles in any cardinal direction (N/S/E/W) via the Map sidebar section. Minimum size 10×10. |
 | **Prefab Placement** | Select a prefab from the sidebar, hover to preview, click to place. Prefab layers stack onto map layers starting from the active layer. |
 | **Placed Prefab** | A reference to a prefab placed at a specific map position and layer. Stored in the saved map for tracking. |
 | **Autosave** | Maps are saved automatically 5 seconds after any paint, fill, or prefab operation (only when the map has been named/saved once). |
-| **Sidebar** | Collapsible left panel (240px) containing all controls: File, Tools, Layers, Colors, and Prefabs. Toggle with **Tab**. |
+| **Sidebar** | Collapsible left panel (240px) containing all controls: File, Tools, Layers, Colors, Prefabs, and Map. Toggle with **Tab**. |
 
 ### Prefab Editor (`/tools/prefab-editor/`)
 
@@ -63,6 +68,20 @@ Used to arrange specific tiles into reusable templates.
 | **Anchor** | The origin point (0,0) of a prefab. Defines where the prefab attaches when placed on a map. |
 | **Canvas** | The editor grid. Auto-expands in steps of 10 cells as tiles are placed beyond its bounds. |
 | **Autosave** | Prefabs are saved automatically 5 seconds after any change. Flushes immediately when switching prefabs. |
+
+### Map Generator (`/tools/map-generator/`)
+
+Used to procedurally generate terrain maps from biome configurations.
+
+| Term | Meaning |
+|------|---------|
+| **Biome** | A terrain color selected for generation, with a weight controlling its relative area coverage. |
+| **Noise** | Simplex noise-based algorithm producing organic, irregular biome regions. Multi-octave (3 octaves) for natural variation. |
+| **Voronoi** | Voronoi diagram-based algorithm producing cleaner, polygon-shaped biome regions via nearest-neighbor assignment to scattered seed points. |
+| **Scale** (noise) | Controls biome region size. Lower values = larger regions. Range 0.01–0.2, default 0.05. |
+| **Point Count** (voronoi) | Number of seed points scattered across the map, distributed proportionally to biome weights. Range 5–100, default 30. |
+| **Seed** | Numeric seed for reproducible generation. Same seed + settings = same map. Uses mulberry32 PRNG. |
+| **Transitions** | After base generation, `insertIntermediates()` auto-inserts transition colors between non-adjacent biomes (e.g. Grass→Dirt→Sand). |
 
 ## File Layout
 
@@ -193,8 +212,8 @@ Maps have 9 layers. Layers 0-4 are user-editable (shown as layers 1-5 in the UI)
   "version": 2,
   "name": "test1",
   "wangSetName": "grass",       // Which WangSet to use for tile resolution
-  "width": 20,                  // Grid dimensions
-  "height": 20,
+  "width": 64,                  // Grid dimensions (default 64, resizable in increments of 10)
+  "height": 64,
   "layers": [                   // 9 arrays, each flat row-major (length = width * height)
     [1, 1, 1, 2, ...],         // Layer 0 (base terrain)
     [0, 0, 0, 0, ...],         // Layer 1
@@ -218,8 +237,6 @@ layer[0]       = cell (0, 0) // top-left
 layer[width-1] = cell (width-1, 0) // top-right
 layer[width]   = cell (0, 1) // second row, first column
 ```
-
-V1 maps (single `colors[]` array) are automatically migrated to v2 on load — the colors become layer 0, all other layers are filled with zeros.
 
 Maps are loaded via URL hash: `/tools/map-painter/#map=test1` loads `assets/maps/test1.json`. Layer can be specified: `#map=test1&layer=2`.
 
@@ -250,8 +267,6 @@ Prefabs are reusable tile arrangements — a collection of specific tiles placed
 ```
 
 Prefabs can contain tiles from multiple tilesets (each tile has its own `tilesetIndex`). The anchor point defines the origin when placing the prefab on a map.
-
-V1 prefabs (single `tiles[]` array) are automatically migrated to v2 on load — the tiles become layer 0, other layers are empty.
 
 When a prefab is placed on a map, its layers stack onto consecutive map layers starting from the active layer. For example, placing a prefab on map layer 2 puts prefab layer 0 on map layer 2, prefab layer 1 on map layer 3, etc.
 
