@@ -61,7 +61,13 @@ export function findBestMatch(
       const desiredColor = desired.indexColor(i);
       const candidateColor = wangId.indexColor(i);
 
-      if (desiredColor === 0 || candidateColor === 0) continue;
+      if (desiredColor === 0) continue; // No constraint on this corner
+      if (candidateColor === 0) {
+        // Candidate has no terrain assigned for a corner where we need one.
+        // Reject — tiles with unspecified corners shouldn't fill concrete terrain.
+        valid = false;
+        break;
+      }
       if (desiredColor === candidateColor) continue;
 
       const distance = wangSet.colorDistance(desiredColor, candidateColor);

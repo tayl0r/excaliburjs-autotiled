@@ -44,6 +44,36 @@ function writeJsonFile(dir: string, safeName: string, data: unknown): { outPath:
   return { outPath, json };
 }
 
+/** Remove wangtiles where all active corners/edges are 0 (no terrain assigned). */
+function sanitizeWangsets(data: Record<string, unknown>): number {
+  const wangsets = data.wangsets as Array<Record<string, unknown>> | undefined;
+  if (!wangsets) return 0;
+
+  let totalRemoved = 0;
+  for (const ws of wangsets) {
+    const type = ws.type as string;
+    const wangtiles = ws.wangtiles as Array<{ tileid: number; wangid: number[]; tileset?: number }> | undefined;
+    if (!wangtiles) continue;
+
+    const before = wangtiles.length;
+    ws.wangtiles = wangtiles.filter(wt => {
+      const w = wt.wangid;
+      if (!w || w.length !== 8) return true; // keep malformed entries for error reporting
+
+      // Check if all active indices are 0
+      const allActiveZero = w.every((color, i) => {
+        const isCorner = i % 2 === 1;
+        const isActive = type === 'corner' ? isCorner : type === 'edge' ? !isCorner : true;
+        return !isActive || color === 0;
+      });
+
+      return !allActiveZero;
+    });
+    totalRemoved += before - (ws.wangtiles as unknown[]).length;
+  }
+  return totalRemoved;
+}
+
 function metadataSavePlugin(): Plugin {
   return {
     name: 'metadata-save',
@@ -57,6 +87,12 @@ function metadataSavePlugin(): Plugin {
 
           const safeName = sanitizeJsonFilename(filename as string);
           if (!safeName) { res.statusCode = 400; res.end('Filename must end with .json'); return; }
+
+          // Sanitize: remove wangtiles with all-zero active corners
+          const removed = sanitizeWangsets(data as Record<string, unknown>);
+          if (removed > 0) {
+            console.log(`[metadata-save] Removed ${removed} wangtile(s) with all-zero active corners`);
+          }
 
           const { outPath, json } = writeJsonFile(ASSETS_DIR, safeName, data);
 
@@ -194,6 +230,7 @@ export default defineConfig({
         'map-painter': path.resolve(__dirname, 'tools/map-painter/index.html'),
         'prefab-editor': path.resolve(__dirname, 'tools/prefab-editor/index.html'),
         'map-generator': path.resolve(__dirname, 'tools/map-generator/index.html'),
+        'debug': path.resolve(__dirname, 'tools/debug/index.html'),
       },
     },
   },

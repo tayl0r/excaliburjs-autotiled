@@ -150,6 +150,12 @@ export class GameScene extends ex.Scene {
   private prefabListContainer!: HTMLDivElement;
   private prefabButtons: HTMLButtonElement[] = [];
 
+  // Debug overlay
+  private debugMode = false;
+  private debugCanvas!: HTMLCanvasElement;
+  private debugCtx!: CanvasRenderingContext2D;
+  private debugToggleBtn!: HTMLButtonElement;
+
   constructor(tilesetManager: TilesetManager) {
     super();
     this.tilesetManager = tilesetManager;
@@ -227,6 +233,7 @@ export class GameScene extends ex.Scene {
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Tab') e.preventDefault();
       if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key === 'n') { e.preventDefault(); this.newMap(); }
       if (e.key === 's') { e.preventDefault(); this.saveMap(); }
       if (e.key === 'o') { e.preventDefault(); this.openMap(); }
       if (e.key === 'z' && e.shiftKey) { e.preventDefault(); this.redoPrefab(); }
@@ -291,6 +298,7 @@ export class GameScene extends ex.Scene {
     this.sidebar.appendChild(this.buildColorSection(wangSet));
     this.sidebar.appendChild(this.buildPrefabSection());
     this.sidebar.appendChild(this.buildMapSection());
+    this.sidebar.appendChild(this.buildDebugSection());
 
     document.body.appendChild(this.sidebar);
 
@@ -400,11 +408,14 @@ export class GameScene extends ex.Scene {
     const content = document.createElement('div');
     content.style.cssText = 'display: flex; gap: 4px; padding: 0 12px 6px;';
 
+    const newBtn = this.makeSidebarButton('New', '\u2318N');
+    newBtn.addEventListener('click', () => this.newMap());
     const saveBtn = this.makeSidebarButton('Save', '\u2318S');
     saveBtn.addEventListener('click', () => this.saveMap());
     const openBtn = this.makeSidebarButton('Open', '\u2318O');
     openBtn.addEventListener('click', () => this.openMap());
 
+    content.appendChild(newBtn);
     content.appendChild(saveBtn);
     content.appendChild(openBtn);
     return this.buildSidebarSection('File', content);
@@ -817,6 +828,8 @@ export class GameScene extends ex.Scene {
         this.camera.pos = this.camera.pos.add(ex.vec(dx, dy));
       }
     }
+
+    this.drawDebugOverlay();
   }
 
   // --- Autosave ---
@@ -895,6 +908,19 @@ export class GameScene extends ex.Scene {
       console.error('[map] Autosave failed:', err);
       this.showIndicator('Save failed!', 5000);
     }
+  }
+
+  newMap(): void {
+    this.currentMapName = null;
+    this.rebuildTilemaps(DEFAULT_COLS, DEFAULT_ROWS);
+    this.layers[0].initializeAll(1);
+    this.placedPrefabs = [];
+    this.prefabUndoStack = [];
+    this.prefabRedoStack = [];
+    this.updateMapSizeLabel();
+    this.resetCamera();
+    window.location.hash = '';
+    console.log('[map] New map created');
   }
 
   async saveMap(): Promise<void> {
@@ -1212,6 +1238,127 @@ export class GameScene extends ex.Scene {
     if (this.zoomLabel) {
       const pct = Math.round(this.camera.zoom * 100);
       this.zoomLabel.textContent = `Zoom: ${pct}%`;
+    }
+  }
+
+  // --- Debug overlay ---
+
+  private buildDebugSection(): HTMLDivElement {
+    const content = document.createElement('div');
+    content.style.cssText = 'padding: 0 12px 6px; display: flex; gap: 4px;';
+
+    this.debugToggleBtn = this.makeSidebarButton('Off', '');
+    this.debugToggleBtn.addEventListener('click', () => this.toggleDebug());
+    content.appendChild(this.debugToggleBtn);
+
+    return this.buildSidebarSection('Debug', content);
+  }
+
+  private toggleDebug(): void {
+    this.debugMode = !this.debugMode;
+    this.debugToggleBtn.textContent = this.debugMode ? 'On' : 'Off';
+    setButtonActive(this.debugToggleBtn, this.debugMode);
+
+    if (this.debugMode && !this.debugCanvas) {
+      this.debugCanvas = document.createElement('canvas');
+      this.debugCanvas.style.cssText = 'position: absolute; top: 0; left: 0; pointer-events: none; z-index: 10;';
+      document.body.appendChild(this.debugCanvas);
+      this.debugCtx = this.debugCanvas.getContext('2d')!;
+    }
+
+    if (this.debugCanvas) {
+      this.debugCanvas.style.display = this.debugMode ? '' : 'none';
+    }
+  }
+
+  private drawDebugOverlay(): void {
+    if (!this.debugMode || !this.debugCtx) return;
+
+    const gameCanvas = this.engine.canvas;
+    const rect = gameCanvas.getBoundingClientRect();
+    const canvas = this.debugCanvas;
+    const dCtx = this.debugCtx;
+    const w = Math.round(rect.width);
+    const h = Math.round(rect.height);
+
+    // Match overlay exactly to game canvas
+    canvas.style.left = Math.round(rect.left) + 'px';
+    canvas.style.top = Math.round(rect.top) + 'px';
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+
+    dCtx.clearRect(0, 0, w, h);
+
+    const ts = this.tilesetManager.primaryTileset;
+    const tw = ts.tileWidth;
+    const th = ts.tileHeight;
+    const layer = this.layers[this.activeLayerIndex];
+    const autoMap = layer.autoMap;
+    const cam = this.camera;
+    const zoom = cam.zoom;
+
+    // Use display-size ratio to account for canvas resolution vs CSS size
+    const scaleX = w / this.engine.screen.resolution.width;
+    const scaleY = h / this.engine.screen.resolution.height;
+    const camX = cam.pos.x;
+    const camY = cam.pos.y;
+
+    // World -> overlay pixel
+    const ox = w / 2 - camX * zoom * scaleX;
+    const oy = h / 2 - camY * zoom * scaleY;
+    const tileW = tw * zoom * scaleX;
+    const tileH = th * zoom * scaleY;
+
+    // Visible tile range
+    const minX = Math.max(0, Math.floor((camX - w / (2 * zoom * scaleX)) / tw) - 1);
+    const minY = Math.max(0, Math.floor((camY - h / (2 * zoom * scaleY)) / th) - 1);
+    const maxX = Math.min(this.mapCols - 1, Math.ceil((camX + w / (2 * zoom * scaleX)) / tw) + 1);
+    const maxY = Math.min(this.mapRows - 1, Math.ceil((camY + h / (2 * zoom * scaleY)) / th) + 1);
+
+    if (tileW < 14) return;
+
+    const fontSize = Math.min(13, Math.max(8, Math.floor(tileW * 0.3)));
+    const smallFontSize = Math.max(7, fontSize - 2);
+    dCtx.textAlign = 'center';
+
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const color = autoMap.colorAt(x, y);
+        const cell = autoMap.cellAt(x, y);
+        const sx = x * tileW + ox;
+        const sy = y * tileH + oy;
+        const cx = sx + tileW / 2;
+        const unresolved = cell.tileId < 0 && color > 0;
+
+        // Tint unresolved cells
+        if (unresolved) {
+          dCtx.fillStyle = 'rgba(255, 40, 40, 0.4)';
+          dCtx.fillRect(sx, sy, tileW, tileH);
+        }
+
+        dCtx.shadowColor = '#000';
+        dCtx.shadowBlur = 2;
+
+        // Color ID on upper third
+        dCtx.font = `bold ${fontSize}px monospace`;
+        dCtx.textBaseline = 'top';
+        dCtx.fillStyle = unresolved ? '#f44' : '#fff';
+        dCtx.fillText(String(color), cx, sy + 2);
+
+        // TileId on lower third (yellow)
+        if (cell.tileId >= 0) {
+          dCtx.font = `${smallFontSize}px monospace`;
+          dCtx.textBaseline = 'bottom';
+          dCtx.fillStyle = '#ff0';
+          dCtx.fillText(String(cell.tileId), cx, sy + tileH - 1);
+        }
+
+        dCtx.shadowBlur = 0;
+      }
     }
   }
 

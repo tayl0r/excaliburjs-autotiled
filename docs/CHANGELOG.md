@@ -652,3 +652,45 @@ Full generator tool page at `/tools/map-generator/` with settings panel and live
 | Dark theme | Done | Matches project dark theme (`#1a1a2e` background, `#16213e` panels, `#6666cc` accent) |
 
 Verification: `tsc --noEmit` clean, 233 tests passing.
+
+---
+
+## 2026-02-19: Zone Biome Generator with Connectivity-Aware Color Placement
+
+New "Zones" algorithm for the map generator that assigns 5 primary biome colors to a center + 4 corners layout, smooths borders via `smoothBorders`, and sprinkles variety using only connectivity-safe 1-hop colors.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `generateZones()` | Done | `src/core/map-generator.ts` — 5 zones (center diamond + NW/NE/SW/SE corners) with noise-perturbed boundaries, `boundaryNoise` controls perturbation amplitude |
+| `sprinkleVariety()` | Done | `src/core/map-generator.ts` — raster-order safe variety placement, only 1-hop colors, checks all 8 neighbors before placing |
+| Updated `GeneratorSettings` | Done | Added `'zones'` algorithm, `zoneBiomes` (5 colorIds: center, NW, NE, SW, SE), `sprinkle`, `boundaryNoise` fields |
+| Updated `generateMap()` | Done | Routes to zone/noise/voronoi, runs `smoothBorders` for all, then `sprinkleVariety` when enabled |
+| Zones UI — algorithm toggle | Done | `src/generator/generator-ui.ts` — "Zones" button alongside Noise and Voronoi |
+| Zones UI — 5-zone biome pickers | Done | 2-column grid: NW/NE row, Center (spanning), SW/SE row — each a dropdown listing all WangSet colors |
+| Zones UI — Variety slider | Done | 0-30%, default 15%, shown for all algorithms |
+| Zones UI — Boundary Noise slider | Done | 0-100%, default 50%, shown for zones algorithm only |
+| Zones UI — connectivity warning | Done | Shows "Good connectivity" or warnings for adjacent zone pairs with distance > 2 |
+| Zone tests | Done | 5 tests: correct zone areas (center + 4 corners), noise perturbation, determinism, seed divergence, dimensions |
+| Sprinkle tests | Done | 4 tests: amount 0 no-op, amount > 0 changes, distance-1 from original, all adjacent pairs safe |
+| Integration test | Done | Zones algorithm output verified: all adjacent cell pairs have `colorDistance <= 1` |
+
+Verification: `tsc --noEmit` clean, 245 tests passing.
+
+---
+
+## 2026-02-19: Fix Gray Tile Rendering Bug
+
+Fixed a bug where random gray/wrong tiles appeared on maps (including brand new all-grass maps).
+
+**Root cause**: `findBestMatch()` in `src/core/matching.ts` treated `candidateColor === 0` as a free wildcard — when a wangtile had 0 (no terrain) in an active corner, that corner was skipped during penalty scoring. This meant wangtiles with all-zero wangids (e.g., tileId 295 with wangid `[0,0,0,0,0,0,0,0]`) matched ANY desired terrain with penalty 0, causing random non-terrain tiles to be placed on the map.
+
+This was triggered by deleting wang colors in the tileset editor: wangtiles whose corners all referenced the deleted color got their corners set to 0, creating universal wildcards.
+
+| Change | Files |
+|--------|-------|
+| Fix matching: reject candidates where active corners are 0 but desired corners are non-zero | `src/core/matching.ts` |
+| Sanitize on save: strip wangtiles with all-zero active corners when saving metadata | `vite.config.ts` — `sanitizeWangsets()` |
+| Debug overlay: shows tileId (yellow) below color ID (white) on each tile | `src/engine/game-scene.ts` |
+| Map painter: New button (Cmd+N) for fresh maps | `src/engine/game-scene.ts` |
+
+Verification: `tsc --noEmit` clean, 245 tests passing.

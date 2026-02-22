@@ -3,6 +3,8 @@ import type { WangSet } from '../core/wang-set.js';
 import type { WangColor } from '../core/wang-color.js';
 import { wangColorHex } from '../core/wang-color.js';
 import { loadMetadata } from '../core/metadata-loader.js';
+import { computeColorDistances } from '../core/color-distance.js';
+import { generateAllVariants } from '../core/variant-generator.js';
 import { generateMap, type BiomeConfig, type GeneratorSettings } from '../core/map-generator.js';
 import { NUM_MAP_LAYERS } from '../core/layers.js';
 import type { SavedMap } from '../core/map-schema.js';
@@ -11,7 +13,6 @@ import type { SavedMap } from '../core/map-schema.js';
 const FONT_FAMILY = "'Segoe UI', system-ui, sans-serif";
 const BG_COLOR = '#1a1a2e';
 const PANEL_COLOR = '#16213e';
-const PANEL_INNER = '#1e1e3a';
 const TEXT_COLOR = '#ccc';
 const TEXT_BRIGHT = '#e0e0e0';
 const BORDER_COLOR = '#333';
@@ -23,6 +24,7 @@ const BTN_STYLE = `background: #333; color: ${TEXT_COLOR}; border: 1px solid #55
 const BTN_ACTIVE = `background: ${ACCENT}; color: #fff; border: 1px solid #8888ee; ${BTN_BASE}`;
 const INPUT_STYLE = `background: #252545; color: ${TEXT_BRIGHT}; border: 1px solid ${BORDER_COLOR}; border-radius: 3px; padding: 4px 8px; font-size: 12px; font-family: ${FONT_FAMILY};`;
 const LABEL_STYLE = `color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;`;
+const SELECT_STYLE = `background: #252545; color: ${TEXT_BRIGHT}; border: 1px solid ${BORDER_COLOR}; border-radius: 3px; padding: 4px 6px; font-size: 12px; font-family: ${FONT_FAMILY}; cursor: pointer;`;
 
 interface BiomeRow {
   colorId: number;
@@ -33,7 +35,7 @@ interface BiomeRow {
   weightLabel: HTMLSpanElement;
 }
 
-type Algorithm = 'noise' | 'voronoi';
+type Algorithm = 'noise' | 'voronoi' | 'zones';
 
 export class GeneratorUI {
   private container: HTMLElement;
@@ -45,7 +47,12 @@ export class GeneratorUI {
   private algorithm: Algorithm = 'noise';
   private noiseBtn!: HTMLButtonElement;
   private voronoiBtn!: HTMLButtonElement;
+  private zonesBtn!: HTMLButtonElement;
   private biomeRows: BiomeRow[] = [];
+  private biomesSection!: HTMLDivElement;
+  private zoneBiomesSection!: HTMLDivElement;
+  private zoneSelects: HTMLSelectElement[] = [];
+  private connectivityStatus!: HTMLDivElement;
   private widthInput!: HTMLInputElement;
   private heightInput!: HTMLInputElement;
   private seedInput!: HTMLInputElement;
@@ -55,6 +62,12 @@ export class GeneratorUI {
   private pointCountRow!: HTMLDivElement;
   private pointCountSlider!: HTMLInputElement;
   private pointCountLabel!: HTMLSpanElement;
+  private varietyRow!: HTMLDivElement;
+  private varietySlider!: HTMLInputElement;
+  private varietyLabel!: HTMLSpanElement;
+  private boundaryNoiseRow!: HTMLDivElement;
+  private boundaryNoiseSlider!: HTMLInputElement;
+  private boundaryNoiseLabel!: HTMLSpanElement;
   private generateBtn!: HTMLButtonElement;
   private saveInput!: HTMLInputElement;
   private saveBtn!: HTMLButtonElement;
@@ -69,8 +82,13 @@ export class GeneratorUI {
   constructor(container: HTMLElement, metadata: ProjectMetadata) {
     this.container = container;
 
-    const { wangSets } = loadMetadata(metadata);
-    this.wangSet = wangSets[0];
+    const { wangSets, transformations } = loadMetadata(metadata);
+    const ws = wangSets[0];
+    const { distances, nextHop } = computeColorDistances(ws);
+    ws.setDistanceMatrix(distances);
+    ws.setNextHopMatrix(nextHop);
+    ws.setVariants(generateAllVariants(ws, transformations));
+    this.wangSet = ws;
     this.wangSetName = metadata.wangsets[0].name;
     this.colors = this.wangSet.colors;
 
@@ -112,7 +130,10 @@ export class GeneratorUI {
     panel.appendChild(this.buildHeader());
     panel.appendChild(this.buildAlgorithmToggle());
     panel.appendChild(this.buildDivider());
-    panel.appendChild(this.buildBiomesSection());
+    this.biomesSection = this.buildBiomesSection();
+    panel.appendChild(this.biomesSection);
+    this.zoneBiomesSection = this.buildZoneBiomesSection();
+    panel.appendChild(this.zoneBiomesSection);
     panel.appendChild(this.buildDivider());
     panel.appendChild(this.buildMapSizeSection());
     panel.appendChild(this.buildDivider());
@@ -122,6 +143,10 @@ export class GeneratorUI {
     panel.appendChild(this.scaleRow);
     this.pointCountRow = this.buildPointCountSection();
     panel.appendChild(this.pointCountRow);
+    this.varietyRow = this.buildVarietySection();
+    panel.appendChild(this.varietyRow);
+    this.boundaryNoiseRow = this.buildBoundaryNoiseSection();
+    panel.appendChild(this.boundaryNoiseRow);
     panel.appendChild(this.buildDivider());
     panel.appendChild(this.buildGenerateSection());
     panel.appendChild(this.buildDivider());
@@ -226,8 +251,14 @@ export class GeneratorUI {
     this.voronoiBtn.style.cssText = BTN_STYLE;
     this.voronoiBtn.addEventListener('click', () => this.setAlgorithm('voronoi'));
 
+    this.zonesBtn = document.createElement('button');
+    this.zonesBtn.textContent = 'Zones';
+    this.zonesBtn.style.cssText = BTN_STYLE;
+    this.zonesBtn.addEventListener('click', () => this.setAlgorithm('zones'));
+
     row.appendChild(this.noiseBtn);
     row.appendChild(this.voronoiBtn);
+    row.appendChild(this.zonesBtn);
     section.appendChild(row);
     return section;
   }
@@ -338,6 +369,128 @@ export class GeneratorUI {
     };
   }
 
+  private buildZoneBiomesSection(): HTMLDivElement {
+    const section = this.buildSection('Zone Biomes');
+
+    const defaultIds = this.getDefaultZoneBiomes();
+    const zoneLabels = ['Center', 'NW', 'NE', 'SW', 'SE'];
+
+    // Layout: NW/NE row, Center row, SW/SE row
+    const grid = document.createElement('div');
+    grid.style.cssText = `
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    `;
+
+    this.zoneSelects = [];
+    for (let i = 0; i < 5; i++) {
+      this.zoneSelects.push(this.buildZoneSelect(defaultIds[i]));
+    }
+
+    // Row 1: NW, NE
+    grid.appendChild(this.wrapZoneSelect(zoneLabels[1], this.zoneSelects[1]));
+    grid.appendChild(this.wrapZoneSelect(zoneLabels[2], this.zoneSelects[2]));
+    // Row 2: Center (spans 2 cols)
+    const centerWrap = this.wrapZoneSelect(zoneLabels[0], this.zoneSelects[0]);
+    centerWrap.style.gridColumn = '1 / -1';
+    grid.appendChild(centerWrap);
+    // Row 3: SW, SE
+    grid.appendChild(this.wrapZoneSelect(zoneLabels[3], this.zoneSelects[3]));
+    grid.appendChild(this.wrapZoneSelect(zoneLabels[4], this.zoneSelects[4]));
+
+    section.appendChild(grid);
+
+    // Connectivity status
+    this.connectivityStatus = document.createElement('div');
+    this.connectivityStatus.style.cssText = 'margin-top: 8px; font-size: 11px; line-height: 1.5;';
+    section.appendChild(this.connectivityStatus);
+
+    this.updateConnectivityStatus();
+    return section;
+  }
+
+  private buildZoneSelect(defaultId: number): HTMLSelectElement {
+    const select = document.createElement('select');
+    select.style.cssText = SELECT_STYLE + ' width: 100%;';
+
+    for (const color of this.colors) {
+      const opt = document.createElement('option');
+      opt.value = String(color.id);
+      opt.textContent = color.name;
+      select.appendChild(opt);
+    }
+
+    select.value = String(defaultId);
+    select.addEventListener('change', () => this.updateConnectivityStatus());
+    return select;
+  }
+
+  private wrapZoneSelect(label: string, select: HTMLSelectElement): HTMLDivElement {
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display: flex; flex-direction: column; gap: 2px;';
+
+    const lbl = document.createElement('span');
+    lbl.textContent = label;
+    lbl.style.cssText = 'color: #666; font-size: 10px;';
+
+    wrapper.appendChild(lbl);
+    wrapper.appendChild(select);
+    return wrapper;
+  }
+
+  private getDefaultZoneBiomes(): number[] {
+    // 5 zones: [center, NW, NE, SW, SE]
+    const ids = this.colors.map(c => c.id);
+    if (ids.length >= 5) return ids.slice(0, 5);
+    const result: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      result.push(ids[i % ids.length]);
+    }
+    return result;
+  }
+
+  private updateConnectivityStatus(): void {
+    const biomes = this.zoneSelects.map(s => parseInt(s.value, 10));
+    const zoneLabels = ['Center', 'NW', 'NE', 'SW', 'SE'];
+
+    // Adjacent pairs: center touches all 4 corners, plus edge neighbors
+    const adjacentPairs: [number, number][] = [
+      [0, 1], [0, 2], [0, 3], [0, 4], // center ↔ each corner
+      [1, 2], [3, 4],                   // NW↔NE, SW↔SE (horizontal)
+      [1, 3], [2, 4],                   // NW↔SW, NE↔SE (vertical)
+    ];
+
+    const warnings: string[] = [];
+    let allGood = true;
+
+    for (const [a, b] of adjacentPairs) {
+      const colorA = biomes[a];
+      const colorB = biomes[b];
+      if (colorA === colorB) continue;
+      const dist = this.wangSet.colorDistance(colorA, colorB);
+      if (dist > 2) {
+        const nameA = this.colors.find(c => c.id === colorA)?.name ?? `Color ${colorA}`;
+        const nameB = this.colors.find(c => c.id === colorB)?.name ?? `Color ${colorB}`;
+        warnings.push(`${zoneLabels[a]}\u2194${zoneLabels[b]}: ${nameA}\u2194${nameB} (dist ${dist})`);
+        allGood = false;
+      }
+    }
+
+    this.connectivityStatus.replaceChildren();
+    if (allGood) {
+      this.connectivityStatus.style.color = '#6a6';
+      this.connectivityStatus.textContent = 'Good connectivity';
+    } else {
+      this.connectivityStatus.style.color = '#cc6';
+      this.connectivityStatus.appendChild(document.createTextNode('Wide transitions needed:'));
+      for (const w of warnings) {
+        this.connectivityStatus.appendChild(document.createElement('br'));
+        this.connectivityStatus.appendChild(document.createTextNode(`\u00a0\u00a0\u2022 ${w}`));
+      }
+    }
+  }
+
   private buildMapSizeSection(): HTMLDivElement {
     const section = this.buildSection('Map Size');
 
@@ -434,6 +587,62 @@ export class GeneratorUI {
 
     row.appendChild(this.pointCountSlider);
     row.appendChild(this.pointCountLabel);
+    section.appendChild(row);
+    return section;
+  }
+
+  private buildVarietySection(): HTMLDivElement {
+    const section = this.buildSection('Variety');
+
+    const row = document.createElement('div');
+    row.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+
+    this.varietySlider = document.createElement('input');
+    this.varietySlider.type = 'range';
+    this.varietySlider.min = '0';
+    this.varietySlider.max = '30';
+    this.varietySlider.step = '1';
+    this.varietySlider.value = '15';
+    this.varietySlider.style.cssText = `flex: 1; accent-color: ${ACCENT}; cursor: pointer;`;
+
+    this.varietyLabel = document.createElement('span');
+    this.varietyLabel.textContent = '15%';
+    this.varietyLabel.style.cssText = 'color: #999; font-size: 11px; min-width: 32px; text-align: right; font-variant-numeric: tabular-nums;';
+
+    this.varietySlider.addEventListener('input', () => {
+      this.varietyLabel.textContent = this.varietySlider.value + '%';
+    });
+
+    row.appendChild(this.varietySlider);
+    row.appendChild(this.varietyLabel);
+    section.appendChild(row);
+    return section;
+  }
+
+  private buildBoundaryNoiseSection(): HTMLDivElement {
+    const section = this.buildSection('Boundary Noise');
+
+    const row = document.createElement('div');
+    row.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+
+    this.boundaryNoiseSlider = document.createElement('input');
+    this.boundaryNoiseSlider.type = 'range';
+    this.boundaryNoiseSlider.min = '0';
+    this.boundaryNoiseSlider.max = '100';
+    this.boundaryNoiseSlider.step = '1';
+    this.boundaryNoiseSlider.value = '50';
+    this.boundaryNoiseSlider.style.cssText = `flex: 1; accent-color: ${ACCENT}; cursor: pointer;`;
+
+    this.boundaryNoiseLabel = document.createElement('span');
+    this.boundaryNoiseLabel.textContent = '50%';
+    this.boundaryNoiseLabel.style.cssText = 'color: #999; font-size: 11px; min-width: 32px; text-align: right; font-variant-numeric: tabular-nums;';
+
+    this.boundaryNoiseSlider.addEventListener('input', () => {
+      this.boundaryNoiseLabel.textContent = this.boundaryNoiseSlider.value + '%';
+    });
+
+    row.appendChild(this.boundaryNoiseSlider);
+    row.appendChild(this.boundaryNoiseLabel);
     section.appendChild(row);
     return section;
   }
@@ -561,8 +770,19 @@ export class GeneratorUI {
   private updateAlgorithmUI(): void {
     this.noiseBtn.style.cssText = this.algorithm === 'noise' ? BTN_ACTIVE : BTN_STYLE;
     this.voronoiBtn.style.cssText = this.algorithm === 'voronoi' ? BTN_ACTIVE : BTN_STYLE;
+    this.zonesBtn.style.cssText = this.algorithm === 'zones' ? BTN_ACTIVE : BTN_STYLE;
+
+    // Noise/Voronoi sections
+    this.biomesSection.style.display = this.algorithm !== 'zones' ? 'block' : 'none';
     this.scaleRow.style.display = this.algorithm === 'noise' ? 'block' : 'none';
     this.pointCountRow.style.display = this.algorithm === 'voronoi' ? 'block' : 'none';
+
+    // Zones sections
+    this.zoneBiomesSection.style.display = this.algorithm === 'zones' ? 'block' : 'none';
+    this.boundaryNoiseRow.style.display = this.algorithm === 'zones' ? 'block' : 'none';
+
+    // Variety shown for all algorithms
+    this.varietyRow.style.display = 'block';
   }
 
   // ── Seed ────────────────────────────────────────────────────────────
@@ -574,25 +794,34 @@ export class GeneratorUI {
   // ── Generation ──────────────────────────────────────────────────────
 
   private generate(): void {
-    const enabledBiomes = this.getEnabledBiomes();
-    if (enabledBiomes.length === 0) {
-      this.showFeedback('Select at least one biome', true);
-      return;
+    if (this.algorithm !== 'zones') {
+      const enabledBiomes = this.getEnabledBiomes();
+      if (enabledBiomes.length === 0) {
+        this.showFeedback('Select at least one biome', true);
+        return;
+      }
     }
 
     const width = this.clampInt(this.widthInput.value, 10, 256, 64);
     const height = this.clampInt(this.heightInput.value, 10, 256, 64);
     const seed = parseInt(this.seedInput.value, 10) || 12345;
+    const sprinkle = parseInt(this.varietySlider.value, 10) / 100;
 
     const settings: GeneratorSettings = {
       algorithm: this.algorithm,
       width,
       height,
       seed,
-      biomes: enabledBiomes,
+      biomes: this.getEnabledBiomes(),
       scale: parseFloat(this.scaleSlider.value),
       pointCount: parseInt(this.pointCountSlider.value, 10),
+      sprinkle,
     };
+
+    if (this.algorithm === 'zones') {
+      settings.zoneBiomes = this.zoneSelects.map(s => parseInt(s.value, 10));
+      settings.boundaryNoise = parseInt(this.boundaryNoiseSlider.value, 10) / 100;
+    }
 
     const t0 = performance.now();
     this.generatedColors = generateMap(settings, this.wangSet);
@@ -725,7 +954,7 @@ export class GeneratorUI {
       this.showFeedback(`Saved "${name}.json" successfully`);
     } catch (err) {
       console.error('Failed to save map:', err);
-      this.showFeedback('Save failed — check console', true);
+      this.showFeedback('Save failed \u2014 check console', true);
     } finally {
       this.saveBtn.disabled = false;
       this.saveBtn.style.opacity = '1';
