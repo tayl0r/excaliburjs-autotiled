@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bake": "tsx scripts/bake.ts"
+    "bake": "tsx scripts/bake.ts",
+    "bake:deploy": "tsx scripts/bake.ts && mkdir -p ../prompt-kings-server/spectator/data && rm -rf ../prompt-kings-server/spectator/data/tilesets && cp -r dist/baked ../prompt-kings-server/spectator/data/tilesets"
   },
   "dependencies": {
     "excalibur": "^0.30.0"

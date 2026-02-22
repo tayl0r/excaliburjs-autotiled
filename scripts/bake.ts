@@ -34,6 +34,7 @@ import {
   prefabToBinary,
   buildAtlas,
   generateIndex,
+  generateReadme,
   loadAllJsonFiles,
 } from './bake-lib.js';
 
@@ -111,6 +112,7 @@ async function main() {
 
   const indexContent = generateIndex(resolvedMaps, resolvedPrefabs, atlas.layout, registry.size);
   writeFileSync(join(OUTPUT_DIR, 'index.ts'), indexContent);
+  writeFileSync(join(OUTPUT_DIR, 'README.md'), generateReadme(atlas.layout, registry.size));
 
   console.log(`Bake complete! Output in ${OUTPUT_DIR}`);
   console.log(`  Atlas: ${atlas.layout.fileCount} file(s), ${atlas.layout.pixelSize}x${atlas.layout.pixelSize}px`);

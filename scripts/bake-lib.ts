@@ -529,6 +529,205 @@ export function generateIndex(
 }
 
 // ============================================================
+// README generation
+// ============================================================
+
+export function generateReadme(layout: AtlasLayout, tileCount: number): string {
+  return `# Tileset Data Loading Guide (PixiJS / TypeScript)
+
+## File Structure
+
+\`\`\`
+tileset-0.png          # Sprite atlas (${layout.pixelSize}x${layout.pixelSize}, ${TILE_SIZE}x${TILE_SIZE} tiles, ${layout.columns} columns)
+index.ts               # Typed metadata, interfaces, and loader functions
+data/maps/*.bin         # Binary tile data per map
+data/prefabs/*.bin      # Binary tile data per prefab
+\`\`\`
+
+## Quick Start
+
+\`\`\`typescript
+import { atlas, maps, loadMap } from "./index.js";
+
+// 1. Load the atlas as a PixiJS spritesheet
+const atlasTexture = await PIXI.Assets.load("tileset-0.png");
+
+// 2. Load a map
+const map = await loadMap(maps.test, ".");
+
+// 3. Render each layer (see detailed example below)
+\`\`\`
+
+## Atlas
+
+The atlas PNG (\`tileset-0.png\`) is a ${layout.pixelSize}x${layout.pixelSize} spritesheet containing ${tileCount} unique ${TILE_SIZE}x${TILE_SIZE} tiles packed left-to-right, top-to-bottom.
+
+\`\`\`
+atlas.tileWidth    = ${TILE_SIZE}      // pixels per tile
+atlas.tileHeight   = ${TILE_SIZE}
+atlas.columns      = ${layout.columns}      // tiles per row in the atlas
+atlas.tileCount    = ${tileCount}     // total unique tiles
+atlas.tilesPerFile = ${layout.tilesPerFile}   // max capacity per atlas file
+\`\`\`
+
+**Baked tile ID 0 = empty (no tile).** IDs start at 1.
+
+To get the source rectangle for a baked tile ID:
+
+\`\`\`typescript
+function getTileRect(bakedId: number) {
+  const index = bakedId - 1; // IDs are 1-based
+  const col = index % atlas.columns;
+  const row = Math.floor(index / atlas.columns);
+  return {
+    x: col * atlas.tileWidth,
+    y: row * atlas.tileHeight,
+    width: atlas.tileWidth,
+    height: atlas.tileHeight,
+  };
+}
+\`\`\`
+
+## Maps
+
+Each map has 9 layers rendered bottom-to-top. All tile matching and prefab stamping is pre-resolved — every cell is a final baked tile ID ready to draw.
+
+### Layer structure
+
+| Layer | Purpose |
+|-------|---------|
+| 0     | Base terrain (ground) |
+| 1     | Terrain overlay / decoration |
+| 2     | Objects (trees, buildings base) |
+| 3     | Objects upper (rooftops, canopy) |
+| 4     | Top overlay |
+| 5-8   | Overflow layers (used when prefabs are stacked on upper layers) |
+
+Layers are rendered in order 0 through 8. Each layer is a flat row-major array of \`width * height\` Uint16 values. Most upper layers will be mostly zeros (empty).
+
+### Map data format
+
+\`\`\`typescript
+interface BakedMap {
+  name: string;       // display name
+  width: number;      // grid width in tiles
+  height: number;     // grid height in tiles
+  tileWidth: number;  // ${TILE_SIZE}
+  tileHeight: number; // ${TILE_SIZE}
+  layerCount: number; // 9
+  layers: Uint16Array[]; // 9 arrays, each width*height values
+}
+\`\`\`
+
+Cell access: \`map.layers[layerIndex][y * map.width + x]\` returns the baked tile ID (0 = empty).
+
+### Loading a map
+
+\`\`\`typescript
+import { maps, loadMap } from "./index.js";
+
+// loadMap fetches the .bin file and parses it into typed Uint16Arrays
+const map = await loadMap(maps.test, ".");
+// map.layers[0][y * map.width + x] → baked tile ID
+\`\`\`
+
+### Full PixiJS rendering example
+
+\`\`\`typescript
+import * as PIXI from "pixi.js";
+import { atlas, maps, loadMap } from "./index.js";
+
+async function renderMap() {
+  const app = new PIXI.Application();
+  await app.init({ width: 800, height: 600 });
+
+  // Load atlas texture
+  const atlasTexture = await PIXI.Assets.load("tileset-0.png");
+  const baseTexture = atlasTexture;
+
+  // Pre-slice tile textures (skip ID 0 = empty)
+  const tileTextures: PIXI.Texture[] = [PIXI.Texture.EMPTY]; // index 0 = empty
+  for (let id = 1; id <= atlas.tileCount; id++) {
+    const col = (id - 1) % atlas.columns;
+    const row = Math.floor((id - 1) / atlas.columns);
+    const frame = new PIXI.Rectangle(
+      col * atlas.tileWidth,
+      row * atlas.tileHeight,
+      atlas.tileWidth,
+      atlas.tileHeight,
+    );
+    tileTextures.push(new PIXI.Texture({ source: baseTexture.source, frame }));
+  }
+
+  // Load map
+  const map = await loadMap(maps.test, ".");
+
+  // Create a container per layer, rendered in order
+  const mapContainer = new PIXI.Container();
+  app.stage.addChild(mapContainer);
+
+  for (let li = 0; li < map.layerCount; li++) {
+    const layerContainer = new PIXI.Container();
+    mapContainer.addChild(layerContainer);
+
+    const layer = map.layers[li];
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) {
+        const tileId = layer[y * map.width + x];
+        if (tileId === 0) continue; // empty
+
+        const sprite = new PIXI.Sprite(tileTextures[tileId]);
+        sprite.x = x * atlas.tileWidth;
+        sprite.y = y * atlas.tileHeight;
+        layerContainer.addChild(sprite);
+      }
+    }
+  }
+}
+\`\`\`
+
+For large maps, consider using \`PIXI.TilingSprite\`, a \`CompositeTilemap\` from \`@pixi/tilemap\`, or rendering each layer to a \`PIXI.RenderTexture\` instead of creating individual sprites per tile.
+
+## Prefabs
+
+Prefabs are standalone reusable tile arrangements (buildings, objects). They are also pre-baked into maps at their placed positions, so you only need standalone prefabs if you want to place them dynamically at runtime.
+
+\`\`\`typescript
+interface BakedPrefab {
+  name: string;
+  width: number;      // bounding box width in tiles
+  height: number;     // bounding box height in tiles
+  anchorX: number;    // anchor tile X within bounding box
+  anchorY: number;    // anchor tile Y within bounding box
+  layerCount: number; // 5
+  layers: Uint16Array[];
+}
+\`\`\`
+
+Prefabs have 5 layers. When placing on a map, prefab layer 0 goes on the target map layer, layer 1 on the next map layer up, etc.
+
+\`\`\`typescript
+import { prefabs, loadPrefab } from "./index.js";
+
+const prefab = await loadPrefab(prefabs.house_front, ".");
+// Place at world position, offset by anchor
+const worldX = targetTileX - prefab.anchorX;
+const worldY = targetTileY - prefab.anchorY;
+\`\`\`
+
+## Key Facts
+
+- **Tile size**: ${TILE_SIZE}x${TILE_SIZE} pixels
+- **Tile ID 0**: Always empty (skip rendering)
+- **Tile IDs are 1-based**: ID 1 is atlas position (0,0), ID 2 is (1,0), etc.
+- **Row-major order**: \`layers[layer][y * width + x]\`
+- **9 map layers**: Render bottom (0) to top (8) for correct z-ordering
+- **5 prefab layers**: Stack onto consecutive map layers when placing
+- **Pre-baked**: All autotile matching and flip transforms are pre-resolved. No runtime tile logic needed — just draw the tile for each ID.
+`;
+}
+
+// ============================================================
 // File loading helpers
 // ============================================================
 
