@@ -404,3 +404,67 @@ When the user paints color C at position (x, y):
 4. **Find best match**: Search `wangSet.variants` for the variant whose WangId best matches the desired one, weighted by tile and color probabilities
 5. **Set cell**: `map.setCellAt(x, y, bestMatch.cell)`
 6. **Render**: The engine reads the Cell's `tileId`, `tilesetIndex`, and flip flags to draw the correct sprite
+
+---
+
+## Baked Output (`dist/baked/`)
+
+The bake pipeline (`npm run bake`) resolves all maps and prefabs at build time and outputs a compact, engine-agnostic format. No autotile engine needed at runtime — consumers just draw tiles from the atlas.
+
+### Output files
+
+```text
+dist/baked/
+  tileset-0.png              # Atlas PNG (square, power-of-2, max 2048px)
+  tileset-1.png              # Additional atlas if tiles exceed 16384
+  data/maps/<slug>.bin        # Binary tile data per map
+  data/prefabs/<slug>.bin     # Binary tile data per prefab
+  index.ts                    # Typed metadata + loader functions
+```
+
+### Atlas PNG
+
+All unique tiles used across maps and prefabs are packed into a single spritesheet. Each unique `(tilesetIndex, tileId, flipH, flipV, flipD)` combination is a separate tile in the atlas — flips are pre-rendered so consumers don't need transform logic.
+
+- **Tile size**: 16x16 pixels
+- **Layout**: Left-to-right, top-to-bottom. Baked ID 1 is at position (0,0), ID 2 at (1,0), etc.
+- **Atlas sizing**: Smallest square power-of-2 that fits all tiles. If > 2048px, splits into `tileset-0.png`, `tileset-1.png`, etc.
+- **Baked ID 0** = empty (no tile). IDs start at 1.
+- **Consumer formula**: `atlasCol = (bakedId - 1) % columns`, `atlasRow = floor((bakedId - 1) / columns)`
+
+### Binary map data (`.bin`)
+
+Raw little-endian Uint16 values. Layers are concatenated sequentially:
+
+```text
+[layer0: width*height Uint16 values][layer1: width*height Uint16 values]...[layer8]
+```
+
+Total size: `width * height * 9 * 2` bytes (9 layers per map). Each value is a baked tile ID (0 = empty).
+
+### Binary prefab data (`.bin`)
+
+Same format as maps but with 5 layers and the prefab's bounding-box dimensions:
+
+```text
+[layer0: width*height Uint16 values]...[layer4]
+```
+
+Total size: `width * height * 5 * 2` bytes. Prefab coordinates are rebased to (0,0) origin. The anchor is adjusted: `bakedAnchorX = originalAnchorX - minX`.
+
+### index.ts
+
+Generated TypeScript module with:
+
+- `atlas` — metadata: version, tileWidth, tileHeight, files[], columns, tileCount, tilesPerFile
+- `BakedMap` / `BakedPrefab` — interfaces for loaded data
+- `maps` — metadata for each map (name, dimensions, layerCount, dataFile path)
+- `prefabs` — metadata for each prefab (name, dimensions, anchor, layerCount, dataFile path)
+- `loadMap(meta, baseUrl)` — fetch + parse binary into typed `BakedMap`
+- `loadPrefab(meta, baseUrl)` — fetch + parse binary into typed `BakedPrefab`
+
+Maps with placed prefabs have prefab tiles stamped directly into the map layers. Prefabs are also exported standalone for reuse.
+
+### Determinism
+
+Output is fully deterministic (seeded PRNG). Running `npm run bake` twice on the same input produces identical output.

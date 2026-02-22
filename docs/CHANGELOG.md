@@ -1,7 +1,7 @@
 # Implementation Status — Plans vs. Codebase
 
 > Compares the original specification documents and implementation plans in `./docs/`
-> against what is actually implemented in `src/`. Last updated: 2026-02-18.
+> against what is actually implemented in `src/`. Last updated: 2026-02-21.
 
 ---
 
@@ -694,3 +694,30 @@ This was triggered by deleting wang colors in the tileset editor: wangtiles whos
 | Map painter: New button (Cmd+N) for fresh maps | `src/engine/game-scene.ts` |
 
 Verification: `tsc --noEmit` clean, 245 tests passing.
+
+---
+
+## 2026-02-21: Tile Bake Pipeline
+
+New CLI build script that extracts in-use tiles from source PNGs, packs them into a compact atlas, resolves all map/prefab tiles at build time, and outputs binary data + typed TypeScript loaders for engine-agnostic consumption.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `scripts/bake.ts` CLI entry | Done | Seeded PRNG (mulberry32) for deterministic output, monkey-patches Math.random before core imports |
+| `scripts/bake-lib.ts` library | Done | Extracted testable logic: TileRegistry, atlas sizing, map/prefab resolution, binary serialization, index generation |
+| Tile deduplication | Done | TileRegistry assigns sequential baked IDs (0=empty, 1+=tiles), keyed by `tilesetIndex:tileId:flipH:flipV:flipD` |
+| WangSet matching at bake time | Done | Full init sequence: loadMetadata, generateAllVariants, setVariants, computeColorDistances, setDistanceMatrix/setNextHopMatrix, resolveAllTiles |
+| Prefab stamping into maps | Done | Placed prefabs stamped into resolved map layers with anchor-offset calculation, OOB tiles clipped |
+| Standalone prefab export | Done | Sparse-to-dense grid conversion with bounding box and rebased anchor |
+| Atlas PNG generation | Done | Square power-of-2, smallest that fits, max 2048px, splits into multiple files if needed. Uses sharp for pixel extraction + composition |
+| Flip pre-rendering | Done | Each unique (tile + flip combo) rendered as distinct tile in atlas |
+| Binary output | Done | Raw Uint16LE per layer, concatenated. Maps: width*height*9*2 bytes, Prefabs: width*height*5*2 bytes |
+| Typed index.ts | Done | Atlas metadata, BakedMap/BakedPrefab interfaces, map/prefab metadata objects, fetch-based loader functions |
+| Identifier sanitization | Done | Export names from display names, handles spaces, leading digits, reserved words |
+| npm script | Done | `npm run bake` via tsx |
+| Unit tests (26) | Done | sanitizeSlug, TileRegistry, computeAtlasLayout, resolvePrefab, stampPrefab |
+| Integration tests (7) | Done | Full pipeline on real assets, atlas validation, binary sizes, tile ID ranges, TypeScript validity, determinism |
+
+**Design doc:** `docs/plans/2026-02-21-bake-pipeline.md`
+
+Verification: `tsc --noEmit` clean, 278 tests passing.
