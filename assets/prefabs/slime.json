@@ -5,9 +5,75 @@
     [],
     [
       {
+        "x": 5,
+        "y": 2,
+        "tileId": 0,
+        "tilesetIndex": 9
+      },
+      {
+        "x": 6,
+        "y": 2,
+        "tileId": 1,
+        "tilesetIndex": 9
+      },
+      {
+        "x": 7,
+        "y": 2,
+        "tileId": 2,
+        "tilesetIndex": 9
+      },
+      {
+        "x": 5,
+        "y": 3,
+        "tileId": 12,
+        "tilesetIndex": 9
+      },
+      {
+        "x": 6,
+        "y": 3,
+        "tileId": 13,
+        "tilesetIndex": 9
+      },
+      {
+        "x": 7,
+        "y": 3,
+        "tileId": 14,
+        "tilesetIndex": 9
+      },
+      {
+        "x": 5,
+        "y": 4,
+        "tileId": 24,
+        "tilesetIndex": 9
+      },
+      {
+        "x": 6,
+        "y": 4,
+        "tileId": 25,
+        "tilesetIndex": 9
+      },
+      {
+        "x": 7,
+        "y": 4,
+        "tileId": 26,
+        "tilesetIndex": 9
+      },
+      {
+        "x": 5,
+        "y": 5,
+        "tileId": 36,
+        "tilesetIndex": 9
+      },
+      {
         "x": 6,
         "y": 5,
-        "tileId": 0,
+        "tileId": 37,
+        "tilesetIndex": 9
+      },
+      {
+        "x": 7,
+        "y": 5,
+        "tileId": 38,
         "tilesetIndex": 9
       }
     ],
