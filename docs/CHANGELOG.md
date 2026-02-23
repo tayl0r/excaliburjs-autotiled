@@ -782,3 +782,19 @@ Three related improvements to animation visibility and bake pipeline completenes
 | 11 new tests for registerAnimationFrames, getBakedId, generateIndex animations | `tests/scripts/bake.test.ts` |
 
 Verification: `tsc --noEmit` clean, 307 tests passing.
+
+---
+
+## 2026-02-23: Prefab Canvas Animated Tiles + "A" Badge
+
+Tiles with animation data now visually animate in the prefab canvas and show a green "A" badge.
+
+| Change | Files |
+|--------|-------|
+| Import `AnimationController`, populate from wangsets in `buildAnimController()` | `src/prefab/prefab-canvas.ts` |
+| `startAnimLoop()` — rAF loop that only re-renders when frames change | `src/prefab/prefab-canvas.ts` |
+| `drawAnimatedTile()` — resolves animation frame at call site, keeps `drawTile()` unchanged for hover/ghost previews | `src/prefab/prefab-canvas.ts` |
+| `drawAnimBadges()` — green "A" badge on animated tiles across all visible layers | `src/prefab/prefab-canvas.ts` |
+| Guard canvas dimension reset to avoid context state reset on 60fps frames | `src/prefab/prefab-canvas.ts` |
+
+Verification: `tsc --noEmit` clean, 307 tests passing.

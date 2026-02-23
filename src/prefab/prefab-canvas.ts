@@ -3,6 +3,7 @@ import { NUM_PREFAB_LAYERS } from '../core/layers.js';
 import { type PrefabTool, PrefabEditorState } from './prefab-state.js';
 import { colRowFromTileId, computeTileBounds } from '../utils/tile-math.js';
 import { buildCanvasLayout, drawGridLines, attachWheelZoom } from './canvas-helpers.js';
+import { AnimationController } from '../engine/animation-controller.js';
 
 function cursorColorForTool(tool: PrefabTool): string {
   switch (tool) {
@@ -41,6 +42,10 @@ export class PrefabCanvasPanel {
   // Copy tool state
   private copySelecting = false;
 
+  // Animation state
+  private animController: AnimationController | undefined;
+  private animFrameId: number | null = null;
+
   constructor(state: PrefabEditorState, images: HTMLImageElement[]) {
     this.state = state;
     this.images = images;
@@ -64,6 +69,8 @@ export class PrefabCanvasPanel {
 
     this.updateStatusBar();
     this.render();
+    this.buildAnimController();
+    this.startAnimLoop();
   }
 
   private updateStatusBar(): void {
@@ -89,6 +96,31 @@ export class PrefabCanvasPanel {
     this.dragStartY = -1;
     this.dragCurrentX = -1;
     this.dragCurrentY = -1;
+  }
+
+  private buildAnimController(): void {
+    const controller = new AnimationController();
+    for (const ws of this.state.metadata.wangsets) {
+      for (const wt of ws.wangtiles) {
+        if (wt.animation) {
+          controller.addTileAnimation(wt.tileid, wt.tileset ?? 0, wt.animation);
+        }
+      }
+    }
+    this.animController = controller.isEmpty ? undefined : controller;
+  }
+
+  private startAnimLoop(): void {
+    if (!this.animController) return;
+    let lastTime = performance.now();
+    const tick = (now: number) => {
+      const delta = now - lastTime;
+      lastTime = now;
+      const changed = this.animController!.update(delta);
+      if (changed.length > 0) this.render();
+      this.animFrameId = requestAnimationFrame(tick);
+    };
+    this.animFrameId = requestAnimationFrame(tick);
   }
 
   private isTileSelected(gx: number, gy: number): boolean {
@@ -314,6 +346,44 @@ export class PrefabCanvasPanel {
     this.ctx.drawImage(img, sx, sy, ts.tileWidth, ts.tileHeight, destX, destY, tw, th);
   }
 
+  private drawAnimatedTile(tile: PrefabTile, destX: number, destY: number, tw: number, th: number): void {
+    if (this.animController) {
+      const key = this.animController.getAnimationKey(tile.tilesetIndex, tile.tileId);
+      if (key) {
+        const frame = this.animController.getCurrentFrame(key);
+        if (frame && frame.tileId >= 0) {
+          this.drawTile({ ...tile, tileId: frame.tileId, tilesetIndex: frame.tileset }, destX, destY, tw, th);
+          return;
+        }
+      }
+    }
+    this.drawTile(tile, destX, destY, tw, th);
+  }
+
+  private drawAnimBadges(prefab: SavedPrefab, tw: number, th: number): void {
+    if (!this.animController) return;
+    const activeLayer = this.state.activeLayer;
+    const visibility = this.state.visibilityMode;
+
+    for (let i = 0; i < NUM_PREFAB_LAYERS; i++) {
+      const layer = prefab.layers[i];
+      if (!layer || layer.length === 0) continue;
+      if (i !== activeLayer && visibility === 'hidden') continue;
+
+      for (const tile of layer) {
+        if (!this.animController.getAnimationKey(tile.tilesetIndex, tile.tileId)) continue;
+        const x = tile.x * tw + tw - 14;
+        const y = tile.y * th + 2;
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(x, y, 12, 12);
+        this.ctx.fillStyle = '#0f0';
+        this.ctx.font = 'bold 9px monospace';
+        this.ctx.textBaseline = 'top';
+        this.ctx.fillText('A', x + 2, y + 2);
+      }
+    }
+  }
+
   private drawSelectionRect(tw: number, th: number, fillColor: string, strokeColor: string): void {
     const minX = Math.min(this.selectStartX, this.selectEndX);
     const maxX = Math.max(this.selectStartX, this.selectEndX);
@@ -349,8 +419,10 @@ export class PrefabCanvasPanel {
 
     const cw = canvasW * tw;
     const ch = canvasH * th;
-    this.canvas.width = cw;
-    this.canvas.height = ch;
+    if (this.canvas.width !== cw || this.canvas.height !== ch) {
+      this.canvas.width = cw;
+      this.canvas.height = ch;
+    }
 
     this.ctx.imageSmoothingEnabled = false;
     this.ctx.clearRect(0, 0, cw, ch);
@@ -374,10 +446,12 @@ export class PrefabCanvasPanel {
 
       this.ctx.globalAlpha = (i !== activeLayer && visibility === 'highlight') ? 0.25 : 1.0;
       for (const tile of layer) {
-        this.drawTile(tile, tile.x * tw, tile.y * th, tw, th);
+        this.drawAnimatedTile(tile, tile.x * tw, tile.y * th, tw, th);
       }
     }
     this.ctx.globalAlpha = 1.0;
+
+    this.drawAnimBadges(prefab, tw, th);
 
     // Draw anchor highlight
     this.ctx.strokeStyle = '#ff4444';
