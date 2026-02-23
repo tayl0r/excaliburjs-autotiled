@@ -63,6 +63,34 @@
       "tileHeight": 16,
       "columns": 39,
       "tileCount": 1014
+    },
+    {
+      "tilesetImage": "monster1.png",
+      "tileWidth": 60,
+      "tileHeight": 64,
+      "columns": 12,
+      "tileCount": 96
+    },
+    {
+      "tilesetImage": "monster2.png",
+      "tileWidth": 60,
+      "tileHeight": 64,
+      "columns": 12,
+      "tileCount": 96
+    },
+    {
+      "tilesetImage": "monster3.png",
+      "tileWidth": 60,
+      "tileHeight": 64,
+      "columns": 12,
+      "tileCount": 96
+    },
+    {
+      "tilesetImage": "monster4.png",
+      "tileWidth": 60,
+      "tileHeight": 64,
+      "columns": 12,
+      "tileCount": 96
     }
   ],
   "transformations": {
