@@ -626,3 +626,124 @@ describe('EditorState per-tile animation', () => {
     expect(count).toBe(1);
   });
 });
+
+describe('EditorState animation-only stubs for untagged tiles', () => {
+  function stateWithWangSet(): EditorState {
+    const state = new EditorState(makeMetadata());
+    state.addWangSet('Test', 'corner');
+    state.addColor('Grass');
+    return state;
+  }
+
+  const stubAnim: TileAnimation = {
+    frameDuration: 200,
+    pattern: 'loop',
+    frames: [
+      { tileId: 5, tileset: 0 },
+      { tileId: 8, tileset: 0 },
+    ],
+  };
+
+  it('setTileAnimation creates stub WangTile for untagged tile', () => {
+    const state = stateWithWangSet();
+    // Tile 5 has no WangTile entry
+    expect(state.getWangTile(5)).toBeUndefined();
+    state.setTileAnimation(5, stubAnim);
+    const wt = state.getWangTile(5);
+    expect(wt).toBeDefined();
+    expect(wt!.wangid).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(wt!.animation).toBeDefined();
+    expect(wt!.animation!.frameDuration).toBe(200);
+  });
+
+  it('setTileAnimation(undefined) removes stub when wangid is all zeros', () => {
+    const state = stateWithWangSet();
+    state.setTileAnimation(5, stubAnim);
+    expect(state.getWangTile(5)).toBeDefined();
+    state.setTileAnimation(5, undefined);
+    expect(state.getWangTile(5)).toBeUndefined();
+  });
+
+  it('setTileAnimation(undefined) keeps WangTile when wangid has non-zero values', () => {
+    const state = stateWithWangSet();
+    // Tag tile 5 with a real wangid, then add animation
+    state.setWangId(5, [0, 1, 0, 1, 0, 1, 0, 1]);
+    state.setTileAnimation(5, stubAnim);
+    expect(state.getWangTile(5)!.animation).toBeDefined();
+    // Clear animation — tile should remain because it has a real wangid
+    state.setTileAnimation(5, undefined);
+    expect(state.getWangTile(5)).toBeDefined();
+    expect(state.getWangTile(5)!.animation).toBeUndefined();
+  });
+
+  it('undo restores state before stub creation', () => {
+    const state = stateWithWangSet();
+    state.setTileAnimation(5, stubAnim);
+    expect(state.getWangTile(5)).toBeDefined();
+    state.undo();
+    expect(state.getWangTile(5)).toBeUndefined();
+  });
+
+  it('setTileAnimationMulti creates stubs for multiple untagged tiles', () => {
+    const state = stateWithWangSet();
+    state.setTileAnimationMulti([5, 6, 7], stubAnim);
+    expect(state.getWangTile(5)!.animation).toBeDefined();
+    expect(state.getWangTile(6)!.animation).toBeDefined();
+    expect(state.getWangTile(7)!.animation).toBeDefined();
+    // All should have zero wangids
+    expect(state.getWangTile(5)!.wangid).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+  });
+
+  it('setTileAnimationMulti(undefined) removes stubs for all-zero wangids', () => {
+    const state = stateWithWangSet();
+    state.setTileAnimationMulti([5, 6], stubAnim);
+    state.setTileAnimationMulti([5, 6], undefined);
+    expect(state.getWangTile(5)).toBeUndefined();
+    expect(state.getWangTile(6)).toBeUndefined();
+  });
+
+  it('setTileAnimationMulti undo restores state', () => {
+    const state = stateWithWangSet();
+    state.setTileAnimationMulti([5, 6, 7], stubAnim);
+    state.undo();
+    expect(state.getWangTile(5)).toBeUndefined();
+    expect(state.getWangTile(6)).toBeUndefined();
+    expect(state.getWangTile(7)).toBeUndefined();
+  });
+
+  it('pasteTileAnimation creates stubs for untagged paste targets', () => {
+    const state = stateWithWangSet();
+    // Tag tile 0 and give it an animation
+    state.setWangId(0, [0, 1, 0, 1, 0, 1, 0, 1]);
+    state.setTileAnimation(0, {
+      frameDuration: 200,
+      pattern: 'loop',
+      frames: [
+        { tileId: 0, tileset: 0 },
+        { tileId: 3, tileset: 0 },
+      ],
+    });
+    state.selectTile(0);
+    state.copyTileAnimation();
+
+    // Select untagged tile 5 and paste
+    state.selectTile(5);
+    state.pasteTileAnimation();
+
+    const wt = state.getWangTile(5);
+    expect(wt).toBeDefined();
+    expect(wt!.wangid).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(wt!.animation).toBeDefined();
+    expect(wt!.animation!.frames[0].tileId).toBe(5);
+    expect(wt!.animation!.frames[1].tileId).toBe(8);
+  });
+
+  it('setTileAnimation is a no-op for undefined on untagged tile', () => {
+    const state = stateWithWangSet();
+    let count = 0;
+    state.on('metadataChanged', () => count++);
+    state.setTileAnimation(5, undefined);
+    expect(count).toBe(0);
+    expect(state.getWangTile(5)).toBeUndefined();
+  });
+});

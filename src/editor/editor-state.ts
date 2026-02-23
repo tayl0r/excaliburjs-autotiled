@@ -567,28 +567,47 @@ export class EditorState {
     else wt.animation = animation;
   }
 
-  /** Set or clear animation on a WangTile (undoable) */
+  /** Set or clear animation on a WangTile (undoable). Creates a stub WangTile for untagged tiles. */
   setTileAnimation(tileId: number, animation: TileAnimation | undefined): void {
     const ws = this.activeWangSet;
     if (!ws) return;
-    const wt = this.findWangTile(ws, tileId);
+    let wt = this.findWangTile(ws, tileId);
+    if (!wt && animation) {
+      // Create animation-only stub
+      this.saveSnapshot();
+      wt = { tileid: tileId, wangid: [0, 0, 0, 0, 0, 0, 0, 0], tileset: this._activeTilesetIndex };
+      ws.wangtiles.push(wt);
+      wt.animation = animation;
+      this.emit('metadataChanged');
+      return;
+    }
     if (!wt) return;
     this.saveSnapshot();
     this.applyAnimation(wt, animation);
+    // Clean up stub if animation removed and wangid is all zeros
+    if (!animation && wt.wangid.every(c => c === 0)) {
+      ws.wangtiles.splice(ws.wangtiles.indexOf(wt), 1);
+    }
     this.emit('metadataChanged');
   }
 
-  /** Set animation on multiple WangTiles in one undo snapshot */
+  /** Set animation on multiple WangTiles in one undo snapshot. Creates stubs for untagged tiles. */
   setTileAnimationMulti(tileIds: number[], animation: TileAnimation | undefined): void {
     const ws = this.activeWangSet;
     if (!ws || tileIds.length === 0) return;
-    const targets = tileIds
-      .map(id => this.findWangTile(ws, id))
-      .filter((wt): wt is WangTileData => wt !== undefined);
-    if (targets.length === 0) return;
     this.saveSnapshot();
-    for (const wt of targets) {
+    for (const id of tileIds) {
+      let wt = this.findWangTile(ws, id);
+      if (!wt && animation) {
+        wt = { tileid: id, wangid: [0, 0, 0, 0, 0, 0, 0, 0], tileset: this._activeTilesetIndex };
+        ws.wangtiles.push(wt);
+      }
+      if (!wt) continue;
       this.applyAnimation(wt, animation ? structuredClone(animation) : undefined);
+      // Clean up stub if animation removed and wangid is all zeros
+      if (!animation && wt.wangid.every(c => c === 0)) {
+        ws.wangtiles.splice(ws.wangtiles.indexOf(wt), 1);
+      }
     }
     this.emit('metadataChanged');
   }
@@ -604,7 +623,7 @@ export class EditorState {
     this.emit('clipboardChanged');
   }
 
-  /** Paste animation to selected tile(s), computing frames per-tile using stored offset */
+  /** Paste animation to selected tile(s), computing frames per-tile using stored offset. Creates stubs for untagged tiles. */
   pasteTileAnimation(): void {
     if (!this._animationClipboard) return;
     const ws = this.activeWangSet;
@@ -614,13 +633,13 @@ export class EditorState {
     if (tileIds.length === 0 && this._selectedTileId >= 0) tileIds.push(this._selectedTileId);
     if (tileIds.length === 0) return;
 
-    const targets = tileIds
-      .map(id => this.findWangTile(ws, id))
-      .filter((wt): wt is WangTileData => wt !== undefined);
-    if (targets.length === 0) return;
-
     this.saveSnapshot();
-    for (const wt of targets) {
+    for (const id of tileIds) {
+      let wt = this.findWangTile(ws, id);
+      if (!wt) {
+        wt = { tileid: id, wangid: [0, 0, 0, 0, 0, 0, 0, 0], tileset: this._activeTilesetIndex };
+        ws.wangtiles.push(wt);
+      }
       wt.animation = this.buildAnimationForTile(animation, wt.tileid, wt.tileset ?? this._activeTilesetIndex, offset);
     }
     this.emit('metadataChanged');

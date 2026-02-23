@@ -3623,5 +3623,13 @@
       0,
       0
     ]
+  ],
+  "placedPrefabs": [
+    {
+      "prefabName": "slime",
+      "x": 6,
+      "y": 6,
+      "layer": 0
+    }
   ]
 }

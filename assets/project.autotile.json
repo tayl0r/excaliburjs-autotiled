@@ -6207,6 +6207,134 @@
             2
           ],
           "tileset": 0
+        },
+        {
+          "tileid": 0,
+          "wangid": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "tileset": 9,
+          "animation": {
+            "frameDuration": 300,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 0,
+                "tileset": 9
+              },
+              {
+                "tileId": 1,
+                "tileset": 9
+              },
+              {
+                "tileId": 2,
+                "tileset": 9
+              }
+            ]
+          }
+        },
+        {
+          "tileid": 12,
+          "wangid": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "tileset": 9,
+          "animation": {
+            "frameDuration": 300,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 12,
+                "tileset": 9
+              },
+              {
+                "tileId": 13,
+                "tileset": 9
+              },
+              {
+                "tileId": 14,
+                "tileset": 9
+              }
+            ]
+          }
+        },
+        {
+          "tileid": 24,
+          "wangid": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "tileset": 9,
+          "animation": {
+            "frameDuration": 300,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 24,
+                "tileset": 9
+              },
+              {
+                "tileId": 25,
+                "tileset": 9
+              },
+              {
+                "tileId": 26,
+                "tileset": 9
+              }
+            ]
+          }
+        },
+        {
+          "tileid": 36,
+          "wangid": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "tileset": 9,
+          "animation": {
+            "frameDuration": 300,
+            "pattern": "ping-pong",
+            "frames": [
+              {
+                "tileId": 36,
+                "tileset": 9
+              },
+              {
+                "tileId": 37,
+                "tileset": 9
+              },
+              {
+                "tileId": 38,
+                "tileset": 9
+              }
+            ]
+          }
         }
       ]
     }

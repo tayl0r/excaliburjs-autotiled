@@ -217,9 +217,7 @@ export class InspectorPanel {
     if (tileId < 0) return;
 
     const wt = this.state.getWangTile(tileId);
-    if (!wt) return;
-
-    const anim = wt.animation;
+    const anim = wt?.animation;
 
     // Section label
     const sectionLabel = document.createElement('div');

@@ -67,7 +67,7 @@ function sanitizeWangsets(data: Record<string, unknown>): number {
         return !isActive || color === 0;
       });
 
-      return !allActiveZero;
+      return !allActiveZero || !!((wt as Record<string, unknown>).animation);
     });
     totalRemoved += before - (ws.wangtiles as unknown[]).length;
   }
