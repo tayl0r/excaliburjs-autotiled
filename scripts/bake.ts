@@ -116,7 +116,7 @@ async function main() {
     writeFileSync(join(OUTPUT_DIR, 'data', 'prefabs', `${rp.slug}.bin`), prefabToBinary(rp));
   }
 
-  const indexContent = generateIndex(resolvedMaps, resolvedPrefabs, atlasLayout, registry.size);
+  const indexContent = generateIndex(resolvedMaps, resolvedPrefabs, atlasLayout, registry.size, oversizeTiles);
   writeFileSync(join(OUTPUT_DIR, 'index.ts'), indexContent);
   writeFileSync(join(OUTPUT_DIR, 'README.md'), generateReadme(atlasLayout, registry.size));
 

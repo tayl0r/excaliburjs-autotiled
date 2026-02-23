@@ -6,9 +6,11 @@ import {
   resolvePrefab,
   stampPrefab,
   remapLayers,
+  generateIndex,
   TILE_SIZE,
   MAX_ATLAS_PX,
 } from '../../scripts/bake-lib.js';
+import type { OversizeTileMeta, AtlasLayout } from '../../scripts/bake-lib.js';
 import { createCell, EMPTY_CELL } from '@core/cell.js';
 import type { SavedPrefab, PrefabTile } from '@core/prefab-schema.js';
 import type { PlacedPrefab } from '@core/map-schema.js';
@@ -415,5 +417,33 @@ describe('stampPrefab', () => {
     // Actually stampPrefab registers then checks bounds... let me re-check the code
     // No, it checks bounds first then registers. So only 1 tile registered.
     expect(registry.size).toBe(1);
+  });
+});
+
+// ============================================================
+// generateIndex
+// ============================================================
+
+describe('generateIndex', () => {
+  const baseLayout: AtlasLayout = {
+    pixelSize: 256, columns: 16, tilesPerFile: 256, fileCount: 1,
+  };
+
+  it('includes oversizeTiles when present', () => {
+    const meta: OversizeTileMeta[] = [{
+      bakedId: 5, atlasX: 64, atlasY: 128,
+      sourceWidth: 60, sourceHeight: 64,
+      renderOffsetX: -22, renderOffsetY: -48,
+    }];
+    const output = generateIndex([], [], baseLayout, 10, meta);
+    expect(output).toContain('oversizeTiles');
+    expect(output).toContain('atlasX: 64');
+    expect(output).toContain('sourceWidth: 60');
+    expect(output).toContain('renderOffsetX: -22');
+  });
+
+  it('emits empty oversizeTiles when none present', () => {
+    const output = generateIndex([], [], baseLayout, 10, []);
+    expect(output).toContain('oversizeTiles: {}');
   });
 });
