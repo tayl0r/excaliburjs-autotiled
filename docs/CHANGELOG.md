@@ -728,3 +728,23 @@ New CLI build script that extracts in-use tiles from source PNGs, packs them int
 **Design doc:** `docs/plans/2026-02-21-bake-pipeline.md`
 
 Verification: `tsc --noEmit` clean, 291 tests passing.
+
+---
+
+## 2026-02-23: Oversized Tile Bake Support
+
+Added support for baking non-16×16 tiles (e.g., 60×64 monster sprites). Oversized tiles are packed in aligned blocks in the atlas, and consumer metadata includes source rects and render offsets.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| TileRegistry dimension tracking | Done | `sourceWidth`/`sourceHeight` on TileEntry, `isOversized()`, `normalEntries()`/`oversizedEntries()` |
+| Baked ID stabilization | Done | `finalize()` reassigns IDs so normal tiles are contiguous 1..N, `remapLayers()` updates binary data |
+| Atlas layout sizing | Done | `computeAtlasLayout` accounts for oversized block slots, enforces minimum columns |
+| Atlas packing | Done | Two-phase: normal tiles sequential, oversized in aligned blocks; source extraction uses tileset metadata |
+| Generated index metadata | Done | `atlas.oversizeTiles` table with atlasX/Y, sourceWidth/Height, renderOffsetX/Y |
+| Generated README | Done | Documents oversized tile lookup and render offset usage |
+| Slime prefab | Done | Simplified from 12 sub-tile entries to single 60×64 monster tile |
+
+**Design doc:** `docs/plans/2026-02-23-oversized-tile-bake-design.md`
+
+Verification: `tsc --noEmit` clean, 291 tests passing.

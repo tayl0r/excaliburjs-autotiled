@@ -431,6 +431,8 @@ All unique tiles used across maps and prefabs are packed into a single spriteshe
 - **Atlas sizing**: Smallest square power-of-2 that fits all tiles. If > 2048px, splits into `tileset-0.png`, `tileset-1.png`, etc.
 - **Baked ID 0** = empty (no tile). IDs start at 1.
 - **Consumer formula**: `atlasCol = (bakedId - 1) % columns`, `atlasRow = floor((bakedId - 1) / columns)`
+- **Oversized tiles**: Tiles larger than 16×16 (e.g., 60×64 monster sprites) are packed in aligned blocks after normal tiles. A 60×64 tile occupies a 4×4 block (64×64 pixels). Their positions are listed in `atlas.oversizeTiles` rather than derived from baked ID.
+- **Render offsets**: Oversized tiles are bottom-center anchored to their 16×16 grid cell. `renderOffsetX` centers horizontally, `renderOffsetY` aligns the bottom edge. For 60×64: offsetX=-22, offsetY=-48.
 
 ### Binary map data (`.bin`)
 
@@ -456,7 +458,7 @@ Total size: `width * height * 5 * 2` bytes. Prefab coordinates are rebased to (0
 
 Generated TypeScript module with:
 
-- `atlas` — metadata: version, tileWidth, tileHeight, files[], columns, tileCount, tilesPerFile
+- `atlas` — metadata: version, tileWidth, tileHeight, files[], columns, tileCount, tilesPerFile, oversizeTiles (map of bakedId → atlas position + source rect + render offsets)
 - `BakedMap` / `BakedPrefab` — interfaces for loaded data
 - `maps` — metadata for each map (name, dimensions, layerCount, dataFile path)
 - `prefabs` — metadata for each prefab (name, dimensions, anchor, layerCount, dataFile path)
