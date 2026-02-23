@@ -720,7 +720,11 @@ New CLI build script that extracts in-use tiles from source PNGs, packs them int
 | Tile dimension tracking | Done | TileRegistry stores `sourceWidth`/`sourceHeight` per entry from TilesetDef; `isOversized()`, `normalEntries()`, `oversizedEntries()` |
 | finalize() stable ordering | Done | `TileRegistry.finalize()` reassigns baked IDs so normal (16x16) tiles are contiguous 1..N, oversized tiles follow; returns old→new remap |
 | remapLayers() | Done | Applies finalize remap to already-filled Uint16Array layers; wired into `bake.ts` before atlas build |
+| computeAtlasLayout oversized slots | Done | Accepts `OversizeTileSlots[]`, adds slot counts to total, enforces minimum column width for widest oversized tile |
+| buildAtlas two-phase packing | Done | Phase 1: normal 16x16 tiles packed sequentially. Phase 2: oversized tiles packed in aligned blocks after normal rows. `copyTilePixels` with flip support. Returns `OversizeTileMeta[]` with atlas coords and render offsets |
+| generateIndex oversizeTiles metadata | Done | `generateIndex` accepts `OversizeTileMeta[]`, emits `oversizeTiles` record in atlas object keyed by bakedId with atlasX/Y, sourceWidth/Height, renderOffsetX/Y |
+| generateReadme oversized tiles section | Done | Documents `atlas.oversizeTiles` lookup, `getTileRect` with oversize fallback, bottom-center render offset usage |
 
 **Design doc:** `docs/plans/2026-02-21-bake-pipeline.md`
 
-Verification: `tsc --noEmit` clean, 286 tests passing.
+Verification: `tsc --noEmit` clean, 291 tests passing.
