@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "name": "slime",
+  "layers": [
+    [],
+    [
+      {
+        "x": 6,
+        "y": 5,
+        "tileId": 0,
+        "tilesetIndex": 9
+      }
+    ],
+    [],
+    [],
+    []
+  ],
+  "anchorX": 6,
+  "anchorY": 5
+}
