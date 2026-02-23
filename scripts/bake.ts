@@ -100,14 +100,14 @@ async function main() {
   for (const rp of resolvedPrefabs) remapLayers(rp.layers, remap);
 
   // 5. Build atlas
-  const atlas = await buildAtlas(registry, tilesetDefs, TILESETS_DIR);
+  const { buffers: atlasBuffers, layout: atlasLayout, oversizeTiles } = await buildAtlas(registry, tilesetDefs, TILESETS_DIR);
 
   // 6. Write output
   mkdirSync(join(OUTPUT_DIR, 'data', 'maps'), { recursive: true });
   mkdirSync(join(OUTPUT_DIR, 'data', 'prefabs'), { recursive: true });
 
-  for (let i = 0; i < atlas.buffers.length; i++) {
-    writeFileSync(join(OUTPUT_DIR, `tileset-${i}.png`), atlas.buffers[i]);
+  for (let i = 0; i < atlasBuffers.length; i++) {
+    writeFileSync(join(OUTPUT_DIR, `tileset-${i}.png`), atlasBuffers[i]);
   }
   for (const rm of resolvedMaps) {
     writeFileSync(join(OUTPUT_DIR, 'data', 'maps', `${rm.slug}.bin`), mapToBinary(rm));
@@ -116,14 +116,17 @@ async function main() {
     writeFileSync(join(OUTPUT_DIR, 'data', 'prefabs', `${rp.slug}.bin`), prefabToBinary(rp));
   }
 
-  const indexContent = generateIndex(resolvedMaps, resolvedPrefabs, atlas.layout, registry.size);
+  const indexContent = generateIndex(resolvedMaps, resolvedPrefabs, atlasLayout, registry.size);
   writeFileSync(join(OUTPUT_DIR, 'index.ts'), indexContent);
-  writeFileSync(join(OUTPUT_DIR, 'README.md'), generateReadme(atlas.layout, registry.size));
+  writeFileSync(join(OUTPUT_DIR, 'README.md'), generateReadme(atlasLayout, registry.size));
 
   console.log(`Bake complete! Output in ${OUTPUT_DIR}`);
-  console.log(`  Atlas: ${atlas.layout.fileCount} file(s), ${atlas.layout.pixelSize}x${atlas.layout.pixelSize}px`);
+  console.log(`  Atlas: ${atlasLayout.fileCount} file(s), ${atlasLayout.pixelSize}x${atlasLayout.pixelSize}px`);
   console.log(`  Maps: ${resolvedMaps.length}, Prefabs: ${resolvedPrefabs.length}`);
   console.log(`  Unique tiles: ${registry.size}`);
+  if (oversizeTiles.length > 0) {
+    console.log(`  Oversized tiles: ${oversizeTiles.length}`);
+  }
 }
 
 main().catch(err => {

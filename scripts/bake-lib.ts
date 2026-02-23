@@ -411,9 +411,46 @@ export function prefabToBinary(rp: ResolvedPrefab): Buffer {
 // Atlas building
 // ============================================================
 
+export interface OversizeTileMeta {
+  bakedId: number;
+  atlasX: number;
+  atlasY: number;
+  sourceWidth: number;
+  sourceHeight: number;
+  renderOffsetX: number;
+  renderOffsetY: number;
+}
+
 export interface AtlasResult {
   buffers: Buffer[];
   layout: AtlasLayout;
+  oversizeTiles: OversizeTileMeta[];
+}
+
+function copyTilePixels(
+  srcBuf: Buffer, srcStride: number,
+  srcPixelX: number, srcPixelY: number,
+  copyWidth: number, copyHeight: number,
+  destBuf: Buffer, destStride: number,
+  destPixelX: number, destPixelY: number,
+  flipH: boolean, flipV: boolean, flipD: boolean,
+): void {
+  for (let py = 0; py < copyHeight; py++) {
+    for (let px = 0; px < copyWidth; px++) {
+      let sx = px, sy = py;
+      if (flipD) [sx, sy] = [sy, sx];
+      if (flipH) sx = copyWidth - 1 - sx;
+      if (flipV) sy = copyHeight - 1 - sy;
+
+      const srcOff = ((srcPixelY + sy) * srcStride + (srcPixelX + sx)) * 4;
+      const destOff = ((destPixelY + py) * destStride + (destPixelX + px)) * 4;
+
+      destBuf[destOff]     = srcBuf[srcOff];
+      destBuf[destOff + 1] = srcBuf[srcOff + 1];
+      destBuf[destOff + 2] = srcBuf[srcOff + 2];
+      destBuf[destOff + 3] = srcBuf[srcOff + 3];
+    }
+  }
 }
 
 export async function buildAtlas(
@@ -421,82 +458,115 @@ export async function buildAtlas(
   tilesetDefs: TilesetDef[],
   tilesetsDir: string,
 ): Promise<AtlasResult> {
-  const layout = computeAtlasLayout(registry.size);
+  const normalEntries = registry.normalEntries();
+  const oversizedEntries = registry.oversizedEntries();
+
+  const oversizeSlots = oversizedEntries.map(e => ({
+    slotsWide: Math.ceil(e.sourceWidth / TILE_SIZE),
+    slotsTall: Math.ceil(e.sourceHeight / TILE_SIZE),
+  }));
+
+  const layout = computeAtlasLayout(normalEntries.length, oversizeSlots);
 
   if (layout.fileCount === 0) {
-    return { buffers: [], layout };
+    return { buffers: [], layout, oversizeTiles: [] };
   }
 
-  // Load source tileset raw buffers
+  if (layout.fileCount > 1) {
+    throw new Error('Multi-file atlas not yet supported for oversized tiles');
+  }
+
+  // Load source tileset raw RGBA buffers
   const tilesetBuffers: { buf: Buffer; width: number }[] = [];
   for (const def of tilesetDefs) {
     const imgPath = join(tilesetsDir, def.tilesetImage);
-    const { data, info } = await sharp(imgPath).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const { data, info } = await sharp(imgPath)
+      .ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     tilesetBuffers.push({ buf: data, width: info.width });
   }
 
-  const entries = registry.entries();
-  const atlasBuffers: Buffer[] = [];
+  const filePx = layout.pixelSize;
+  const fileCols = layout.columns;
+  const atlasRgba = Buffer.alloc(filePx * filePx * 4);
 
-  for (let fi = 0; fi < layout.fileCount; fi++) {
-    const startIdx = fi * layout.tilesPerFile;
-    const endIdx = Math.min(startIdx + layout.tilesPerFile, registry.size);
-    const tilesInThisFile = endIdx - startIdx;
+  // Phase 1: pack normal 16x16 tiles sequentially
+  for (let i = 0; i < normalEntries.length; i++) {
+    const entry = normalEntries[i];
+    const destCol = i % fileCols;
+    const destRow = Math.floor(i / fileCols);
 
-    // For the last file, use smallest power-of-2 that fits
-    let fileCols = layout.columns;
-    let filePx = layout.pixelSize;
-    if (fi === layout.fileCount - 1 && layout.fileCount > 1) {
-      fileCols = 1;
-      while (fileCols * fileCols < tilesInThisFile) fileCols *= 2;
-      filePx = Math.min(fileCols * TILE_SIZE, MAX_ATLAS_PX);
-      fileCols = filePx / TILE_SIZE;
-    }
+    const def = tilesetDefs[entry.tilesetIndex];
+    const src = tilesetBuffers[entry.tilesetIndex];
+    const srcCol = entry.tileId % def.columns;
+    const srcRow = Math.floor(entry.tileId / def.columns);
 
-    const atlasRgba = Buffer.alloc(filePx * filePx * 4);
-
-    for (let i = startIdx; i < endIdx; i++) {
-      const entry = entries[i];
-      const localIdx = i - startIdx;
-      const destCol = localIdx % fileCols;
-      const destRow = Math.floor(localIdx / fileCols);
-
-      const src = tilesetBuffers[entry.tilesetIndex];
-      const srcCols = Math.floor(src.width / TILE_SIZE);
-      const srcCol = entry.tileId % srcCols;
-      const srcRow = Math.floor(entry.tileId / srcCols);
-
-      for (let py = 0; py < TILE_SIZE; py++) {
-        for (let px = 0; px < TILE_SIZE; px++) {
-          let sx = px, sy = py;
-          if (entry.flipD) [sx, sy] = [sy, sx];
-          if (entry.flipH) sx = TILE_SIZE - 1 - sx;
-          if (entry.flipV) sy = TILE_SIZE - 1 - sy;
-
-          const srcX = srcCol * TILE_SIZE + sx;
-          const srcY = srcRow * TILE_SIZE + sy;
-          const srcOff = (srcY * src.width + srcX) * 4;
-
-          const destX = destCol * TILE_SIZE + px;
-          const destY = destRow * TILE_SIZE + py;
-          const destOff = (destY * filePx + destX) * 4;
-
-          atlasRgba[destOff] = src.buf[srcOff];
-          atlasRgba[destOff + 1] = src.buf[srcOff + 1];
-          atlasRgba[destOff + 2] = src.buf[srcOff + 2];
-          atlasRgba[destOff + 3] = src.buf[srcOff + 3];
-        }
-      }
-    }
-
-    const pngBuf = await sharp(atlasRgba, {
-      raw: { width: filePx, height: filePx, channels: 4 },
-    }).png().toBuffer();
-
-    atlasBuffers.push(pngBuf);
+    copyTilePixels(
+      src.buf, src.width,
+      srcCol * def.tileWidth, srcRow * def.tileHeight,
+      TILE_SIZE, TILE_SIZE,
+      atlasRgba, filePx,
+      destCol * TILE_SIZE, destRow * TILE_SIZE,
+      entry.flipH, entry.flipV, entry.flipD,
+    );
   }
 
-  return { buffers: atlasBuffers, layout };
+  // Phase 2: pack oversized tiles in aligned blocks after normal rows
+  const normalRows = normalEntries.length > 0
+    ? Math.ceil(normalEntries.length / fileCols)
+    : 0;
+  let curRow = normalRows;
+  let curCol = 0;
+  let rowMaxSlotsTall = 0;
+
+  const oversizeMeta: OversizeTileMeta[] = [];
+
+  for (let i = 0; i < oversizedEntries.length; i++) {
+    const entry = oversizedEntries[i];
+    const slotsW = oversizeSlots[i].slotsWide;
+    const slotsH = oversizeSlots[i].slotsTall;
+
+    if (curCol + slotsW > fileCols) {
+      curRow += rowMaxSlotsTall;
+      curCol = 0;
+      rowMaxSlotsTall = 0;
+    }
+
+    const destPixelX = curCol * TILE_SIZE;
+    const destPixelY = curRow * TILE_SIZE;
+
+    const def = tilesetDefs[entry.tilesetIndex];
+    const src = tilesetBuffers[entry.tilesetIndex];
+    const srcCol = entry.tileId % def.columns;
+    const srcRow = Math.floor(entry.tileId / def.columns);
+
+    copyTilePixels(
+      src.buf, src.width,
+      srcCol * def.tileWidth, srcRow * def.tileHeight,
+      entry.sourceWidth, entry.sourceHeight,
+      atlasRgba, filePx,
+      destPixelX, destPixelY,
+      entry.flipH, entry.flipV, entry.flipD,
+    );
+
+    oversizeMeta.push({
+      bakedId: entry.bakedId,
+      atlasX: destPixelX,
+      atlasY: destPixelY,
+      sourceWidth: entry.sourceWidth,
+      sourceHeight: entry.sourceHeight,
+      renderOffsetX: -Math.floor((entry.sourceWidth - TILE_SIZE) / 2),
+      renderOffsetY: -(entry.sourceHeight - TILE_SIZE),
+    });
+
+    curCol += slotsW;
+    rowMaxSlotsTall = Math.max(rowMaxSlotsTall, slotsH);
+  }
+
+  const pngBuf = await sharp(atlasRgba, {
+    raw: { width: filePx, height: filePx, channels: 4 },
+  }).png().toBuffer();
+
+  return { buffers: [pngBuf], layout, oversizeTiles: oversizeMeta };
 }
 
 // ============================================================
