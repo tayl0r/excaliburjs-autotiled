@@ -136,6 +136,11 @@ export function sanitizeSlug(name: string): string {
 // Atlas sizing
 // ============================================================
 
+export interface OversizeTileSlots {
+  slotsWide: number;
+  slotsTall: number;
+}
+
 export interface AtlasLayout {
   /** Pixels per side for each atlas file */
   pixelSize: number;
@@ -148,18 +153,29 @@ export interface AtlasLayout {
 }
 
 /** Compute the smallest power-of-2 square atlas layout for N tiles. */
-export function computeAtlasLayout(tileCount: number): AtlasLayout {
-  if (tileCount === 0) {
+export function computeAtlasLayout(
+  normalTileCount: number,
+  oversizeTiles: OversizeTileSlots[] = [],
+): AtlasLayout {
+  const oversizeSlotCount = oversizeTiles.reduce(
+    (sum, t) => sum + t.slotsWide * t.slotsTall, 0,
+  );
+  const totalSlots = normalTileCount + oversizeSlotCount;
+
+  if (totalSlots === 0) {
     return { pixelSize: TILE_SIZE, columns: 1, tilesPerFile: 1, fileCount: 0 };
   }
 
   const maxCols = MAX_ATLAS_PX / TILE_SIZE; // 128
   const maxPerFile = maxCols * maxCols;      // 16384
 
-  if (tileCount <= maxPerFile) {
+  if (totalSlots <= maxPerFile) {
     // Single file — find smallest power-of-2 columns that fits
     let cols = 1;
-    while (cols * cols < tileCount) cols *= 2;
+    while (cols * cols < totalSlots) cols *= 2;
+    // Ensure columns are wide enough for the widest oversized tile
+    const minCols = oversizeTiles.reduce((max, t) => Math.max(max, t.slotsWide), 0);
+    while (cols < minCols) cols *= 2;
     return {
       pixelSize: cols * TILE_SIZE,
       columns: cols,
@@ -173,7 +189,7 @@ export function computeAtlasLayout(tileCount: number): AtlasLayout {
     pixelSize: MAX_ATLAS_PX,
     columns: maxCols,
     tilesPerFile: maxPerFile,
-    fileCount: Math.ceil(tileCount / maxPerFile),
+    fileCount: Math.ceil(totalSlots / maxPerFile),
   };
 }
 

@@ -259,6 +259,25 @@ describe('computeAtlasLayout', () => {
     expect(layout.fileCount).toBe(2);
     expect(layout.pixelSize).toBe(MAX_ATLAS_PX);
   });
+
+  it('accounts for oversized tile slots', () => {
+    // 10 normal + 1 oversized 4x4 (16 slots) = 26 total
+    const layout = computeAtlasLayout(10, [{ slotsWide: 4, slotsTall: 4 }]);
+    expect(layout.columns).toBeGreaterThanOrEqual(4); // must fit 4-wide block
+    expect(layout.columns * layout.columns).toBeGreaterThanOrEqual(26);
+    expect(layout.fileCount).toBe(1);
+  });
+
+  it('handles only oversized tiles (no normal)', () => {
+    const layout = computeAtlasLayout(0, [{ slotsWide: 4, slotsTall: 4 }]);
+    expect(layout.columns).toBeGreaterThanOrEqual(4);
+    expect(layout.fileCount).toBe(1);
+  });
+
+  it('enforces minimum columns for widest oversized tile', () => {
+    const layout = computeAtlasLayout(1, [{ slotsWide: 8, slotsTall: 2 }]);
+    expect(layout.columns).toBeGreaterThanOrEqual(8);
+  });
 });
 
 // ============================================================
