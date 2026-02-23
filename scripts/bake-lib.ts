@@ -34,17 +34,25 @@ export interface TileEntry {
   flipH: boolean;
   flipV: boolean;
   flipD: boolean;
+  sourceWidth: number;
+  sourceHeight: number;
 }
 
 export class TileRegistry {
   private map = new Map<string, TileEntry>();
   private nextId = 1; // 0 reserved for empty
+  private tilesetDefs: TilesetDef[];
+
+  constructor(tilesetDefs: TilesetDef[] = []) {
+    this.tilesetDefs = tilesetDefs;
+  }
 
   register(cell: Cell): number {
     if (isCellEmpty(cell)) return 0;
     const key = cellSpriteKey(cell);
     let entry = this.map.get(key);
     if (!entry) {
+      const def = this.tilesetDefs[cell.tilesetIndex];
       entry = {
         bakedId: this.nextId++,
         tilesetIndex: cell.tilesetIndex,
@@ -52,10 +60,24 @@ export class TileRegistry {
         flipH: cell.flipH,
         flipV: cell.flipV,
         flipD: cell.flipD,
+        sourceWidth: def?.tileWidth ?? TILE_SIZE,
+        sourceHeight: def?.tileHeight ?? TILE_SIZE,
       };
       this.map.set(key, entry);
     }
     return entry.bakedId;
+  }
+
+  isOversized(entry: TileEntry): boolean {
+    return entry.sourceWidth > TILE_SIZE || entry.sourceHeight > TILE_SIZE;
+  }
+
+  normalEntries(): TileEntry[] {
+    return this.entries().filter(e => !this.isOversized(e));
+  }
+
+  oversizedEntries(): TileEntry[] {
+    return this.entries().filter(e => this.isOversized(e));
   }
 
   get size(): number { return this.map.size; }

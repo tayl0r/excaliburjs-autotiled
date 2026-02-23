@@ -59,7 +59,7 @@ async function main() {
   console.log(`Loaded ${maps.length} map(s), ${prefabs.length} prefab(s)`);
 
   // 3. Resolve tiles
-  const registry = new TileRegistry();
+  const registry = new TileRegistry(tilesetDefs);
 
   const resolvedMaps = maps.map(savedMap => {
     const ws = wangSets.find(w => w.name === savedMap.wangSetName);

@@ -11,6 +11,7 @@ import {
 import { createCell, EMPTY_CELL } from '@core/cell.js';
 import type { SavedPrefab, PrefabTile } from '@core/prefab-schema.js';
 import type { PlacedPrefab } from '@core/map-schema.js';
+import type { TilesetDef } from '@core/metadata-schema.js';
 
 // ============================================================
 // sanitizeSlug
@@ -51,6 +52,16 @@ describe('sanitizeSlug', () => {
 // ============================================================
 // TileRegistry
 // ============================================================
+
+function makeTilesetDefs(...sizes: [number, number][]): TilesetDef[] {
+  return sizes.map(([w, h]) => ({
+    tilesetImage: 'test.png',
+    tileWidth: w,
+    tileHeight: h,
+    columns: 10,
+    tileCount: 100,
+  }));
+}
 
 describe('TileRegistry', () => {
   let registry: TileRegistry;
@@ -108,6 +119,46 @@ describe('TileRegistry', () => {
     expect(entries).toHaveLength(2);
     expect(entries[0].bakedId).toBe(1);
     expect(entries[1].bakedId).toBe(2);
+  });
+
+  it('tracks source dimensions from tileset metadata', () => {
+    const defs = makeTilesetDefs([16, 16], [60, 64]);
+    const registry = new TileRegistry(defs);
+    registry.register(createCell(0, false, false, false, 0));
+    registry.register(createCell(0, false, false, false, 1));
+    const entries = registry.entries();
+    expect(entries[0].sourceWidth).toBe(16);
+    expect(entries[0].sourceHeight).toBe(16);
+    expect(entries[1].sourceWidth).toBe(60);
+    expect(entries[1].sourceHeight).toBe(64);
+  });
+
+  it('defaults to TILE_SIZE when no tileset defs provided', () => {
+    const registry = new TileRegistry();
+    registry.register(createCell(0, false, false, false, 0));
+    const entries = registry.entries();
+    expect(entries[0].sourceWidth).toBe(TILE_SIZE);
+    expect(entries[0].sourceHeight).toBe(TILE_SIZE);
+  });
+
+  it('reports oversized tiles', () => {
+    const defs = makeTilesetDefs([16, 16], [60, 64]);
+    const registry = new TileRegistry(defs);
+    registry.register(createCell(0, false, false, false, 0));
+    registry.register(createCell(0, false, false, false, 1));
+    const entries = registry.entries();
+    expect(registry.isOversized(entries[0])).toBe(false);
+    expect(registry.isOversized(entries[1])).toBe(true);
+  });
+
+  it('separates normal and oversized entries', () => {
+    const defs = makeTilesetDefs([16, 16], [60, 64]);
+    const registry = new TileRegistry(defs);
+    registry.register(createCell(0, false, false, false, 0));
+    registry.register(createCell(5, false, false, false, 0));
+    registry.register(createCell(0, false, false, false, 1));
+    expect(registry.normalEntries()).toHaveLength(2);
+    expect(registry.oversizedEntries()).toHaveLength(1);
   });
 });
 
