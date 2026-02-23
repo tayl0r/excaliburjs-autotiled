@@ -172,6 +172,12 @@ export class TilesetViewerPanel {
 
     drawGridLines(this.ctx, columns, rows, tw, th, 'rgba(255,255,255,0.1)');
 
+    // Draw badge on animated tiles
+    this.drawAnimatedTileBadges(tw, th);
+
+    // Draw animation frame highlights
+    this.drawAnimationFrameHighlights(tw, th);
+
     // Hover highlight
     if (this.hoveredTileId >= 0) {
       const [hc, hr] = colRowFromTileId(this.hoveredTileId, columns);
@@ -190,5 +196,64 @@ export class TilesetViewerPanel {
         this.ctx.strokeRect(sc * tw + 1, sr * th + 1, tw - 2, th - 2);
       }
     }
+  }
+
+  private drawAnimatedTileBadges(tw: number, th: number): void {
+    const { columns } = this.state;
+    const tsi = this.state.activeTilesetIndex;
+
+    for (const ws of this.state.metadata.wangsets) {
+      for (const wt of ws.wangtiles) {
+        if (!wt.animation) continue;
+        if ((wt.tileset ?? 0) !== tsi) continue;
+
+        const [col, row] = colRowFromTileId(wt.tileid, columns);
+        const x = col * tw + tw - 14;
+        const y = row * th + 2;
+
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(x, y, 12, 12);
+        this.ctx.fillStyle = '#0f0';
+        this.ctx.font = 'bold 9px monospace';
+        this.ctx.textBaseline = 'top';
+        this.ctx.fillText('A', x + 2, y + 2);
+      }
+    }
+  }
+
+  private drawAnimationFrameHighlights(tw: number, th: number): void {
+    const { columns } = this.state;
+    const tsi = this.state.activeTilesetIndex;
+    const selectedIds = this.state.selectedTileIds;
+    if (selectedIds.length === 0) return;
+
+    const frameTileIds = new Set<number>();
+
+    for (const selId of selectedIds) {
+      for (const ws of this.state.metadata.wangsets) {
+        const wt = ws.wangtiles.find(
+          w => w.tileid === selId && (w.tileset ?? 0) === tsi,
+        );
+        if (!wt?.animation) continue;
+        for (const frame of wt.animation.frames) {
+          if (frame.tileId < 0) continue;
+          if (frame.tileset !== tsi) continue;
+          frameTileIds.add(frame.tileId);
+        }
+      }
+    }
+
+    if (frameTileIds.size === 0) return;
+
+    this.ctx.setLineDash([4, 3]);
+    this.ctx.strokeStyle = '#0f0';
+    this.ctx.lineWidth = 2;
+
+    for (const fid of frameTileIds) {
+      const [col, row] = colRowFromTileId(fid, columns);
+      this.ctx.strokeRect(col * tw + 1, row * th + 1, tw - 2, th - 2);
+    }
+
+    this.ctx.setLineDash([]);
   }
 }

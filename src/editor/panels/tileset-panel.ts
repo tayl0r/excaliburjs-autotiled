@@ -300,6 +300,9 @@ export class TilesetPanel {
     // Draw badge on animated tiles
     this.drawAnimatedTileBadges(tw, th);
 
+    // Draw animation frame highlights for selected tile
+    this.drawAnimationFrameHighlights(tw, th);
+
     // Draw hover highlight
     if (this.hoveredTileId >= 0) {
       const [hc, hr] = colRowFromTileId(this.hoveredTileId, columns);
@@ -390,6 +393,36 @@ export class TilesetPanel {
       this.ctx.textBaseline = 'top';
       this.ctx.fillText('A', x + 2, y + 2);
     }
+  }
+
+  private drawAnimationFrameHighlights(tw: number, th: number): void {
+    const { columns } = this.state;
+    const tsi = this.state.activeTilesetIndex;
+
+    const frameTileIds = new Set<number>();
+
+    for (const selId of this.state.selectedTileIds) {
+      const wt = this.state.getWangTile(selId);
+      if (!wt?.animation) continue;
+      for (const frame of wt.animation.frames) {
+        if (frame.tileId < 0) continue;
+        if (frame.tileset !== tsi) continue;
+        frameTileIds.add(frame.tileId);
+      }
+    }
+
+    if (frameTileIds.size === 0) return;
+
+    this.ctx.setLineDash([4, 3]);
+    this.ctx.strokeStyle = '#0f0';
+    this.ctx.lineWidth = 2;
+
+    for (const fid of frameTileIds) {
+      const [col, row] = colRowFromTileId(fid, columns);
+      this.ctx.strokeRect(col * tw + 1, row * th + 1, tw - 2, th - 2);
+    }
+
+    this.ctx.setLineDash([]);
   }
 
   destroy(): void {

@@ -31,6 +31,7 @@ import {
   resolveMap,
   resolvePrefab,
   remapLayers,
+  registerAnimationFrames,
   mapToBinary,
   prefabToBinary,
   buildAtlas,
@@ -72,6 +73,11 @@ async function main() {
   }).filter((m): m is NonNullable<typeof m> => m !== null);
 
   const resolvedPrefabs = prefabs.map(p => resolvePrefab(p, registry));
+
+  const animFrames = registerAnimationFrames(metadataJson, registry);
+  if (animFrames > 0) {
+    console.log(`Registered ${animFrames} animation frame tile(s)`);
+  }
 
   console.log(`Collected ${registry.size} unique tile(s)`);
   if (registry.size > 65535) {
@@ -116,7 +122,7 @@ async function main() {
     writeFileSync(join(OUTPUT_DIR, 'data', 'prefabs', `${rp.slug}.bin`), prefabToBinary(rp));
   }
 
-  const indexContent = generateIndex(resolvedMaps, resolvedPrefabs, atlasLayout, registry.size, oversizeTiles);
+  const indexContent = generateIndex(resolvedMaps, resolvedPrefabs, atlasLayout, registry.size, oversizeTiles, metadataJson, registry);
   writeFileSync(join(OUTPUT_DIR, 'index.ts'), indexContent);
   writeFileSync(join(OUTPUT_DIR, 'README.md'), generateReadme(atlasLayout, registry.size));
 

@@ -201,6 +201,10 @@ Values are 1-indexed color IDs (matching position in the `colors[]` array + 1). 
 
 For `type: "corner"`, only odd indices (1, 3, 5, 7) are used. For `type: "edge"`, only even indices (0, 2, 4, 6). For `type: "mixed"`, all 8.
 
+### Animation-Only Stubs
+
+Tiles that need animations but have no terrain tagging (e.g., monster sprites) are stored as WangTile entries with an all-zero `wangid` (`[0,0,0,0,0,0,0,0]`) and an `animation` property. These "stubs" are auto-created when the user checks "Is animated?" on an untagged tile in the editor, and auto-removed when the animation is cleared. The save sanitizer preserves these entries despite the all-zero wangid because they carry animation data.
+
 ## Saved Maps (`assets/maps/<name>.json`)
 
 Maps store **only terrain colors**, not tile IDs. When a map is loaded, the autotile engine recomputes which specific tiles to use based on the current WangSet definitions. This means saved maps automatically pick up tileset changes.
@@ -462,6 +466,7 @@ Generated TypeScript module with:
 - `BakedMap` / `BakedPrefab` — interfaces for loaded data
 - `maps` — metadata for each map (name, dimensions, layerCount, dataFile path)
 - `prefabs` — metadata for each prefab (name, dimensions, anchor, layerCount, dataFile path)
+- `animations` — animation metadata keyed by base baked tile ID, with `frameDuration` (ms), `pattern` ("loop" | "ping-pong"), and `frames` (array of baked IDs for each animation frame). Only emitted when animated tiles exist.
 - `loadMap(meta, baseUrl)` — fetch + parse binary into typed `BakedMap`
 - `loadPrefab(meta, baseUrl)` — fetch + parse binary into typed `BakedPrefab`
 

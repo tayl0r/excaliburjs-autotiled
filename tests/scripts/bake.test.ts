@@ -6,6 +6,7 @@ import {
   resolvePrefab,
   stampPrefab,
   remapLayers,
+  registerAnimationFrames,
   generateIndex,
   TILE_SIZE,
   MAX_ATLAS_PX,
@@ -14,7 +15,7 @@ import type { OversizeTileMeta, AtlasLayout } from '../../scripts/bake-lib.js';
 import { createCell, EMPTY_CELL } from '@core/cell.js';
 import type { SavedPrefab, PrefabTile } from '@core/prefab-schema.js';
 import type { PlacedPrefab } from '@core/map-schema.js';
-import type { TilesetDef } from '@core/metadata-schema.js';
+import type { TilesetDef, ProjectMetadata } from '@core/metadata-schema.js';
 
 // ============================================================
 // sanitizeSlug
@@ -445,5 +446,133 @@ describe('generateIndex', () => {
   it('emits empty oversizeTiles when none present', () => {
     const output = generateIndex([], [], baseLayout, 10, []);
     expect(output).toContain('oversizeTiles: {}');
+  });
+
+  it('emits animations block when metadata and registry provided', () => {
+    const metadata: ProjectMetadata = {
+      tilesets: [{ tilesetImage: 'test.png', tileWidth: 16, tileHeight: 16, columns: 10, tileCount: 100 }],
+      wangsets: [{
+        name: 'test',
+        type: 'corner',
+        colors: [{ name: 'a', color: '#ff0000', probability: 1 }],
+        wangtiles: [{
+          tileid: 5,
+          wangid: [0, 1, 0, 1, 0, 1, 0, 1],
+          animation: {
+            frameDuration: 200,
+            pattern: 'loop',
+            frames: [
+              { tileId: 5, tileset: 0 },
+              { tileId: 6, tileset: 0 },
+              { tileId: 7, tileset: 0 },
+            ],
+          },
+        }],
+      }],
+    };
+
+    const registry = new TileRegistry();
+    // Register base tile and frame tiles
+    registry.register(createCell(5, false, false, false, 0));
+    registry.register(createCell(6, false, false, false, 0));
+    registry.register(createCell(7, false, false, false, 0));
+
+    const output = generateIndex([], [], baseLayout, 3, [], metadata, registry);
+    expect(output).toContain('export const animations = {');
+    // base tile 5 has bakedId 1
+    expect(output).toContain('1: { frameDuration: 200,');
+    expect(output).toContain('pattern: "loop"');
+    expect(output).toContain('frames: [1, 2, 3]');
+  });
+});
+
+// ============================================================
+// TileRegistry.getBakedId
+// ============================================================
+
+describe('TileRegistry.getBakedId', () => {
+  it('returns correct baked ID for registered tile', () => {
+    const registry = new TileRegistry();
+    registry.register(createCell(10, false, false, false, 0));
+    registry.register(createCell(20, false, false, false, 1));
+    expect(registry.getBakedId(0, 10)).toBe(1);
+    expect(registry.getBakedId(1, 20)).toBe(2);
+  });
+
+  it('returns 0 for unregistered tile', () => {
+    const registry = new TileRegistry();
+    expect(registry.getBakedId(0, 99)).toBe(0);
+  });
+
+  it('returns 0 for flipped variant when only unflipped exists', () => {
+    const registry = new TileRegistry();
+    registry.register(createCell(10, true, false, false, 0)); // flipH
+    // getBakedId looks up unflipped key
+    expect(registry.getBakedId(0, 10)).toBe(0);
+  });
+});
+
+// ============================================================
+// registerAnimationFrames
+// ============================================================
+
+describe('registerAnimationFrames', () => {
+  function makeMetadata(frames: { tileId: number; tileset: number }[]): ProjectMetadata {
+    return {
+      tilesets: [{ tilesetImage: 'test.png', tileWidth: 16, tileHeight: 16, columns: 10, tileCount: 100 }],
+      wangsets: [{
+        name: 'test',
+        type: 'corner',
+        colors: [{ name: 'a', color: '#ff0000', probability: 1 }],
+        wangtiles: [{
+          tileid: 0,
+          wangid: [0, 1, 0, 1, 0, 1, 0, 1],
+          animation: {
+            frameDuration: 200,
+            pattern: 'loop',
+            frames,
+          },
+        }],
+      }],
+    };
+  }
+
+  it('registers frame tiles in registry', () => {
+    const metadata = makeMetadata([
+      { tileId: 1, tileset: 0 },
+      { tileId: 2, tileset: 0 },
+      { tileId: 3, tileset: 0 },
+    ]);
+    const registry = new TileRegistry();
+    const count = registerAnimationFrames(metadata, registry);
+    expect(count).toBe(3);
+    expect(registry.size).toBe(3);
+  });
+
+  it('skips frames with tileId -1', () => {
+    const metadata = makeMetadata([
+      { tileId: 1, tileset: 0 },
+      { tileId: -1, tileset: 0 },
+      { tileId: 3, tileset: 0 },
+    ]);
+    const registry = new TileRegistry();
+    const count = registerAnimationFrames(metadata, registry);
+    expect(count).toBe(2);
+    expect(registry.size).toBe(2);
+  });
+
+  it('deduplicates when frame tile already registered', () => {
+    const metadata = makeMetadata([
+      { tileId: 1, tileset: 0 },
+      { tileId: 2, tileset: 0 },
+    ]);
+    const registry = new TileRegistry();
+    // Pre-register tile 1
+    registry.register(createCell(1, false, false, false, 0));
+    expect(registry.size).toBe(1);
+
+    const count = registerAnimationFrames(metadata, registry);
+    expect(count).toBe(2); // count includes the attempt, even if deduplicated
+    expect(registry.size).toBe(2); // only tile 2 is new
   });
 });

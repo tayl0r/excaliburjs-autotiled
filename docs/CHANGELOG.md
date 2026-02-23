@@ -748,3 +748,37 @@ Added support for baking non-16×16 tiles (e.g., 60×64 monster sprites). Oversi
 **Design doc:** `docs/plans/2026-02-23-oversized-tile-bake-design.md`
 
 Verification: `tsc --noEmit` clean, 291 tests passing.
+
+---
+
+## 2026-02-23: Animation-Only Stubs for Non-WangTile Tiles
+
+Allow animations on tiles that don't have WangId data (e.g., monster sprites). When "Is animated?" is checked on an untagged tile, a stub WangTile entry with an all-zero WangId is auto-created. Clearing the animation removes the stub.
+
+| Change | Files |
+|--------|-------|
+| Inspector panel shows animation section for all selected tiles, not just WangTiles | `src/editor/panels/inspector-panel.ts` |
+| `setTileAnimation` creates stub WangTile for untagged tiles; removes stub when animation cleared and wangid is all zeros | `src/editor/editor-state.ts` |
+| `setTileAnimationMulti` creates stubs for multiple untagged tiles; cleans up stubs on clear | `src/editor/editor-state.ts` |
+| `pasteTileAnimation` creates stubs for untagged paste targets | `src/editor/editor-state.ts` |
+| Save sanitizer preserves WangTiles that have animation data even if wangid is all zeros | `vite.config.ts` |
+| 9 new tests for stub creation, cleanup, undo, multi-tile, paste | `tests/editor/editor-state.test.ts` |
+
+Verification: `tsc --noEmit` clean, 300 tests passing.
+
+---
+
+## 2026-02-23: Animation Badges, Frame Highlights, and Bake Animation Frames
+
+Three related improvements to animation visibility and bake pipeline completeness.
+
+| Change | Files |
+|--------|-------|
+| Prefab tileset viewer: green "A" badge on animated tiles | `src/prefab/tileset-viewer.ts` |
+| Animation frame highlights: green dashed borders on frame tiles when an animated tile is selected (both editors) | `src/editor/panels/tileset-panel.ts`, `src/prefab/tileset-viewer.ts` |
+| Bake pipeline: `registerAnimationFrames()` registers all animation frame tiles in TileRegistry | `scripts/bake-lib.ts`, `scripts/bake.ts` |
+| Bake pipeline: `TileRegistry.getBakedId()` convenience method for unflipped tile lookup | `scripts/bake-lib.ts` |
+| Bake pipeline: `generateIndex()` emits `animations` export keyed by base baked ID with frameDuration, pattern, and frame baked IDs | `scripts/bake-lib.ts`, `scripts/bake.ts` |
+| 11 new tests for registerAnimationFrames, getBakedId, generateIndex animations | `tests/scripts/bake.test.ts` |
+
+Verification: `tsc --noEmit` clean, 307 tests passing.
