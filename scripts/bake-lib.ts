@@ -80,8 +80,33 @@ export class TileRegistry {
     return this.entries().filter(e => this.isOversized(e));
   }
 
+  /**
+   * Reassign baked IDs so all normal (16x16) tiles come first (1..N),
+   * followed by oversized tiles (N+1..). Returns old→new remap.
+   */
+  finalize(): Map<number, number> {
+    const normal = [...this.map.values()].filter(e => !this.isOversized(e));
+    const oversize = [...this.map.values()].filter(e => this.isOversized(e));
+    const remap = new Map<number, number>();
+    let id = 1;
+    for (const e of normal) { remap.set(e.bakedId, id); e.bakedId = id++; }
+    for (const e of oversize) { remap.set(e.bakedId, id); e.bakedId = id++; }
+    return remap;
+  }
+
   get size(): number { return this.map.size; }
   entries(): TileEntry[] { return [...this.map.values()]; }
+}
+
+/** Apply a baked-ID remap to already-filled layers. */
+export function remapLayers(layers: Uint16Array[], remap: Map<number, number>): void {
+  for (const layer of layers) {
+    for (let i = 0; i < layer.length; i++) {
+      if (layer[i] !== 0) {
+        layer[i] = remap.get(layer[i]) ?? layer[i];
+      }
+    }
+  }
 }
 
 // ============================================================

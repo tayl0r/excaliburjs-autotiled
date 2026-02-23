@@ -5,6 +5,7 @@ import {
   computeAtlasLayout,
   resolvePrefab,
   stampPrefab,
+  remapLayers,
   TILE_SIZE,
   MAX_ATLAS_PX,
 } from '../../scripts/bake-lib.js';
@@ -159,6 +160,50 @@ describe('TileRegistry', () => {
     registry.register(createCell(0, false, false, false, 1));
     expect(registry.normalEntries()).toHaveLength(2);
     expect(registry.oversizedEntries()).toHaveLength(1);
+  });
+
+  it('finalize() remaps IDs so normal tiles come first', () => {
+    const defs = makeTilesetDefs([60, 64], [16, 16]);
+    const registry = new TileRegistry(defs);
+    registry.register(createCell(0, false, false, false, 0)); // oversized → id 1
+    registry.register(createCell(0, false, false, false, 1)); // normal → id 2
+
+    const remap = registry.finalize();
+    expect(remap.get(1)).toBe(2); // oversized moved from 1 → 2
+    expect(remap.get(2)).toBe(1); // normal moved from 2 → 1
+    expect(registry.normalEntries()[0].bakedId).toBe(1);
+    expect(registry.oversizedEntries()[0].bakedId).toBe(2);
+  });
+
+  it('finalize() is identity when normal tiles already come first', () => {
+    const defs = makeTilesetDefs([16, 16], [60, 64]);
+    const registry = new TileRegistry(defs);
+    registry.register(createCell(0, false, false, false, 0)); // normal → id 1
+    registry.register(createCell(0, false, false, false, 1)); // oversized → id 2
+
+    const remap = registry.finalize();
+    expect(remap.get(1)).toBe(1);
+    expect(remap.get(2)).toBe(2);
+  });
+});
+
+// ============================================================
+// remapLayers
+// ============================================================
+
+describe('remapLayers', () => {
+  it('applies remap to all non-zero values in layers', () => {
+    const layer = new Uint16Array([0, 1, 2, 3, 0, 2]);
+    const remap = new Map([[1, 3], [2, 1], [3, 2]]);
+    remapLayers([layer], remap);
+    expect([...layer]).toEqual([0, 3, 1, 2, 0, 1]);
+  });
+
+  it('leaves unmapped values unchanged', () => {
+    const layer = new Uint16Array([0, 5, 10]);
+    const remap = new Map([[5, 8]]);
+    remapLayers([layer], remap);
+    expect([...layer]).toEqual([0, 8, 10]);
   });
 });
 

@@ -30,6 +30,7 @@ import {
   initializeProject,
   resolveMap,
   resolvePrefab,
+  remapLayers,
   mapToBinary,
   prefabToBinary,
   buildAtlas,
@@ -93,10 +94,15 @@ async function main() {
     prefabSlugs.set(rp.slug, rp.name);
   }
 
-  // 4. Build atlas
+  // 4. Finalize tile ordering (normal tiles first, then oversized)
+  const remap = registry.finalize();
+  for (const rm of resolvedMaps) remapLayers(rm.layers, remap);
+  for (const rp of resolvedPrefabs) remapLayers(rp.layers, remap);
+
+  // 5. Build atlas
   const atlas = await buildAtlas(registry, tilesetDefs, TILESETS_DIR);
 
-  // 5. Write output
+  // 6. Write output
   mkdirSync(join(OUTPUT_DIR, 'data', 'maps'), { recursive: true });
   mkdirSync(join(OUTPUT_DIR, 'data', 'prefabs'), { recursive: true });
 

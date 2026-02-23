@@ -717,7 +717,10 @@ New CLI build script that extracts in-use tiles from source PNGs, packs them int
 | npm script | Done | `npm run bake` via tsx |
 | Unit tests (26) | Done | sanitizeSlug, TileRegistry, computeAtlasLayout, resolvePrefab, stampPrefab |
 | Integration tests (7) | Done | Full pipeline on real assets, atlas validation, binary sizes, tile ID ranges, TypeScript validity, determinism |
+| Tile dimension tracking | Done | TileRegistry stores `sourceWidth`/`sourceHeight` per entry from TilesetDef; `isOversized()`, `normalEntries()`, `oversizedEntries()` |
+| finalize() stable ordering | Done | `TileRegistry.finalize()` reassigns baked IDs so normal (16x16) tiles are contiguous 1..N, oversized tiles follow; returns old→new remap |
+| remapLayers() | Done | Applies finalize remap to already-filled Uint16Array layers; wired into `bake.ts` before atlas build |
 
 **Design doc:** `docs/plans/2026-02-21-bake-pipeline.md`
 
-Verification: `tsc --noEmit` clean, 278 tests passing.
+Verification: `tsc --noEmit` clean, 286 tests passing.
